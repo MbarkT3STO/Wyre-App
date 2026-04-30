@@ -66,6 +66,8 @@
   --sidebar-width:     220px;
   --sidebar-collapsed: 58px;
   --titlebar-height:   44px;
+  --topnav-height:     44px;
+  --topnav-offset:     64px;   /* top spacing so content clears the floating nav */
   --content-max-w:     960px;
 }
 
