@@ -182,7 +182,7 @@ export class SettingsView extends Component {
           <div class="sg__icon sg__icon--purple">${ICONS.appearance}</div>
           <div class="sg__meta">
             <div class="sg__title">Appearance</div>
-            <div class="sg__desc">Customize the look and feel of FileDrop</div>
+            <div class="sg__desc">Customize the look and feel of Wyre</div>
           </div>
         </div>
         <div class="sg__body">

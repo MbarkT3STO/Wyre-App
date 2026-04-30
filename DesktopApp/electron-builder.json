@@ -1,7 +1,7 @@
 {
-  "productName": "FileDrop",
-  "appId": "com.filedrop.app",
-  "copyright": "Copyright © 2024 FileDrop",
+  "productName": "Wyre",
+  "appId": "com.wyre.app",
+  "copyright": "Copyright © 2024 Wyre",
   "directories": {
     "output": "release",
     "buildResources": "assets"
@@ -47,7 +47,7 @@
     "category": "Utility"
   },
   "dmg": {
-    "title": "FileDrop",
+    "title": "Wyre",
     "contents": [
       { "x": 130, "y": 220 },
       { "x": 410, "y": 220, "type": "link", "path": "/Applications" }

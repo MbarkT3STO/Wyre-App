@@ -1,5 +1,5 @@
 {
-  "name": "filedrop",
+  "name": "wyre",
   "version": "1.0.0",
   "description": "Seamless peer-to-peer file transfer for local networks",
   "main": "dist/main/index.js",
@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "keywords": ["electron", "file-transfer", "p2p", "local-network"],
-  "author": "FileDrop",
+  "author": "Wyre",
   "license": "MIT",
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.0.0",

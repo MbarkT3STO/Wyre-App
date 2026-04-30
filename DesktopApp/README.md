@@ -1,8 +1,8 @@
-# FileDrop
+# Wyre
 
 Seamless peer-to-peer file transfer between devices on the same local network. No internet required, no accounts, no cloud — just fast, direct transfers.
 
-![FileDrop Screenshot](assets/icons/screenshot-placeholder.png)
+![Wyre Screenshot](assets/icons/screenshot-placeholder.png)
 
 ## Features
 
@@ -20,7 +20,7 @@ Seamless peer-to-peer file transfer between devices on the same local network. N
 ## Architecture
 
 ```
-filedrop/
+wyre/
 ├── src/
 │   ├── main/                    # Electron main process (Node.js)
 │   │   ├── app/                 # App lifecycle, window management
@@ -79,7 +79,7 @@ filedrop/
 ### Install
 
 ```bash
-cd filedrop
+cd wyre
 npm install
 ```
 
@@ -133,9 +133,9 @@ Produces platform-specific installers in `release/`:
 ## Configuration
 
 Settings are persisted via `electron-store` in the OS app data directory:
-- **macOS**: `~/Library/Application Support/FileDrop/settings.json`
-- **Windows**: `%APPDATA%\FileDrop\settings.json`
-- **Linux**: `~/.config/FileDrop/settings.json`
+- **macOS**: `~/Library/Application Support/Wyre/settings.json`
+- **Windows**: `%APPDATA%\Wyre\settings.json`
+- **Linux**: `~/.config/Wyre/settings.json`
 
 ## Network Requirements
 

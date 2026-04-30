@@ -70,6 +70,6 @@ export class Router {
       });
     });
 
-    document.title = `FileDrop — ${route.title}`;
+    document.title = `Wyre — ${route.title}`;
   }
 }

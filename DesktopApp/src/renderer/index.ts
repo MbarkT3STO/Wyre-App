@@ -111,9 +111,9 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
       ${isMac ? `<div class="titlebar__macos-spacer"></div>` : ''}
       <div class="titlebar__logo">
         <div class="titlebar__logo-icon">
-          <img src="${appIconUrl}" alt="FileDrop" draggable="false" />
+          <img src="${appIconUrl}" alt="Wyre" draggable="false" />
         </div>
-        <span class="titlebar__app-name">FileDrop</span>
+        <span class="titlebar__app-name">Wyre</span>
       </div>
       <div class="titlebar__spacer"></div>
       ${!isMac ? `
@@ -134,9 +134,9 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
       <nav class="sidebar" role="navigation" aria-label="Main navigation">
         <div class="sidebar__brand">
           <div class="sidebar__brand-icon">
-            <img src="${appIconUrl}" alt="FileDrop" draggable="false" />
+            <img src="${appIconUrl}" alt="Wyre" draggable="false" />
           </div>
-          <span class="sidebar__brand-name">FileDrop</span>
+          <span class="sidebar__brand-name">Wyre</span>
         </div>
         <div class="sidebar__header">
           <div class="sidebar__device-card">

@@ -118,11 +118,11 @@ export class AppBootstrapper {
       const iconPath = join(resourcesPath, 'assets/icons/tray.png');
       const icon = nativeImage.createFromPath(iconPath);
       this.tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
-      this.tray.setToolTip('FileDrop');
+      this.tray.setToolTip('Wyre');
 
       const contextMenu = Menu.buildFromTemplate([
         {
-          label: 'Open FileDrop',
+          label: 'Open Wyre',
           click: () => this.windowManager.focusMainWindow(),
         },
         { type: 'separator' },
