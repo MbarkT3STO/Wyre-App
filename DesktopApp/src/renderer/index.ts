@@ -128,6 +128,12 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
     </div>
     <div class="app-body">
       <nav class="sidebar" role="navigation" aria-label="Main navigation">
+        <div class="sidebar__brand">
+          <div class="sidebar__brand-icon">
+            <img src="/assets/icons/icon.png" alt="FileDrop" draggable="false" />
+          </div>
+          <span class="sidebar__brand-name">FileDrop</span>
+        </div>
         <div class="sidebar__header">
           <div class="sidebar__device-card">
             <div class="sidebar__device-avatar">${escapeHtml(initial)}</div>
