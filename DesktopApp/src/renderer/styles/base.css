@@ -332,7 +332,7 @@ a:hover { text-decoration: none; }
 .sidebar__nav {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: var(--sp-3);
   padding: 0 var(--sp-3);
   flex: 1;
   overflow: visible;
@@ -342,7 +342,7 @@ a:hover { text-decoration: none; }
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  padding: 10px var(--sp-3);
+  padding: 16px var(--sp-5);
   border-radius: var(--radius-full);
   font-size: var(--text-base);
   font-weight: var(--weight-semibold);
@@ -620,7 +620,7 @@ a:hover { text-decoration: none; }
 
   .sidebar__nav-item {
     justify-content: center;
-    padding: 10px;
+    padding: 16px;
     width: auto;
   }
 
