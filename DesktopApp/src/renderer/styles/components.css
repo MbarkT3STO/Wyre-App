@@ -1668,7 +1668,7 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: var(--sp-6);
+  gap: var(--sp-5);
 }
 
 /* ── Shared section header ── */
@@ -1680,16 +1680,18 @@
 }
 
 .home-view__section-title {
-  font-size: var(--text-md);
-  font-weight: var(--weight-bold);
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  font-size: 10.5px;
   line-height: var(--leading-tight);
 }
 
 .home-view__section-hint {
   font-size: var(--text-xs);
-  color: var(--text-tertiary);
+  color: var(--text-muted);
 }
 
 /* ── Devices section — full width, centered content ── */
@@ -1864,7 +1866,7 @@
 @media (max-width: 700px) {
   .home-view__scroll {
     padding: var(--sp-4) var(--sp-4) var(--sp-8);
-    gap: var(--sp-5);
+    gap: var(--sp-4);
   }
 
   .home-view__devices-mount .device-list__grid {
@@ -1938,7 +1940,7 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: var(--sp-5) var(--sp-6) var(--sp-8);
+  padding: var(--sp-4) var(--sp-6) var(--sp-8);
   box-sizing: border-box;
 }
 
@@ -1989,7 +1991,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   box-sizing: border-box;
-  padding: var(--sp-5) var(--sp-6) var(--sp-10);
+  padding: var(--sp-4) var(--sp-6) var(--sp-10);
 }
 
 /* The content wrapper — natural height, centers and gaps the cards */
@@ -2035,7 +2037,7 @@
 
 @media (max-width: 700px) {
   .settings-view__scroll {
-    padding: var(--sp-4) var(--sp-4) var(--sp-8);
+    padding: var(--sp-3) var(--sp-4) var(--sp-8);
   }
 
   .settings-view__content {
@@ -2061,6 +2063,38 @@
   .settings-view__content {
     gap: var(--sp-3);
   }
+}
+
+
+/* ══════════════════════════════════════════════════════════
+   VIEW PAGE TITLE — inline heading used inside scroll areas
+   (replaces the old full-width view__header bar)
+   ══════════════════════════════════════════════════════════ */
+
+.view-page-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--sp-1);
+}
+
+.view-page-title__heading {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.03em;
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.15;
+}
+
+.view-page-title__sub {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  font-weight: var(--weight-normal);
 }
 
 

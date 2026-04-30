@@ -30,6 +30,7 @@ export class HomeView extends Component {
 
     view.innerHTML = `
       <div class="home-view__scroll">
+
         <div class="home-view__devices-section">
           <div class="home-view__section-header">
             <span class="home-view__section-title">Nearby Devices</span>
@@ -68,6 +69,7 @@ export class HomeView extends Component {
           </div>
           <div id="transfer-list-mount"></div>
         </div>
+
       </div>
     `;
 

@@ -65,9 +65,10 @@
   /* ── Layout ────────────────────────────────────────────── */
   --sidebar-width:     220px;
   --sidebar-collapsed: 58px;
-  --titlebar-height:   44px;
+  --titlebar-height:   38px;
   --topnav-height:     44px;
-  --topnav-offset:     64px;   /* top spacing so content clears the floating nav */
+  /* titlebar(38) + gap(10) + nav(44) + gap(10) = 102px clearance */
+  --topnav-offset:     102px;
   --content-max-w:     960px;
 }
 

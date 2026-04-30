@@ -36,14 +36,12 @@ export class SettingsView extends Component {
     const settings = this.settings ?? StateManager.get('settings');
 
     view.innerHTML = `
-      <div class="view__header">
-        <div class="view__header-left">
-          <h1 class="view__title">Settings</h1>
-          <p class="view__subtitle">Manage your device preferences</p>
-        </div>
-      </div>
       <div class="settings-view__scroll">
         <div class="settings-view__content">
+          <div class="view-page-title">
+            <h1 class="view-page-title__heading">Settings</h1>
+            <p class="view-page-title__sub">Manage your device preferences</p>
+          </div>
           ${settings ? this.renderForm(settings) : this.renderLoading()}
         </div>
       </div>

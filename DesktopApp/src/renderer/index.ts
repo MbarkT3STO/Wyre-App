@@ -109,12 +109,6 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
   return `
     <div class="titlebar" id="titlebar">
       ${isMac ? `<div class="titlebar__macos-spacer"></div>` : ''}
-      <div class="titlebar__logo">
-        <div class="titlebar__logo-icon">
-          <img src="${appIconUrl}" alt="Wyre" draggable="false" />
-        </div>
-        <span class="titlebar__app-name">Wyre</span>
-      </div>
       <div class="titlebar__spacer"></div>
       ${!isMac ? `
         <div class="titlebar__controls">

@@ -12,19 +12,19 @@ export class TransfersView extends Component {
   render(): HTMLElement {
     const view = this.el('div', 'view transfers-view');
 
-    const header = this.el('div', 'view__header');
-    header.innerHTML = `
-      <div class="view__header-left">
-        <h1 class="view__title">Transfers</h1>
-        <p class="view__subtitle">Active and completed file transfers</p>
-      </div>
+    const content = this.el('div', 'view__content');
+
+    const pageTitle = document.createElement('div');
+    pageTitle.className = 'view-page-title';
+    pageTitle.innerHTML = `
+      <h1 class="view-page-title__heading">Transfers</h1>
+      <p class="view-page-title__sub">Active and completed file transfers</p>
     `;
 
-    const content = this.el('div', 'view__content');
     const listMount = this.el('div', 'transfers-view__list-mount');
+    content.appendChild(pageTitle);
     content.appendChild(listMount);
 
-    view.appendChild(header);
     view.appendChild(content);
 
     return view;
