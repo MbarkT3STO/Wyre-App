@@ -4,7 +4,7 @@
    ============================================================ */
 
 /* ── Google Fonts: Inter + Outfit ──────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300..800&family=Outfit:wght@400;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300..800&display=swap');
 
 :root {
   /* ── Core Hue ──────────────────────────────────────────── */
@@ -32,7 +32,7 @@
 
   /* ── Typography ────────────────────────────────────────── */
   --font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  --font-heading: 'Outfit', system-ui, sans-serif;
+  --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono:   'JetBrains Mono', 'SF Mono', 'Fira Code', 'Consolas', monospace;
 
   --text-xs:   12px;

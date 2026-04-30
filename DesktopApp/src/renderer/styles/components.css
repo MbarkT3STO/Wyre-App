@@ -1781,7 +1781,6 @@
 }
 
 .view-page-title__heading {
-  font-family: var(--font-heading);
   font-size: var(--text-2xl);
   font-weight: var(--weight-black);
   letter-spacing: -0.04em;
@@ -1859,7 +1858,6 @@
 }
 
 .sg__title {
-  font-family: var(--font-heading);
   font-size: var(--text-md);
   font-weight: var(--weight-extrabold);
   color: var(--text-primary);

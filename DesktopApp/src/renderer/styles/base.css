@@ -35,7 +35,6 @@ input, textarea, [contenteditable] { user-select: text; }
 
 /* ── Typography ────────────────────────────────────────────── */
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-heading);
   line-height: var(--leading-tight);
   font-weight: var(--weight-bold);
   color: var(--text-primary);
@@ -225,7 +224,6 @@ a:hover { text-decoration: none; }
 }
 
 .sidebar__brand-name {
-  font-family: var(--font-heading);
   font-size: var(--text-lg);
   font-weight: var(--weight-black);
   letter-spacing: -0.04em;
