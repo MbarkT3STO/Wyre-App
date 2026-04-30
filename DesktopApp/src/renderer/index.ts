@@ -112,13 +112,13 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
       <div class="titlebar__spacer"></div>
       <div class="titlebar__controls">
         <button class="titlebar__btn" id="btn-minimize" aria-label="Minimize">
-          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 8a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H2.75A.75.75 0 012 8z"/></svg>
+          <i class="fa-solid fa-minus"></i>
         </button>
         <button class="titlebar__btn" id="btn-maximize" aria-label="Maximize">
-          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 2h10.5c.414 0 .75.336.75.75v10.5a.75.75 0 01-.75.75H2.75a.75.75 0 01-.75-.75V2.75A.75.75 0 012.75 2zm.75 1.5v9h9v-9h-9z"/></svg>
+          <i class="fa-regular fa-square"></i>
         </button>
         <button class="titlebar__btn titlebar__btn--close" id="btn-close" aria-label="Close">
-          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/></svg>
+          <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
     </div>

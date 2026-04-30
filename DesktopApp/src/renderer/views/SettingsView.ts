@@ -109,7 +109,7 @@ export class SettingsView extends Component {
               <input class="sg__input sg__input--mono sg__input--readonly" id="save-dir"
                 type="text" value="${escapeHtml(s.saveDirectory)}" readonly/>
               <button class="btn btn--secondary btn--sm" id="browse-dir-btn">
-                <svg viewBox="0 0 16 16" fill="currentColor" class="btn__icon"><path d="M1.75 1A1.75 1.75 0 000 2.75v10.5C0 14.216.784 15 1.75 15h12.5A1.75 1.75 0 0016 13.25v-8.5A1.75 1.75 0 0014.25 3H7.5a.25.25 0 01-.2-.1l-.9-1.2C6.07 1.26 5.55 1 5 1H1.75z"/></svg>
+                <i class="fa-solid fa-folder-open btn__icon"></i>
                 Browse
               </button>
             </div>
@@ -249,7 +249,7 @@ export class SettingsView extends Component {
               <span class="sg__hint">Permanently removes all completed, failed, and cancelled records</span>
             </div>
             <button class="btn btn--danger btn--sm" id="clear-history-btn">
-              <svg viewBox="0 0 16 16" fill="currentColor" class="btn__icon"><path d="M6.5 1.75a.25.25 0 01.25-.25h2.5a.25.25 0 01.25.25V3h-3V1.75zm4.5 0V3h2.25a.75.75 0 010 1.5H2.75a.75.75 0 010-1.5H5V1.75C5 .784 5.784 0 6.75 0h2.5C10.216 0 11 .784 11 1.75zM4.496 6.675a.75.75 0 10-1.492.15l.66 6.6A1.75 1.75 0 005.405 15h5.19a1.75 1.75 0 001.741-1.575l.66-6.6a.75.75 0 10-1.492-.15l-.66 6.6a.25.25 0 01-.249.225H5.405a.25.25 0 01-.249-.225l-.66-6.6z"/></svg>
+              <i class="fa-solid fa-trash-can btn__icon"></i>
               Clear History
             </button>
           </div>

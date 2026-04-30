@@ -55,9 +55,7 @@ export class HomeView extends Component {
             <div id="file-drop-zone-mount"></div>
             <div class="home-view__send-footer">
               <button class="btn btn--primary home-view__send-btn" id="send-btn" disabled>
-                <svg viewBox="0 0 16 16" fill="currentColor" class="btn__icon">
-                  <path d="M1.5 1.75a.75.75 0 011.28-.53l10.5 6.25a.75.75 0 010 1.06l-10.5 6.25A.75.75 0 011.5 14.25V1.75z"/>
-                </svg>
+                <i class="fa-solid fa-paper-plane btn__icon"></i>
                 Send File
               </button>
             </div>
@@ -200,12 +198,7 @@ export class HomeView extends Component {
 
   private resetSendButton(): void {
     if (!this.sendBtn) return;
-    this.sendBtn.innerHTML = `
-      <svg viewBox="0 0 16 16" fill="currentColor" class="btn__icon">
-        <path d="M1.5 1.75a.75.75 0 011.28-.53l10.5 6.25a.75.75 0 010 1.06l-10.5 6.25A.75.75 0 011.5 14.25V1.75z"/>
-      </svg>
-      Send File
-    `;
+    this.sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane btn__icon"></i> Send File`;
   }
 
   protected onUnmount(): void {

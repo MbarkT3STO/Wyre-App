@@ -145,6 +145,7 @@ a:hover { text-decoration: none; }
   color: var(--danger);
 }
 
+.titlebar__btn { font-size: 13px; }
 .titlebar__btn svg { width: 13px; height: 13px; }
 
 /* ══════════════════════════════════════════════════════════

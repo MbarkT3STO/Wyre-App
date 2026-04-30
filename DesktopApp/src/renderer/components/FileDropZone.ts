@@ -37,23 +37,19 @@ export class FileDropZone extends Component {
     if (this.selectedFile) {
       this.dropZoneEl.innerHTML = `
         <div class="file-drop-zone__file-info">
-          <svg class="file-drop-zone__file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
+          <i class="fa-solid fa-file-lines file-drop-zone__file-icon"></i>
           <div class="file-drop-zone__file-details">
             <span class="file-drop-zone__file-name" title="${escapeHtml(this.selectedFile.name)}">${escapeHtml(this.selectedFile.name)}</span>
             <span class="file-drop-zone__file-size">${formatFileSize(this.selectedFile.size)}</span>
           </div>
           <button class="file-drop-zone__clear" aria-label="Remove file" type="button">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/></svg>
+            <i class="fa-solid fa-xmark"></i>
           </button>
         </div>
       `;
     } else {
       this.dropZoneEl.innerHTML = `
-        <svg class="file-drop-zone__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.338-2.32 5.75 5.75 0 011.344 11.095H6.75z"/>
-        </svg>
+        <i class="fa-solid fa-cloud-arrow-up file-drop-zone__icon"></i>
         <p class="file-drop-zone__label">Drop files here or <span class="file-drop-zone__browse">click to browse</span></p>
         <span class="file-drop-zone__hint">${hasDevice ? 'Any file type supported' : 'Select a device first'}</span>
       `;

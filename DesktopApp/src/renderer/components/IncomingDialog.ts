@@ -63,9 +63,7 @@ export class IncomingDialog extends Component {
 
           <div class="incoming-dialog__file-row">
             <div class="incoming-dialog__file-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-              </svg>
+              <i class="fa-solid fa-file-lines incoming-dialog__accept-icon"></i>
             </div>
             <div class="incoming-dialog__file-info">
               <span class="incoming-dialog__file-name" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</span>
@@ -77,9 +75,7 @@ export class IncomingDialog extends Component {
         <div class="incoming-dialog__actions">
           <button class="incoming-dialog__decline" type="button">Decline</button>
           <button class="incoming-dialog__accept" type="button">
-            <svg viewBox="0 0 16 16" fill="currentColor" class="incoming-dialog__accept-icon">
-              <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
-            </svg>
+            <i class="fa-solid fa-check incoming-dialog__accept-icon"></i>
             Accept
           </button>
         </div>

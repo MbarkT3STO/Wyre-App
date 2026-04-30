@@ -45,12 +45,8 @@ export class TransferItem extends Component {
 
     const isSend = t.direction === 'send';
     const dirIcon = isSend
-      ? `<svg viewBox="0 0 16 16" fill="currentColor" class="transfer-item__dir-icon">
-           <path d="M8 1.5a.75.75 0 01.75.75v8.69l2.97-2.97a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L3.22 9.03a.75.75 0 111.06-1.06L7.25 10.94V2.25A.75.75 0 018 1.5z" transform="rotate(180 8 8)"/>
-         </svg>`
-      : `<svg viewBox="0 0 16 16" fill="currentColor" class="transfer-item__dir-icon">
-           <path d="M8 1.5a.75.75 0 01.75.75v8.69l2.97-2.97a.75.75 0 111.06 1.06l-4.25 4.25a.75.75 0 01-1.06 0L3.22 9.03a.75.75 0 111.06-1.06L7.25 10.94V2.25A.75.75 0 018 1.5z"/>
-         </svg>`;
+      ? `<i class="fa-solid fa-arrow-up transfer-item__dir-icon"></i>`
+      : `<i class="fa-solid fa-arrow-down transfer-item__dir-icon"></i>`;
 
     const statusBadge = this.renderStatusBadge(t.status);
     const progress = isActiveTransfer(t) ? t.progress : (t.status === TransferStatus.Completed ? 100 : 0);
@@ -67,9 +63,7 @@ export class TransferItem extends Component {
         <div class="transfer-item__meta">
           <span class="transfer-item__filename" title="${escapeHtml(t.fileName)}">${escapeHtml(truncateFilename(t.fileName, 32))}</span>
           <span class="transfer-item__peer">
-            <svg viewBox="0 0 12 12" fill="currentColor" class="transfer-item__peer-icon">
-              <path d="M6 0a3 3 0 100 6 3 3 0 000-6zM2 9a4 4 0 018 0v1a1 1 0 01-1 1H3a1 1 0 01-1-1V9z"/>
-            </svg>
+            <i class="fa-solid fa-user transfer-item__peer-icon" aria-hidden="true"></i>
             ${escapeHtml(t.peerName)}
           </span>
         </div>
@@ -97,22 +91,16 @@ export class TransferItem extends Component {
       ` : ''}
       <div class="transfer-item__actions">
         ${isActive ? `<button class="btn btn--danger btn--sm transfer-item__cancel" data-id="${t.id}">
-          <svg viewBox="0 0 12 12" fill="currentColor" class="btn__icon transfer-item__btn-icon">
-            <path d="M2.22 2.22a.75.75 0 011.06 0L6 4.94l2.72-2.72a.75.75 0 111.06 1.06L7.06 6l2.72 2.72a.75.75 0 11-1.06 1.06L6 7.06 3.28 9.78a.75.75 0 01-1.06-1.06L4.94 6 2.22 3.28a.75.75 0 010-1.06z"/>
-          </svg>
+          <i class="fa-solid fa-xmark btn__icon transfer-item__btn-icon"></i>
           Cancel
         </button>` : ''}
         ${t.status === TransferStatus.Completed && savedPath ? `
           <button class="btn btn--ghost btn--sm transfer-item__open-file" data-path="${escapeHtml(savedPath)}">
-            <svg viewBox="0 0 12 12" fill="currentColor" class="btn__icon transfer-item__btn-icon">
-              <path d="M1.5 1.5h4.25a.75.75 0 010 1.5H3.06l6.22 6.22V6.25a.75.75 0 011.5 0v4.25a.75.75 0 01-.75.75H5.75a.75.75 0 010-1.5h2.97L2.5 3.53v2.72a.75.75 0 01-1.5 0V2.25a.75.75 0 01.75-.75z"/>
-            </svg>
+            <i class="fa-solid fa-arrow-up-right-from-square btn__icon transfer-item__btn-icon"></i>
             Open
           </button>
           <button class="btn btn--ghost btn--sm transfer-item__open-folder" data-path="${escapeHtml(savedPath)}">
-            <svg viewBox="0 0 12 12" fill="currentColor" class="btn__icon transfer-item__btn-icon">
-              <path d="M1 2.5A1.5 1.5 0 012.5 1h2.379a1.5 1.5 0 011.06.44l.622.621A.5.5 0 007.207 2.5H9.5A1.5 1.5 0 0111 4v5.5A1.5 1.5 0 019.5 11h-7A1.5 1.5 0 011 9.5v-7z"/>
-            </svg>
+            <i class="fa-solid fa-folder-open btn__icon transfer-item__btn-icon"></i>
             Folder
           </button>
         ` : ''}
