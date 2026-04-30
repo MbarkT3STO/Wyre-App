@@ -17,7 +17,7 @@ export class IncomingDialog extends Component {
   private countdownInterval: ReturnType<typeof setInterval> | null = null;
   private svgCircle: SVGCircleElement | null = null;
   private countdownEl: HTMLElement | null = null;
-  private circumference = 2 * Math.PI * 36; // r=36
+  private circumference = 2 * Math.PI * 44; // r=44
 
   constructor(request: IncomingRequestPayload, timeoutSeconds = 30) {
     super();
@@ -38,12 +38,18 @@ export class IncomingDialog extends Component {
     backdrop.innerHTML = `
       <div class="incoming-dialog">
         <div class="incoming-dialog__avatar-wrap">
-          <svg class="incoming-dialog__countdown-ring" viewBox="0 0 80 80">
-            <circle class="incoming-dialog__ring-track" cx="40" cy="40" r="36" fill="none" stroke-width="3"/>
-            <circle class="incoming-dialog__ring-fill" cx="40" cy="40" r="36" fill="none" stroke-width="3"
-              stroke-dasharray="${this.circumference}"
-              stroke-dashoffset="0"
-              transform="rotate(-90 40 40)"/>
+          <svg class="incoming-dialog__countdown-ring" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#7C3AED"/>
+                <stop offset="50%" stop-color="#A855F7"/>
+                <stop offset="100%" stop-color="#EC4899"/>
+              </linearGradient>
+            </defs>
+            <circle class="incoming-dialog__ring-track" cx="50" cy="50" r="44"/>
+            <circle class="incoming-dialog__ring-fill" cx="50" cy="50" r="44"
+              stroke-dasharray="${2 * Math.PI * 44}"
+              stroke-dashoffset="0"/>
           </svg>
           <div class="incoming-dialog__avatar">
             <span class="incoming-dialog__initial">${escapeHtml(initial)}</span>
@@ -53,13 +59,15 @@ export class IncomingDialog extends Component {
 
         <div class="incoming-dialog__body">
           <h2 class="incoming-dialog__title">
-            <strong>${escapeHtml(senderName)}</strong> wants to send you a file
+            <span>${escapeHtml(senderName)}</span> wants to send you a file
           </h2>
 
           <div class="incoming-dialog__file-row">
-            <svg class="incoming-dialog__file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-            </svg>
+            <div class="incoming-dialog__file-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+              </svg>
+            </div>
             <div class="incoming-dialog__file-info">
               <span class="incoming-dialog__file-name" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</span>
               <span class="incoming-dialog__file-size">${formatFileSize(fileSize)}</span>
@@ -68,8 +76,13 @@ export class IncomingDialog extends Component {
         </div>
 
         <div class="incoming-dialog__actions">
-          <button class="btn btn--ghost incoming-dialog__decline" type="button">Decline</button>
-          <button class="btn btn--primary incoming-dialog__accept" type="button">Accept</button>
+          <button class="incoming-dialog__decline" type="button">Decline</button>
+          <button class="incoming-dialog__accept" type="button">
+            <svg viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px">
+              <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
+            </svg>
+            Accept
+          </button>
         </div>
       </div>
     `;

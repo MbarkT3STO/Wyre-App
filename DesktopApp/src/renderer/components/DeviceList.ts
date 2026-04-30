@@ -24,8 +24,9 @@ export class DeviceList extends Component {
 
   render(): HTMLElement {
     const wrapper = this.el('div', 'device-list');
+    wrapper.style.cssText = 'padding: var(--sp-5) var(--sp-4); height: 100%; overflow-y: auto; box-sizing: border-box;';
 
-    const heading = this.el('h2', 'device-list__heading');
+    const heading = this.el('div', 'device-list__heading');
     heading.textContent = 'Nearby Devices';
 
     this.gridEl = this.el('div', 'device-list__grid');

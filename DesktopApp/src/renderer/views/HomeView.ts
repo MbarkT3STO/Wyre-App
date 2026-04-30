@@ -29,31 +29,44 @@ export class HomeView extends Component {
     const view = this.el('div', 'view home-view');
 
     view.innerHTML = `
-      <div class="home-view__left">
-        <div class="home-view__device-section" id="device-list-mount"></div>
-      </div>
-      <div class="home-view__right">
-        <div class="home-view__send-panel">
-          <div class="home-view__panel-header">
-            <div class="home-view__panel-title">Send a File</div>
-            <div class="home-view__panel-subtitle">Select a device, then drop your file</div>
+      <div class="home-view__scroll">
+        <div class="home-view__devices-section">
+          <div class="home-view__section-header">
+            <span class="home-view__section-title">Nearby Devices</span>
+            <span class="home-view__section-hint">Click a device to select it as the transfer target</span>
           </div>
-          <div class="home-view__panel-body">
-            <div class="home-view__target-label">Target Device</div>
-            <div id="selected-device-info">
-              <div class="home-view__no-device">No device selected</div>
+          <div id="device-list-mount" class="home-view__devices-mount"></div>
+        </div>
+
+        <div class="home-view__send-section">
+          <div class="home-view__section-header">
+            <span class="home-view__section-title">Send a File</span>
+            <span class="home-view__section-hint">Drop a file or click to browse, then hit Send</span>
+          </div>
+          <div class="home-view__send-body">
+            <div class="home-view__target-row">
+              <span class="home-view__target-label">To</span>
+              <div id="selected-device-info" class="home-view__target-info">
+                <div class="home-view__no-device">No device selected — pick one above</div>
+              </div>
             </div>
             <div id="file-drop-zone-mount"></div>
-            <div id="transfer-list-mount" class="home-view__transfer-list"></div>
+            <div class="home-view__send-footer">
+              <button class="btn btn--primary home-view__send-btn" id="send-btn" disabled>
+                <svg viewBox="0 0 16 16" fill="currentColor" class="btn__icon">
+                  <path d="M1.5 1.75a.75.75 0 011.28-.53l10.5 6.25a.75.75 0 010 1.06l-10.5 6.25A.75.75 0 011.5 14.25V1.75z"/>
+                </svg>
+                Send File
+              </button>
+            </div>
           </div>
-          <div class="home-view__panel-footer">
-            <button class="btn btn--primary home-view__send-btn" id="send-btn" disabled>
-              <svg viewBox="0 0 16 16" fill="currentColor" class="btn__icon">
-                <path d="M1.5 1.75a.75.75 0 011.28-.53l10.5 6.25a.75.75 0 010 1.06l-10.5 6.25A.75.75 0 011.5 14.25V1.75z"/>
-              </svg>
-              Send File
-            </button>
+        </div>
+
+        <div class="home-view__transfers-section">
+          <div class="home-view__section-header">
+            <span class="home-view__section-title">Active Transfers</span>
           </div>
+          <div id="transfer-list-mount"></div>
         </div>
       </div>
     `;
@@ -81,7 +94,7 @@ export class HomeView extends Component {
     });
     this.fileDropZone.mount(dropZoneMount);
 
-    // Mount TransferList inline so progress is visible without navigating away
+    // Mount TransferList
     const transferListMount = this.element.querySelector('#transfer-list-mount') as HTMLElement;
     this.transferList = new TransferList();
     this.transferList.mount(transferListMount);
@@ -111,7 +124,7 @@ export class HomeView extends Component {
     if (!infoEl) return;
 
     if (!deviceId) {
-      infoEl.innerHTML = `<div class="home-view__no-device">Click a device to select it</div>`;
+      infoEl.innerHTML = `<div class="home-view__no-device">No device selected — pick one above</div>`;
       return;
     }
 

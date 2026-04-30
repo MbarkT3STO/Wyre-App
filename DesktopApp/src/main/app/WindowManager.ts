@@ -24,7 +24,7 @@ export class WindowManager {
       frame: false,
       titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
       trafficLightPosition: { x: 16, y: 16 },
-      backgroundColor: '#0D0F14',
+      backgroundColor: '#0a0812',
       show: false,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),

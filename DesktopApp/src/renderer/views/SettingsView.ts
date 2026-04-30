@@ -42,8 +42,10 @@ export class SettingsView extends Component {
           <p class="view__subtitle">Manage your device preferences</p>
         </div>
       </div>
-      <div class="view__content settings-view__content">
-        ${settings ? this.renderForm(settings) : this.renderLoading()}
+      <div class="settings-view__scroll">
+        <div class="settings-view__content">
+          ${settings ? this.renderForm(settings) : this.renderLoading()}
+        </div>
       </div>
     `;
 
