@@ -8,14 +8,19 @@
   },
   "files": [
     "dist/**/*",
-    "index.html",
-    "assets/icons/**/*"
+    "index.html"
+  ],
+  "extraResources": [
+    {
+      "from": "assets/icons",
+      "to": "assets/icons"
+    }
   ],
   "mac": {
     "target": [
       {
         "target": "dmg",
-        "arch": ["x64"]
+        "arch": ["x64", "arm64"]
       }
     ],
     "icon": "assets/icons/icon.icns",

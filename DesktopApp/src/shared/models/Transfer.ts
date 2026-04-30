@@ -7,7 +7,6 @@ export enum TransferStatus {
   Pending = 'pending',
   Connecting = 'connecting',
   Active = 'active',
-  Paused = 'paused',
   Completed = 'completed',
   Failed = 'failed',
   Cancelled = 'cancelled',

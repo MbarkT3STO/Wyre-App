@@ -37,6 +37,10 @@ export const IpcChannels = {
   WINDOW_MAXIMIZE: 'window:maximize',
   WINDOW_CLOSE: 'window:close',
   WINDOW_IS_MAXIMIZED: 'window:isMaximized',
+
+  // Shell actions
+  SHELL_OPEN_FILE: 'shell:openFile',
+  SHELL_SHOW_IN_FOLDER: 'shell:showInFolder',
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];
@@ -136,4 +140,6 @@ export interface IpcInvokeMap {
   [IpcChannels.WINDOW_MAXIMIZE]: [void, void];
   [IpcChannels.WINDOW_CLOSE]: [void, void];
   [IpcChannels.WINDOW_IS_MAXIMIZED]: [void, boolean];
+  [IpcChannels.SHELL_OPEN_FILE]: [{ path: string }, void];
+  [IpcChannels.SHELL_SHOW_IN_FOLDER]: [{ path: string }, void];
 }

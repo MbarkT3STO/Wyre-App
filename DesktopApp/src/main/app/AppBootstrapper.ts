@@ -4,7 +4,7 @@
  * This is the composition root — wires all services together.
  */
 
-import { app, Tray, Menu, nativeImage } from 'electron';
+import { app, Tray, Menu, nativeImage, ipcMain } from 'electron';
 import { join } from 'path';
 import { WindowManager } from './WindowManager';
 import { SettingsStore } from '../store/SettingsStore';
@@ -14,6 +14,7 @@ import { TransferClient } from '../transfer/TransferClient';
 import { TransferQueue } from '../transfer/TransferQueue';
 import { NotificationManager } from '../notifications/NotificationManager';
 import { IpcBridge } from '../ipc/IpcBridge';
+import { IpcChannels } from '../../shared/ipc/IpcContracts';
 import type { Platform } from '../../shared/models/Device';
 
 function getElectronPlatform(): Platform {
@@ -85,6 +86,11 @@ export class AppBootstrapper {
     // Start discovery
     this.discoveryService.start();
 
+    // Handle discovery errors gracefully — never let them crash the app
+    this.discoveryService.on('error', (err) => {
+      console.warn('[Discovery] Non-fatal error:', err.message);
+    });
+
     // Setup tray
     this.setupTray();
 
@@ -106,7 +112,10 @@ export class AppBootstrapper {
 
   private setupTray(): void {
     try {
-      const iconPath = join(__dirname, '../../assets/icons/tray.png');
+      // In a packaged app, assets live outside the asar archive under Resources/.
+      // process.resourcesPath points there correctly on all platforms.
+      const resourcesPath = process.resourcesPath ?? join(__dirname, '../../');
+      const iconPath = join(resourcesPath, 'assets/icons/tray.png');
       const icon = nativeImage.createFromPath(iconPath);
       this.tray = new Tray(icon.isEmpty() ? nativeImage.createEmpty() : icon);
       this.tray.setToolTip('FileDrop');
@@ -131,8 +140,21 @@ export class AppBootstrapper {
   }
 
   private watchSettingsChanges(): void {
-    // Settings changes are applied on next relevant operation
-    // For name/port changes, update discovery service
+    // Re-read settings on every SETTINGS_SET so live changes propagate to services.
+    // SettingsHandlers calls settingsStore.set() synchronously before this fires,
+    // so settingsStore.get() already reflects the new values.
+    ipcMain.on(IpcChannels.SETTINGS_SET, () => {
+      const updated = this.settingsStore.get();
+
+      // Propagate device name / port changes to the discovery broadcaster
+      this.discoveryService?.updateAnnouncement({
+        name: updated.deviceName,
+        port: updated.transferPort,
+      });
+
+      // Propagate notification preference
+      this.notificationManager?.setEnabled(updated.showNotifications);
+    });
   }
 
   private shutdown(): void {

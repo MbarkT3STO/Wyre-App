@@ -1,9 +1,9 @@
 /**
  * SettingsHandlers.ts
- * IPC handlers for settings read/write and window controls.
+ * IPC handlers for settings read/write, window controls, and shell actions.
  */
 
-import { IpcMain, BrowserWindow } from 'electron';
+import { IpcMain, BrowserWindow, shell } from 'electron';
 import { IpcChannels } from '../../../shared/ipc/IpcContracts';
 import type { SettingsStore } from '../../store/SettingsStore';
 import type { SettingsSetPayload } from '../../../shared/ipc/IpcContracts';
@@ -42,5 +42,13 @@ export function registerSettingsHandlers(
 
   ipcMain.handle(IpcChannels.WINDOW_IS_MAXIMIZED, (): boolean => {
     return getMainWindow()?.isMaximized() ?? false;
+  });
+
+  ipcMain.handle(IpcChannels.SHELL_OPEN_FILE, (_event, payload: { path: string }): void => {
+    void shell.openPath(payload.path);
+  });
+
+  ipcMain.handle(IpcChannels.SHELL_SHOW_IN_FOLDER, (_event, payload: { path: string }): void => {
+    shell.showItemInFolder(payload.path);
   });
 }

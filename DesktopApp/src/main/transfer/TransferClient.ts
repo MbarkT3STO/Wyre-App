@@ -88,12 +88,18 @@ export class TransferClient extends EventEmitter {
 
       socket.write(header);
 
-      // Wait for accept/decline response from receiver
+      // Wait for accept/decline response from receiver.
+      // The response is a newline-terminated JSON line, but it may arrive
+      // split across multiple TCP packets, so we accumulate until we see '\n'.
       let responseBuffer = '';
-      socket.once('data', (chunk: Buffer) => {
+
+      const onResponseData = (chunk: Buffer): void => {
         responseBuffer += chunk.toString('utf8');
         const newlineIdx = responseBuffer.indexOf('\n');
-        if (newlineIdx === -1) return;
+        if (newlineIdx === -1) return; // incomplete — wait for more data
+
+        // We have a full line — stop listening for response data
+        socket.removeListener('data', onResponseData);
 
         try {
           const response = JSON.parse(responseBuffer.slice(0, newlineIdx)) as { accepted: boolean };
@@ -110,7 +116,9 @@ export class TransferClient extends EventEmitter {
           socket.destroy(err instanceof Error ? err : new Error(String(err)));
           this.emit('error', transferId, err instanceof Error ? err : new Error(String(err)));
         }
-      });
+      };
+
+      socket.on('data', onResponseData);
     });
 
     let cancelled = false;

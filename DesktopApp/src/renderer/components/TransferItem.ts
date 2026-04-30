@@ -161,7 +161,6 @@ export class TransferItem extends Component {
       [TransferStatus.Pending]: 'Waiting',
       [TransferStatus.Connecting]: 'Connecting',
       [TransferStatus.Active]: 'Transferring',
-      [TransferStatus.Paused]: 'Paused',
       [TransferStatus.Completed]: 'Done',
       [TransferStatus.Failed]: 'Failed',
       [TransferStatus.Cancelled]: 'Cancelled',

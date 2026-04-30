@@ -123,17 +123,6 @@ export class IpcBridge {
             code: transfer.status.toUpperCase(),
           });
           break;
-
-        default:
-          // Pending/Connecting — send progress update with current state
-          this.send(IpcChannels.TRANSFER_PROGRESS, {
-            transferId: transfer.id,
-            progress: transfer.progress,
-            speed: transfer.speed,
-            eta: transfer.eta,
-            bytesTransferred: transfer.bytesTransferred,
-            totalBytes: transfer.fileSize,
-          });
       }
     });
   }

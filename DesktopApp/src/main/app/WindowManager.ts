@@ -4,7 +4,7 @@
  * Single responsibility: window lifecycle only.
  */
 
-import { BrowserWindow, shell } from 'electron';
+import { BrowserWindow, shell, app } from 'electron';
 import { join } from 'path';
 
 const WINDOW_WIDTH = 900;
@@ -26,6 +26,7 @@ export class WindowManager {
       trafficLightPosition: { x: 16, y: 16 },
       backgroundColor: '#0a0812',
       show: false,
+      icon: join(process.resourcesPath ?? join(__dirname, '../../'), 'assets/icons/icon.png'),
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
         contextIsolation: true,

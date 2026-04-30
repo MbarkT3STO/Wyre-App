@@ -164,10 +164,6 @@ export class HomeView extends Component {
       this.sendBtn!.disabled = true;
       this.sendBtn!.textContent = 'Sending…';
 
-      // Navigate to transfers view FIRST so TransferList is mounted
-      // and subscribed before TRANSFER_STARTED arrives from main
-      window.location.hash = '/transfers';
-
       await IpcClient.sendFile({
         deviceId,
         filePath: file.path,
@@ -176,19 +172,29 @@ export class HomeView extends Component {
       this.toasts.success(`Sending ${file.name}…`);
       this.fileDropZone?.clearSelection();
       this.selectedFile = null;
-      this.updateSendButton();
+
+      // Reset button before navigating away so it's correct when the user returns
+      this.resetSendButton();
+
+      // Navigate to transfers view so TransferList is mounted and subscribed
+      window.location.hash = '/transfers';
 
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to send file';
       this.toasts.error(message);
-      this.sendBtn!.disabled = false;
-      this.sendBtn!.innerHTML = `
-        <svg viewBox="0 0 16 16" fill="currentColor" class="btn__icon">
-          <path d="M1.5 1.75a.75.75 0 011.28-.53l10.5 6.25a.75.75 0 010 1.06l-10.5 6.25A.75.75 0 011.5 14.25V1.75z"/>
-        </svg>
-        Send
-      `;
+      this.resetSendButton();
+      this.updateSendButton();
     }
+  }
+
+  private resetSendButton(): void {
+    if (!this.sendBtn) return;
+    this.sendBtn.innerHTML = `
+      <svg viewBox="0 0 16 16" fill="currentColor" class="btn__icon">
+        <path d="M1.5 1.75a.75.75 0 011.28-.53l10.5 6.25a.75.75 0 010 1.06l-10.5 6.25A.75.75 0 011.5 14.25V1.75z"/>
+      </svg>
+      Send File
+    `;
   }
 
   protected onUnmount(): void {

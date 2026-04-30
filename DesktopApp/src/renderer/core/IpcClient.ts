@@ -64,6 +64,10 @@ export const IpcClient = {
   closeWindow: (): Promise<void> => getApi().closeWindow(),
   isMaximized: (): Promise<boolean> => getApi().isMaximized(),
 
+  // Shell actions
+  openFile: (path: string): Promise<void> => getApi().openFile(path),
+  showInFolder: (path: string): Promise<void> => getApi().showInFolder(path),
+
   // Platform
   getPlatform: (): NodeJS.Platform => getApi().platform,
 } as const;

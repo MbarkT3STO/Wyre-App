@@ -8,6 +8,10 @@ import './styles/base.css';
 import './styles/components.css';
 import './styles/animations.css';
 
+// Import the app icon so Vite bundles it and gives us a correct asset URL
+// that works in both dev and production (file:// protocol).
+import appIconUrl from '../../assets/icons/icon.png';
+
 import { IpcClient } from './core/IpcClient';
 import { StateManager } from './core/StateManager';
 import { Router } from './core/Router';
@@ -107,7 +111,7 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
       ${isMac ? `<div class="titlebar__macos-spacer"></div>` : ''}
       <div class="titlebar__logo">
         <div class="titlebar__logo-icon">
-          <img src="/assets/icons/icon.png" alt="FileDrop" draggable="false" />
+          <img src="${appIconUrl}" alt="FileDrop" draggable="false" />
         </div>
         <span class="titlebar__app-name">FileDrop</span>
       </div>
@@ -130,7 +134,7 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
       <nav class="sidebar" role="navigation" aria-label="Main navigation">
         <div class="sidebar__brand">
           <div class="sidebar__brand-icon">
-            <img src="/assets/icons/icon.png" alt="FileDrop" draggable="false" />
+            <img src="${appIconUrl}" alt="FileDrop" draggable="false" />
           </div>
           <span class="sidebar__brand-name">FileDrop</span>
         </div>
@@ -324,13 +328,16 @@ function wireCustomEvents(): void {
   // These events are dispatched by TransferItem buttons
   window.addEventListener('filedrop:open-file', (e) => {
     const path = (e as CustomEvent<{ path: string }>).detail.path;
-    // In Electron, we'd use shell.openPath — for now log
-    console.log('Open file:', path);
+    IpcClient.openFile(path).catch((err: unknown) => {
+      toasts.error(`Could not open file: ${err instanceof Error ? err.message : String(err)}`);
+    });
   });
 
   window.addEventListener('filedrop:show-in-folder', (e) => {
     const path = (e as CustomEvent<{ path: string }>).detail.path;
-    console.log('Show in folder:', path);
+    IpcClient.showInFolder(path).catch((err: unknown) => {
+      toasts.error(`Could not reveal file: ${err instanceof Error ? err.message : String(err)}`);
+    });
   });
 
   window.addEventListener('filedrop:theme-change', (e) => {

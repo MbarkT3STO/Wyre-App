@@ -55,6 +55,10 @@ export interface FileDropApi {
   closeWindow: () => Promise<void>;
   isMaximized: () => Promise<boolean>;
 
+  // Shell actions
+  openFile: (path: string) => Promise<void>;
+  showInFolder: (path: string) => Promise<void>;
+
   // Platform info
   platform: NodeJS.Platform;
 }
@@ -102,6 +106,10 @@ const api: FileDropApi = {
   maximizeWindow: () => ipcRenderer.invoke(IpcChannels.WINDOW_MAXIMIZE),
   closeWindow: () => ipcRenderer.invoke(IpcChannels.WINDOW_CLOSE),
   isMaximized: () => ipcRenderer.invoke(IpcChannels.WINDOW_IS_MAXIMIZED),
+
+  // Shell actions
+  openFile: (path: string) => ipcRenderer.invoke(IpcChannels.SHELL_OPEN_FILE, { path }),
+  showInFolder: (path: string) => ipcRenderer.invoke(IpcChannels.SHELL_SHOW_IN_FOLDER, { path }),
 
   // Platform info
   platform: process.platform,
