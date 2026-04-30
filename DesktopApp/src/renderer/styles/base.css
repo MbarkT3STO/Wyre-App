@@ -5,7 +5,8 @@
 
 @import url('./tokens.css');
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,300..800;1,14..32,300..800&display=swap');
+/* Font Awesome 6 — bundled locally, no CSP issues */
+@import '@fortawesome/fontawesome-free/css/all.min.css';
 
 /* ── Reset ─────────────────────────────────────────────────── */
 *, *::before, *::after {
@@ -34,16 +35,17 @@ input, textarea, [contenteditable] { user-select: text; }
 
 /* ── Typography ────────────────────────────────────────────── */
 h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
   line-height: var(--leading-tight);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-bold);
   color: var(--text-primary);
   letter-spacing: -0.02em;
 }
 
-h1 { font-size: var(--text-2xl); font-weight: var(--weight-bold); }
-h2 { font-size: var(--text-xl); }
-h3 { font-size: var(--text-lg); }
-h4 { font-size: var(--text-md); }
+h1 { font-size: var(--text-2xl); font-weight: var(--weight-black); }
+h2 { font-size: var(--text-xl);  font-weight: var(--weight-extrabold); }
+h3 { font-size: var(--text-lg);  font-weight: var(--weight-bold); }
+h4 { font-size: var(--text-md);  font-weight: var(--weight-bold); }
 
 p { color: var(--text-secondary); line-height: var(--leading-relaxed); }
 
@@ -170,7 +172,6 @@ a:hover { text-decoration: none; }
   display: flex;
   flex-direction: column;
   background: var(--bg-sidebar);
-  border-right: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-sidebar);
   position: relative;
   z-index: 10;
@@ -224,10 +225,11 @@ a:hover { text-decoration: none; }
 }
 
 .sidebar__brand-name {
+  font-family: var(--font-heading);
   font-size: var(--text-lg);
-  font-weight: var(--weight-bold);
+  font-weight: var(--weight-black);
   letter-spacing: -0.04em;
-  background: var(--gradient-accent);
+  background: linear-gradient(135deg, var(--accent-mid), var(--accent-bright));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -245,10 +247,10 @@ a:hover { text-decoration: none; }
   align-items: center;
   gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-3);
-  background: var(--bg-active);
-  border: 1px solid var(--border-accent);
-  border-radius: var(--radius-lg);
-  transition: background var(--transition), border-color var(--transition);
+  background: var(--bg-app);
+  border-radius: var(--radius-full);
+  box-shadow: var(--nm-pressed);
+  transition: all var(--transition-fast);
   min-width: 0;
   overflow: hidden;
 }
@@ -308,7 +310,7 @@ a:hover { text-decoration: none; }
 
 .sidebar__device-ip {
   font-size: var(--text-xs);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-family: var(--font-mono);
   white-space: nowrap;
   overflow: hidden;
@@ -319,7 +321,7 @@ a:hover { text-decoration: none; }
 .sidebar__nav-label {
   font-size: 10px;
   font-weight: var(--weight-semibold);
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   text-transform: uppercase;
   letter-spacing: 0.12em;
   padding: var(--sp-3) var(--sp-5) var(--sp-2);
@@ -341,17 +343,13 @@ a:hover { text-decoration: none; }
   align-items: center;
   gap: var(--sp-3);
   padding: 10px var(--sp-3);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   font-size: var(--text-base);
-  font-weight: var(--weight-medium);
+  font-weight: var(--weight-semibold);
   color: var(--text-secondary);
   cursor: pointer;
   text-decoration: none;
-  transition:
-    background var(--transition),
-    color var(--transition),
-    box-shadow var(--transition),
-    transform var(--transition-fast);
+  transition: all var(--transition-fast);
   border: none;
   background: transparent;
   white-space: nowrap;
@@ -363,17 +361,17 @@ a:hover { text-decoration: none; }
 }
 
 .sidebar__nav-item:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  color: var(--accent-mid);
+  background: var(--bg-app);
+  box-shadow: var(--nm-raised);
+  transform: translateY(-1px);
 }
 
 .sidebar__nav-item--active {
-  background: var(--accent-100);
-  color: var(--accent-text);
-  font-weight: var(--weight-semibold);
-  box-shadow:
-    0 0 0 1px var(--border-accent),
-    0 2px 12px var(--accent-glow-sm);
+  background: var(--bg-app);
+  color: var(--accent-mid);
+  font-weight: var(--weight-bold);
+  box-shadow: var(--nm-pressed);
 }
 
 [data-theme="light"] .sidebar__nav-item--active {
@@ -381,23 +379,21 @@ a:hover { text-decoration: none; }
 }
 
 .sidebar__nav-item--active .sidebar__nav-item-icon {
-  color: var(--accent-bright);
+  color: var(--accent-mid);
   opacity: 1;
-  filter: drop-shadow(0 0 5px var(--accent-glow-sm));
 }
 
 [data-theme="light"] .sidebar__nav-item--active .sidebar__nav-item-icon {
   color: var(--accent-base);
-  filter: none;
 }
 
 .sidebar__nav-item-icon {
-  width: 18px;
-  height: 18px;
-  min-width: 18px;
+  font-size: 15px;
+  width: 16px;
+  text-align: center;
   flex-shrink: 0;
-  opacity: 0.50;
-  transition: opacity var(--transition), color var(--transition);
+  opacity: 0.45;
+  transition: opacity var(--transition-fast), color var(--transition-fast);
 }
 
 .sidebar__nav-item:hover .sidebar__nav-item-icon,
@@ -428,13 +424,12 @@ a:hover { text-decoration: none; }
 /* ── Footer ── */
 .sidebar__footer {
   padding: var(--sp-4) var(--sp-5);
-  border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
 .sidebar__version {
   font-size: var(--text-xs);
-  color: var(--text-muted);
+  color: var(--text-tertiary);
   font-family: var(--font-mono);
   letter-spacing: 0.02em;
 }
@@ -630,8 +625,8 @@ a:hover { text-decoration: none; }
   }
 
   .sidebar__nav-item-icon {
-    width: 20px;
-    height: 20px;
+    font-size: 18px;
+    width: 18px;
     opacity: 1;
   }
 
