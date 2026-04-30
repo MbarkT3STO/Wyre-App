@@ -141,12 +141,11 @@ export class IpcBridge {
         checksum: request.checksum,
       });
 
-      // Auto-accept logic
-      if (settings.autoAccept) {
-        const isTrusted =
-          settings.trustedDeviceIds.length === 0 ||
-          settings.trustedDeviceIds.includes(request.senderDeviceId);
-
+      // Auto-accept logic — only if autoAccept is enabled AND the device is
+      // explicitly listed in trustedDeviceIds. An empty trusted list means
+      // "no devices are trusted yet", not "trust everyone".
+      if (settings.autoAccept && settings.trustedDeviceIds.length > 0) {
+        const isTrusted = settings.trustedDeviceIds.includes(request.senderDeviceId);
         if (isTrusted) {
           this.transferQueue.acceptIncoming(request.transferId, settings.saveDirectory);
           return;

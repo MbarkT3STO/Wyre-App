@@ -11,11 +11,22 @@ import { IpcClient } from '../core/IpcClient';
 import type { Transfer, TransferRecord } from '../../shared/models/Transfer';
 import { TransferStatus } from '../../shared/models/Transfer';
 
+export interface TransferListOptions {
+  /** When true, only the active transfers section is rendered (no history). */
+  activeOnly?: boolean;
+}
+
 export class TransferList extends Component {
   private activeItems: Map<string, TransferItem> = new Map();
   private historyItems: Map<string, TransferItem> = new Map();
   private activeSection: HTMLElement | null = null;
   private historySection: HTMLElement | null = null;
+  private readonly activeOnly: boolean;
+
+  constructor(options: TransferListOptions = {}) {
+    super();
+    this.activeOnly = options.activeOnly ?? false;
+  }
 
   render(): HTMLElement {
     const wrapper = this.el('div', 'transfer-list');
@@ -24,19 +35,20 @@ export class TransferList extends Component {
     this.activeSection.innerHTML = `<h3 class="transfer-list__section-title">Active Transfers</h3>`;
     const activeContainer = this.el('div', 'transfer-list__items');
     this.activeSection.appendChild(activeContainer);
-
-    this.historySection = this.el('div', 'transfer-list__section');
-    const historyHeader = this.el('div', 'transfer-list__history-header');
-    historyHeader.innerHTML = `
-      <h3 class="transfer-list__section-title">History</h3>
-      <button class="btn btn--ghost btn--sm transfer-list__clear-btn">Clear history</button>
-    `;
-    const historyContainer = this.el('div', 'transfer-list__items');
-    this.historySection.appendChild(historyHeader);
-    this.historySection.appendChild(historyContainer);
-
     wrapper.appendChild(this.activeSection);
-    wrapper.appendChild(this.historySection);
+
+    if (!this.activeOnly) {
+      this.historySection = this.el('div', 'transfer-list__section');
+      const historyHeader = this.el('div', 'transfer-list__history-header');
+      historyHeader.innerHTML = `
+        <h3 class="transfer-list__section-title">History</h3>
+        <button class="btn btn--ghost btn--sm transfer-list__clear-btn">Clear history</button>
+      `;
+      const historyContainer = this.el('div', 'transfer-list__items');
+      this.historySection.appendChild(historyHeader);
+      this.historySection.appendChild(historyContainer);
+      wrapper.appendChild(this.historySection);
+    }
 
     return wrapper;
   }
@@ -47,23 +59,26 @@ export class TransferList extends Component {
     });
     this.addCleanup(unsub1);
 
-    const unsub2 = StateManager.subscribe('transferHistory', (history) => {
-      this.syncHistory(history);
-    });
-    this.addCleanup(unsub2);
-
-    // Clear history button
-    const clearBtn = this.element?.querySelector('.transfer-list__clear-btn');
-    if (clearBtn) {
-      clearBtn.addEventListener('click', async () => {
-        await IpcClient.clearHistory();
-        StateManager.setState('transferHistory', []);
+    if (!this.activeOnly) {
+      const unsub2 = StateManager.subscribe('transferHistory', (history) => {
+        this.syncHistory(history);
       });
+      this.addCleanup(unsub2);
+
+      // Clear history button
+      const clearBtn = this.element?.querySelector('.transfer-list__clear-btn');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', async () => {
+          await IpcClient.clearHistory();
+          StateManager.setState('transferHistory', []);
+        });
+      }
+
+      this.syncHistory(StateManager.get('transferHistory'));
     }
 
     // Initial render
     this.syncActive(StateManager.get('activeTransfers'));
-    this.syncHistory(StateManager.get('transferHistory'));
   }
 
   private syncActive(transfers: Map<string, Transfer>): void {

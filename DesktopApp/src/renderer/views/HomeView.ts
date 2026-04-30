@@ -96,9 +96,9 @@ export class HomeView extends Component {
     });
     this.fileDropZone.mount(dropZoneMount);
 
-    // Mount TransferList
+    // Mount TransferList (active transfers only — history lives in the Transfers tab)
     const transferListMount = this.element.querySelector('#transfer-list-mount') as HTMLElement;
-    this.transferList = new TransferList();
+    this.transferList = new TransferList({ activeOnly: true });
     this.transferList.mount(transferListMount);
 
     // Send button

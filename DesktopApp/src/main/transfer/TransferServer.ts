@@ -8,10 +8,55 @@
 import { createServer, Server, Socket } from 'net';
 import { EventEmitter } from 'events';
 import { createHash } from 'crypto';
+import { basename } from 'path';
 import { FileChunker } from './FileChunker';
 
 const PROGRESS_EMIT_INTERVAL_MS = 100;
 const HEADER_MAX_SIZE = 4096;
+
+// ─── File name sanitisation ───────────────────────────────────────────────────
+
+/**
+ * Sanitise a peer-supplied file name so it cannot escape the save directory.
+ *
+ * Rules applied (in order):
+ *  1. Extract only the basename — strips any directory component (e.g. "../../etc/passwd" → "passwd")
+ *  2. Remove null bytes and ASCII control characters
+ *  3. Replace Windows-illegal characters  \ / : * ? " < > |
+ *  4. Strip leading dots and spaces (hidden-file / trailing-space tricks)
+ *  5. Reject Windows reserved device names (CON, NUL, COM1 … LPT9, etc.)
+ *  6. Truncate to 255 bytes (max filename length on most filesystems)
+ *  7. Fall back to "file" if the result is empty after sanitisation
+ */
+function sanitizeFileName(raw: string): string {
+  // 1. Basename only — defeats path traversal
+  let name = basename(raw);
+
+  // 2. Remove null bytes and control characters
+  // eslint-disable-next-line no-control-regex
+  name = name.replace(/[\x00-\x1F\x7F]/g, '');
+
+  // 3. Replace characters illegal on Windows (safe to apply on all platforms)
+  name = name.replace(/[\\/:*?"<>|]/g, '_');
+
+  // 4. Strip leading dots and spaces
+  name = name.replace(/^[. ]+/, '');
+
+  // 5. Reject Windows reserved device names (case-insensitive, with or without extension)
+  const reserved = /^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)/i;
+  if (reserved.test(name)) {
+    name = `_${name}`;
+  }
+
+  // 6. Truncate to 255 bytes
+  const encoded = Buffer.from(name, 'utf8');
+  if (encoded.length > 255) {
+    name = encoded.slice(0, 255).toString('utf8').replace(/\uFFFD$/, '');
+  }
+
+  // 7. Fallback
+  return name.length > 0 ? name : 'file';
+}
 
 export interface IncomingTransferRequest {
   transferId: string;
@@ -193,10 +238,13 @@ export class TransferServer extends EventEmitter {
 
         transferId = header.transferId;
 
+        // Sanitise the peer-supplied file name to prevent path traversal
+        const safeFileName = sanitizeFileName(header.fileName);
+
         // Store pending request — remainingBuffer is raw binary file data
         this.pendingRequests.set(header.transferId, {
           socket,
-          header,
+          header: { ...header, fileName: safeFileName },
           remainingBuffer,
         });
 
@@ -204,7 +252,7 @@ export class TransferServer extends EventEmitter {
           transferId: header.transferId,
           senderDeviceId: header.senderDeviceId,
           senderName: header.senderName,
-          fileName: header.fileName,
+          fileName: safeFileName,
           fileSize: header.fileSize,
           checksum: header.checksum,
           socket,

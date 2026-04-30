@@ -192,29 +192,17 @@ export class SettingsView extends Component {
             <div class="sg__theme-group" role="radiogroup" aria-label="Theme">
               <label class="sg__theme-option${s.theme === 'dark' ? ' sg__theme-option--active' : ''}">
                 <input type="radio" name="theme" value="dark" ${s.theme === 'dark' ? 'checked' : ''}/>
-                <span class="sg__theme-preview sg__theme-preview--dark">
-                  <span class="sg__theme-preview-bar"></span>
-                  <span class="sg__theme-preview-bar"></span>
-                  <span class="sg__theme-preview-bar"></span>
-                </span>
+                <span class="sg__theme-preview sg__theme-preview--dark"></span>
                 <span class="sg__theme-label">Dark</span>
               </label>
               <label class="sg__theme-option${s.theme === 'light' ? ' sg__theme-option--active' : ''}">
                 <input type="radio" name="theme" value="light" ${s.theme === 'light' ? 'checked' : ''}/>
-                <span class="sg__theme-preview sg__theme-preview--light">
-                  <span class="sg__theme-preview-bar"></span>
-                  <span class="sg__theme-preview-bar"></span>
-                  <span class="sg__theme-preview-bar"></span>
-                </span>
+                <span class="sg__theme-preview sg__theme-preview--light"></span>
                 <span class="sg__theme-label">Light</span>
               </label>
               <label class="sg__theme-option${s.theme === 'system' ? ' sg__theme-option--active' : ''}">
                 <input type="radio" name="theme" value="system" ${s.theme === 'system' ? 'checked' : ''}/>
-                <span class="sg__theme-preview sg__theme-preview--system">
-                  <span class="sg__theme-preview-bar"></span>
-                  <span class="sg__theme-preview-bar"></span>
-                  <span class="sg__theme-preview-bar"></span>
-                </span>
+                <span class="sg__theme-preview sg__theme-preview--system"></span>
                 <span class="sg__theme-label">System</span>
               </label>
             </div>

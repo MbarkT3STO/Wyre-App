@@ -17,7 +17,8 @@ export class IncomingDialog extends Component {
   private countdownInterval: ReturnType<typeof setInterval> | null = null;
   private svgCircle: SVGCircleElement | null = null;
   private countdownEl: HTMLElement | null = null;
-  private circumference = 2 * Math.PI * 44; // r=44
+  // circumference = 2πr where r=44 (matches the SVG circle)
+  private readonly circumference = 2 * Math.PI * 44;
 
   constructor(request: IncomingRequestPayload, timeoutSeconds = 30) {
     super();
@@ -47,9 +48,7 @@ export class IncomingDialog extends Component {
               </linearGradient>
             </defs>
             <circle class="incoming-dialog__ring-track" cx="50" cy="50" r="44"/>
-            <circle class="incoming-dialog__ring-fill" cx="50" cy="50" r="44"
-              stroke-dasharray="${2 * Math.PI * 44}"
-              stroke-dashoffset="0"/>
+            <circle class="incoming-dialog__ring-fill" cx="50" cy="50" r="44"/>
           </svg>
           <div class="incoming-dialog__avatar">
             <span class="incoming-dialog__initial">${escapeHtml(initial)}</span>
@@ -78,7 +77,7 @@ export class IncomingDialog extends Component {
         <div class="incoming-dialog__actions">
           <button class="incoming-dialog__decline" type="button">Decline</button>
           <button class="incoming-dialog__accept" type="button">
-            <svg viewBox="0 0 16 16" fill="currentColor" style="width:14px;height:14px">
+            <svg viewBox="0 0 16 16" fill="currentColor" class="incoming-dialog__accept-icon">
               <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/>
             </svg>
             Accept
@@ -138,7 +137,8 @@ export class IncomingDialog extends Component {
     if (this.svgCircle) {
       const progress = this.remaining / this.timeoutSeconds;
       const offset = this.circumference * (1 - progress);
-      this.svgCircle.style.strokeDashoffset = String(offset);
+      // Use CSS custom property — avoids a blocked inline style assignment
+      this.svgCircle.style.setProperty('--ring-dashoffset', String(offset));
     }
   }
 

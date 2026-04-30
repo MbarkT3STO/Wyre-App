@@ -107,31 +107,31 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
   const initial = deviceName.charAt(0).toUpperCase();
 
   return `
+    ${!isMac ? `
     <div class="titlebar" id="titlebar">
-      ${isMac ? `<div class="titlebar__macos-spacer"></div>` : ''}
       <div class="titlebar__spacer"></div>
-      ${!isMac ? `
-        <div class="titlebar__controls">
-          <button class="titlebar__btn" id="btn-minimize" aria-label="Minimize">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 8a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H2.75A.75.75 0 012 8z"/></svg>
-          </button>
-          <button class="titlebar__btn" id="btn-maximize" aria-label="Maximize">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 2h10.5c.414 0 .75.336.75.75v10.5a.75.75 0 01-.75.75H2.75a.75.75 0 01-.75-.75V2.75A.75.75 0 012.75 2zm.75 1.5v9h9v-9h-9z"/></svg>
-          </button>
-          <button class="titlebar__btn titlebar__btn--close" id="btn-close" aria-label="Close">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/></svg>
-          </button>
-        </div>
-      ` : ''}
+      <div class="titlebar__controls">
+        <button class="titlebar__btn" id="btn-minimize" aria-label="Minimize">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2 8a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H2.75A.75.75 0 012 8z"/></svg>
+        </button>
+        <button class="titlebar__btn" id="btn-maximize" aria-label="Maximize">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 2h10.5c.414 0 .75.336.75.75v10.5a.75.75 0 01-.75.75H2.75a.75.75 0 01-.75-.75V2.75A.75.75 0 012.75 2zm.75 1.5v9h9v-9h-9z"/></svg>
+        </button>
+        <button class="titlebar__btn titlebar__btn--close" id="btn-close" aria-label="Close">
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z"/></svg>
+        </button>
+      </div>
     </div>
+    ` : ''}
     <div class="app-body">
       <nav class="sidebar" role="navigation" aria-label="Main navigation">
-        <div class="sidebar__brand">
+        <div class="sidebar__brand sidebar__brand--draggable">
           <div class="sidebar__brand-icon">
             <img src="${appIconUrl}" alt="Wyre" draggable="false" />
           </div>
           <span class="sidebar__brand-name">Wyre</span>
         </div>
+
         <div class="sidebar__header">
           <div class="sidebar__device-card">
             <div class="sidebar__device-avatar">${escapeHtml(initial)}</div>
@@ -144,8 +144,10 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
             </div>
           </div>
         </div>
-        <div class="sidebar__nav">
-          <span class="sidebar__nav-label">Menu</span>
+
+        <span class="sidebar__nav-label">Navigation</span>
+
+        <div class="sidebar__nav" role="menubar">
           <a href="#/home" class="sidebar__nav-item sidebar__nav-item--active" data-route="/home" role="menuitem">
             <svg class="sidebar__nav-item-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
               <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
@@ -165,8 +167,9 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
             <span class="sidebar__nav-item-label">Settings</span>
           </a>
         </div>
+
         <div class="sidebar__footer">
-          <div class="sidebar__version">v1.0.0</div>
+          <span class="sidebar__version">v1.0.0</span>
         </div>
       </nav>
       <main class="main-content" id="router-outlet" role="main"></main>

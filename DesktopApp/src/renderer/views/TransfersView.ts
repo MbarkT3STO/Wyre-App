@@ -12,7 +12,8 @@ export class TransfersView extends Component {
   render(): HTMLElement {
     const view = this.el('div', 'view transfers-view');
 
-    const content = this.el('div', 'view__content');
+    const scroll = this.el('div', 'transfers-view__scroll');
+    const content = this.el('div', 'transfers-view__content');
 
     const pageTitle = document.createElement('div');
     pageTitle.className = 'view-page-title';
@@ -24,8 +25,8 @@ export class TransfersView extends Component {
     const listMount = this.el('div', 'transfers-view__list-mount');
     content.appendChild(pageTitle);
     content.appendChild(listMount);
-
-    view.appendChild(content);
+    scroll.appendChild(content);
+    view.appendChild(scroll);
 
     return view;
   }

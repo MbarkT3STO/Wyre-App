@@ -6,8 +6,11 @@
 import { IpcMain, BrowserWindow, shell } from 'electron';
 import { IpcChannels } from '../../../shared/ipc/IpcContracts';
 import type { SettingsStore } from '../../store/SettingsStore';
-import type { SettingsSetPayload } from '../../../shared/ipc/IpcContracts';
 import type { AppSettings } from '../../../shared/models/AppSettings';
+import {
+  validateSettingsSetPayload,
+  validateShellPathPayload,
+} from '../validators/IpcPayloadValidator';
 
 export function registerSettingsHandlers(
   ipcMain: IpcMain,
@@ -18,8 +21,22 @@ export function registerSettingsHandlers(
     return settingsStore.get();
   });
 
-  ipcMain.handle(IpcChannels.SETTINGS_SET, (_event, payload: SettingsSetPayload): void => {
-    settingsStore.set(payload);
+  ipcMain.handle(IpcChannels.SETTINGS_SET, (_event, payload: unknown): void => {
+    // Validate it's a plain object before passing to the store
+    const validated = validateSettingsSetPayload(payload);
+    // Only pass keys that are known AppSettings fields to prevent prototype pollution
+    const allowed: (keyof AppSettings)[] = [
+      'deviceName', 'transferPort', 'saveDirectory', 'theme',
+      'autoAccept', 'trustedDeviceIds', 'autoDeclineTimeout', 'showNotifications',
+    ];
+    const safe: Partial<AppSettings> = {};
+    for (const key of allowed) {
+      if (key in validated) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (safe as any)[key] = validated[key];
+      }
+    }
+    settingsStore.set(safe);
   });
 
   ipcMain.handle(IpcChannels.WINDOW_MINIMIZE, (): void => {
@@ -44,11 +61,13 @@ export function registerSettingsHandlers(
     return getMainWindow()?.isMaximized() ?? false;
   });
 
-  ipcMain.handle(IpcChannels.SHELL_OPEN_FILE, (_event, payload: { path: string }): void => {
-    void shell.openPath(payload.path);
+  ipcMain.handle(IpcChannels.SHELL_OPEN_FILE, (_event, payload: unknown): void => {
+    const { path } = validateShellPathPayload(payload);
+    void shell.openPath(path);
   });
 
-  ipcMain.handle(IpcChannels.SHELL_SHOW_IN_FOLDER, (_event, payload: { path: string }): void => {
-    shell.showItemInFolder(payload.path);
+  ipcMain.handle(IpcChannels.SHELL_SHOW_IN_FOLDER, (_event, payload: unknown): void => {
+    const { path } = validateShellPathPayload(payload);
+    shell.showItemInFolder(path);
   });
 }

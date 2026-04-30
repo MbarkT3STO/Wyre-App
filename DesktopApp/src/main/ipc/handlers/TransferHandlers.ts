@@ -9,7 +9,11 @@ import { IpcChannels } from '../../../shared/ipc/IpcContracts';
 import type { TransferQueue } from '../../transfer/TransferQueue';
 import type { DiscoveryService } from '../../discovery/DiscoveryService';
 import type { SettingsStore } from '../../store/SettingsStore';
-import type { TransferSendPayload, TransferCancelPayload, IncomingResponsePayload } from '../../../shared/ipc/IpcContracts';
+import {
+  validateTransferSendPayload,
+  validateTransferCancelPayload,
+  validateIncomingResponsePayload,
+} from '../validators/IpcPayloadValidator';
 
 export function registerTransferHandlers(
   ipcMain: IpcMain,
@@ -17,14 +21,16 @@ export function registerTransferHandlers(
   discoveryService: DiscoveryService,
   settingsStore: SettingsStore,
 ): void {
-  ipcMain.handle(IpcChannels.TRANSFER_SEND, async (_event, payload: TransferSendPayload): Promise<string> => {
+  ipcMain.handle(IpcChannels.TRANSFER_SEND, async (_event, payload: unknown): Promise<string> => {
+    const { deviceId, filePath } = validateTransferSendPayload(payload);
+
     const devices = discoveryService.getDevices();
-    const peer = devices.find(d => d.id === payload.deviceId);
-    if (!peer) throw new Error(`Device ${payload.deviceId} not found or offline`);
+    const peer = devices.find(d => d.id === deviceId);
+    if (!peer) throw new Error(`Device ${deviceId} not found or offline`);
 
     const settings = settingsStore.get();
     return transferQueue.enqueueSend({
-      filePath: payload.filePath,
+      filePath,
       peerIp: peer.ip,
       peerPort: peer.port,
       peerId: peer.id,
@@ -34,16 +40,18 @@ export function registerTransferHandlers(
     });
   });
 
-  ipcMain.handle(IpcChannels.TRANSFER_CANCEL, (_event, payload: TransferCancelPayload): void => {
-    transferQueue.cancelTransfer(payload.transferId);
+  ipcMain.handle(IpcChannels.TRANSFER_CANCEL, (_event, payload: unknown): void => {
+    const { transferId } = validateTransferCancelPayload(payload);
+    transferQueue.cancelTransfer(transferId);
   });
 
-  ipcMain.handle(IpcChannels.INCOMING_RESPONSE, (_event, payload: IncomingResponsePayload): void => {
-    if (payload.accepted) {
+  ipcMain.handle(IpcChannels.INCOMING_RESPONSE, (_event, payload: unknown): void => {
+    const { transferId, accepted } = validateIncomingResponsePayload(payload);
+    if (accepted) {
       const settings = settingsStore.get();
-      transferQueue.acceptIncoming(payload.transferId, settings.saveDirectory);
+      transferQueue.acceptIncoming(transferId, settings.saveDirectory);
     } else {
-      transferQueue.declineIncoming(payload.transferId);
+      transferQueue.declineIncoming(transferId);
     }
   });
 

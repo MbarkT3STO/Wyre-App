@@ -32,13 +32,6 @@ const PLATFORM_ICONS: Record<string, string> = {
   </svg>`,
 };
 
-const PLATFORM_COLORS: Record<string, string> = {
-  windows: '#4FC3F7',
-  macos: '#A8A5FF',
-  linux: '#81C784',
-  unknown: '#8A90A4',
-};
-
 export class DeviceCard extends Component {
   private options: DeviceCardOptions;
 
@@ -56,7 +49,6 @@ export class DeviceCard extends Component {
     const { device, selected, onClick } = this.options;
     const initial = device.name.charAt(0).toUpperCase();
     const platformIcon = PLATFORM_ICONS[device.platform] ?? PLATFORM_ICONS['unknown'];
-    const platformColor = PLATFORM_COLORS[device.platform] ?? PLATFORM_COLORS['unknown'];
 
     const card = this.el('div', `device-card${selected ? ' device-card--selected' : ''}`);
     card.setAttribute('role', 'button');
@@ -67,7 +59,7 @@ export class DeviceCard extends Component {
     card.innerHTML = `
       <div class="device-card__avatar">
         <span class="device-card__initial">${initial}</span>
-        <span class="device-card__platform-icon" style="color: ${platformColor}" title="${device.platform}">
+        <span class="device-card__platform-icon device-card__platform-icon--${device.platform}" title="${device.platform}">
           ${platformIcon}
         </span>
         <span class="device-card__online-dot" aria-label="Online"></span>
@@ -75,7 +67,7 @@ export class DeviceCard extends Component {
       <div class="device-card__info">
         <span class="device-card__name">${escapeHtml(device.name)}</span>
         <span class="device-card__ip">${escapeHtml(device.ip)}</span>
-        <span class="device-card__platform-badge" style="color: ${platformColor}">
+        <span class="device-card__platform-badge device-card__platform-badge--${device.platform}">
           ${capitalize(device.platform)}
         </span>
       </div>

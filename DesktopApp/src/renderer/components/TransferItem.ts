@@ -29,6 +29,7 @@ export class TransferItem extends Component {
     // Re-attach action listeners — super.update() replaces the DOM element
     // so the previous listeners are gone with the old element
     this.attachActions();
+    this.applyProgressWidth();
   }
 
   render(): HTMLElement {
@@ -66,7 +67,7 @@ export class TransferItem extends Component {
         <div class="transfer-item__meta">
           <span class="transfer-item__filename" title="${escapeHtml(t.fileName)}">${escapeHtml(truncateFilename(t.fileName, 32))}</span>
           <span class="transfer-item__peer">
-            <svg viewBox="0 0 12 12" fill="currentColor" style="width:10px;height:10px;opacity:0.5">
+            <svg viewBox="0 0 12 12" fill="currentColor" class="transfer-item__peer-icon">
               <path d="M6 0a3 3 0 100 6 3 3 0 000-6zM2 9a4 4 0 018 0v1a1 1 0 01-1 1H3a1 1 0 01-1-1V9z"/>
             </svg>
             ${escapeHtml(t.peerName)}
@@ -83,7 +84,7 @@ export class TransferItem extends Component {
       ${isActive ? `
         <div class="transfer-item__progress-wrap">
           <div class="transfer-item__progress-bar" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
-            <div class="transfer-item__progress-fill${t.status === TransferStatus.Active ? ' transfer-item__progress-fill--active' : ''}" style="width:${progress}%"></div>
+            <div class="transfer-item__progress-fill${t.status === TransferStatus.Active ? ' transfer-item__progress-fill--active' : ''}" data-progress="${progress}"></div>
           </div>
           <div class="transfer-item__progress-stats">
             <span class="transfer-item__progress-pct">${progress}%</span>
@@ -96,20 +97,20 @@ export class TransferItem extends Component {
       ` : ''}
       <div class="transfer-item__actions">
         ${isActive ? `<button class="btn btn--danger btn--sm transfer-item__cancel" data-id="${t.id}">
-          <svg viewBox="0 0 12 12" fill="currentColor" class="btn__icon" style="width:11px;height:11px">
+          <svg viewBox="0 0 12 12" fill="currentColor" class="btn__icon transfer-item__btn-icon">
             <path d="M2.22 2.22a.75.75 0 011.06 0L6 4.94l2.72-2.72a.75.75 0 111.06 1.06L7.06 6l2.72 2.72a.75.75 0 11-1.06 1.06L6 7.06 3.28 9.78a.75.75 0 01-1.06-1.06L4.94 6 2.22 3.28a.75.75 0 010-1.06z"/>
           </svg>
           Cancel
         </button>` : ''}
         ${t.status === TransferStatus.Completed && savedPath ? `
           <button class="btn btn--ghost btn--sm transfer-item__open-file" data-path="${escapeHtml(savedPath)}">
-            <svg viewBox="0 0 12 12" fill="currentColor" class="btn__icon" style="width:11px;height:11px">
+            <svg viewBox="0 0 12 12" fill="currentColor" class="btn__icon transfer-item__btn-icon">
               <path d="M1.5 1.5h4.25a.75.75 0 010 1.5H3.06l6.22 6.22V6.25a.75.75 0 011.5 0v4.25a.75.75 0 01-.75.75H5.75a.75.75 0 010-1.5h2.97L2.5 3.53v2.72a.75.75 0 01-1.5 0V2.25a.75.75 0 01.75-.75z"/>
             </svg>
             Open
           </button>
           <button class="btn btn--ghost btn--sm transfer-item__open-folder" data-path="${escapeHtml(savedPath)}">
-            <svg viewBox="0 0 12 12" fill="currentColor" class="btn__icon" style="width:11px;height:11px">
+            <svg viewBox="0 0 12 12" fill="currentColor" class="btn__icon transfer-item__btn-icon">
               <path d="M1 2.5A1.5 1.5 0 012.5 1h2.379a1.5 1.5 0 011.06.44l.622.621A.5.5 0 007.207 2.5H9.5A1.5 1.5 0 0111 4v5.5A1.5 1.5 0 019.5 11h-7A1.5 1.5 0 011 9.5v-7z"/>
             </svg>
             Folder
@@ -123,9 +124,19 @@ export class TransferItem extends Component {
 
   protected onMount(): void {
     this.attachActions();
+    this.applyProgressWidth();
   }
 
   protected onUnmount(): void {}
+
+  /** Set progress bar width via CSS custom property — avoids unsafe-inline style */
+  private applyProgressWidth(): void {
+    if (!this.element) return;
+    const fill = this.element.querySelector<HTMLElement>('.transfer-item__progress-fill');
+    if (!fill) return;
+    const progress = isActiveTransfer(this.data) ? this.data.progress : (this.data.status === TransferStatus.Completed ? 100 : 0);
+    fill.style.setProperty('--progress-width', `${progress}%`);
+  }
 
   private attachActions(): void {
     if (!this.element) return;
