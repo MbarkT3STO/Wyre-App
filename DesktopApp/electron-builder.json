@@ -1,0 +1,61 @@
+{
+  "productName": "FileDrop",
+  "appId": "com.filedrop.app",
+  "copyright": "Copyright © 2024 FileDrop",
+  "directories": {
+    "output": "release",
+    "buildResources": "assets"
+  },
+  "files": [
+    "dist/**/*",
+    "index.html",
+    "assets/icons/**/*"
+  ],
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "assets/icons/icon.icns",
+    "category": "public.app-category.utilities",
+    "darkModeSupport": true
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "assets/icons/icon.ico"
+  },
+  "linux": {
+    "target": [
+      {
+        "target": "AppImage",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "assets/icons/icon.png",
+    "category": "Utility"
+  },
+  "dmg": {
+    "title": "FileDrop",
+    "contents": [
+      { "x": 130, "y": 220 },
+      { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+    ],
+    "window": {
+      "width": 540,
+      "height": 380
+    }
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  }
+}

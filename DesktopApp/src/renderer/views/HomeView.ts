@@ -1,0 +1,190 @@
+/**
+ * HomeView.ts
+ * Main screen: device list + file send UI.
+ */
+
+import { Component } from '../components/base/Component';
+import { DeviceList } from '../components/DeviceList';
+import { FileDropZone } from '../components/FileDropZone';
+import { TransferList } from '../components/TransferList';
+import { StateManager } from '../core/StateManager';
+import { IpcClient } from '../core/IpcClient';
+import type { Device } from '../../shared/models/Device';
+import type { ToastContainer } from '../components/ToastContainer';
+
+export class HomeView extends Component {
+  private deviceList: DeviceList | null = null;
+  private fileDropZone: FileDropZone | null = null;
+  private transferList: TransferList | null = null;
+  private toasts: ToastContainer;
+  private selectedFile: { path: string; name: string; size: number } | null = null;
+  private sendBtn: HTMLButtonElement | null = null;
+
+  constructor(toasts: ToastContainer) {
+    super();
+    this.toasts = toasts;
+  }
+
+  render(): HTMLElement {
+    const view = this.el('div', 'view home-view');
+
+    view.innerHTML = `
+      <div class="home-view__left">
+        <div class="home-view__device-section" id="device-list-mount"></div>
+      </div>
+      <div class="home-view__right">
+        <div class="home-view__send-panel">
+          <div class="home-view__panel-header">
+            <div class="home-view__panel-title">Send a File</div>
+            <div class="home-view__panel-subtitle">Select a device, then drop your file</div>
+          </div>
+          <div class="home-view__panel-body">
+            <div class="home-view__target-label">Target Device</div>
+            <div id="selected-device-info">
+              <div class="home-view__no-device">No device selected</div>
+            </div>
+            <div id="file-drop-zone-mount"></div>
+            <div id="transfer-list-mount" class="home-view__transfer-list"></div>
+          </div>
+          <div class="home-view__panel-footer">
+            <button class="btn btn--primary home-view__send-btn" id="send-btn" disabled>
+              <svg viewBox="0 0 16 16" fill="currentColor" class="btn__icon">
+                <path d="M1.5 1.75a.75.75 0 011.28-.53l10.5 6.25a.75.75 0 010 1.06l-10.5 6.25A.75.75 0 011.5 14.25V1.75z"/>
+              </svg>
+              Send File
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    return view;
+  }
+
+  protected onMount(): void {
+    if (!this.element) return;
+
+    // Mount DeviceList
+    const deviceListMount = this.element.querySelector('#device-list-mount') as HTMLElement;
+    this.deviceList = new DeviceList({
+      onDeviceSelect: (device) => this.handleDeviceSelect(device),
+    });
+    this.deviceList.mount(deviceListMount);
+
+    // Mount FileDropZone
+    const dropZoneMount = this.element.querySelector('#file-drop-zone-mount') as HTMLElement;
+    this.fileDropZone = new FileDropZone({
+      onFileSelected: (path, name, size) => {
+        this.selectedFile = { path, name, size };
+        this.updateSendButton();
+      },
+    });
+    this.fileDropZone.mount(dropZoneMount);
+
+    // Mount TransferList inline so progress is visible without navigating away
+    const transferListMount = this.element.querySelector('#transfer-list-mount') as HTMLElement;
+    this.transferList = new TransferList();
+    this.transferList.mount(transferListMount);
+
+    // Send button
+    this.sendBtn = this.element.querySelector('#send-btn') as HTMLButtonElement;
+    this.sendBtn?.addEventListener('click', () => this.handleSend());
+
+    // Subscribe to selected device changes
+    const unsub = StateManager.subscribe('selectedDeviceId', (id) => {
+      this.updateSelectedDeviceInfo(id);
+      this.updateSendButton();
+    });
+    this.addCleanup(unsub);
+
+    // Initial state
+    this.updateSelectedDeviceInfo(StateManager.get('selectedDeviceId'));
+  }
+
+  private handleDeviceSelect(device: Device): void {
+    const current = StateManager.get('selectedDeviceId');
+    StateManager.setState('selectedDeviceId', current === device.id ? null : device.id);
+  }
+
+  private updateSelectedDeviceInfo(deviceId: string | null): void {
+    const infoEl = this.element?.querySelector('#selected-device-info');
+    if (!infoEl) return;
+
+    if (!deviceId) {
+      infoEl.innerHTML = `<div class="home-view__no-device">Click a device to select it</div>`;
+      return;
+    }
+
+    const device = StateManager.get('devices').find(d => d.id === deviceId);
+    if (!device) {
+      infoEl.innerHTML = `<div class="home-view__no-device">Device not found</div>`;
+      return;
+    }
+
+    const initial = device.name.charAt(0).toUpperCase();
+    infoEl.innerHTML = `
+      <div class="home-view__device-chip">
+        <div class="home-view__device-chip-avatar">${escapeHtml(initial)}</div>
+        <div class="home-view__device-chip-info">
+          <div class="home-view__device-chip-name">${escapeHtml(device.name)}</div>
+          <div class="home-view__device-chip-ip">${escapeHtml(device.ip)}</div>
+        </div>
+        <span class="home-view__device-chip-dot"></span>
+      </div>
+    `;
+  }
+
+  private updateSendButton(): void {
+    if (!this.sendBtn) return;
+    const hasDevice = StateManager.get('selectedDeviceId') !== null;
+    const hasFile = this.selectedFile !== null;
+    this.sendBtn.disabled = !(hasDevice && hasFile);
+  }
+
+  private async handleSend(): Promise<void> {
+    const deviceId = StateManager.get('selectedDeviceId');
+    const file = this.selectedFile;
+
+    if (!deviceId || !file) return;
+
+    try {
+      this.sendBtn!.disabled = true;
+      this.sendBtn!.textContent = 'Sending…';
+
+      // Navigate to transfers view FIRST so TransferList is mounted
+      // and subscribed before TRANSFER_STARTED arrives from main
+      window.location.hash = '/transfers';
+
+      await IpcClient.sendFile({
+        deviceId,
+        filePath: file.path,
+      });
+
+      this.toasts.success(`Sending ${file.name}…`);
+      this.fileDropZone?.clearSelection();
+      this.selectedFile = null;
+      this.updateSendButton();
+
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to send file';
+      this.toasts.error(message);
+      this.sendBtn!.disabled = false;
+      this.sendBtn!.innerHTML = `
+        <svg viewBox="0 0 16 16" fill="currentColor" class="btn__icon">
+          <path d="M1.5 1.75a.75.75 0 011.28-.53l10.5 6.25a.75.75 0 010 1.06l-10.5 6.25A.75.75 0 011.5 14.25V1.75z"/>
+        </svg>
+        Send
+      `;
+    }
+  }
+
+  protected onUnmount(): void {
+    this.deviceList?.unmount();
+    this.fileDropZone?.unmount();
+    this.transferList?.unmount();
+  }
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}

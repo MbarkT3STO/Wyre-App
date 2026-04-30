@@ -1,0 +1,32 @@
+{
+  "name": "filedrop",
+  "version": "1.0.0",
+  "description": "Seamless peer-to-peer file transfer for local networks",
+  "main": "dist/main/index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "package": "npm run build && electron-builder",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": ["electron", "file-transfer", "p2p", "local-network"],
+  "author": "FileDrop",
+  "license": "MIT",
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0",
+    "vite-plugin-electron": "^0.28.0",
+    "vite-plugin-electron-renderer": "^0.14.0",
+    "vitest": "^1.5.0"
+  },
+  "dependencies": {
+    "electron-store": "^8.2.0"
+  }
+}
