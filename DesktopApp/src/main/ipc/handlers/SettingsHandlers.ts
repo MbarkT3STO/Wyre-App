@@ -27,7 +27,7 @@ export function registerSettingsHandlers(
     // Only pass keys that are known AppSettings fields to prevent prototype pollution
     const allowed: (keyof AppSettings)[] = [
       'deviceName', 'transferPort', 'saveDirectory', 'theme',
-      'autoAccept', 'trustedDeviceIds', 'autoDeclineTimeout', 'showNotifications',
+      'autoAccept', 'trustedDeviceIds', 'autoDeclineTimeout', 'showNotifications', 'uiScale',
     ];
     const safe: Partial<AppSettings> = {};
     for (const key of allowed) {

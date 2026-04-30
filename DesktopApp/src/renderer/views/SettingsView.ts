@@ -20,6 +20,7 @@ const ICONS = {
   data:          `<i class="fa-solid fa-trash-can"></i>`,
   folder:        `<i class="fa-solid fa-folder-open"></i>`,
   port:          `<i class="fa-solid fa-plug"></i>`,
+  scale:         `<i class="fa-solid fa-magnifying-glass"></i>`,
 };
 
 export class SettingsView extends Component {
@@ -174,9 +175,41 @@ export class SettingsView extends Component {
         </div>
       </div>
 
-      <!-- ── Appearance ── -->
+      <!-- ── UI Scale ── -->
       <div class="sg">
         <div class="sg__header">
+          <div class="sg__icon sg__icon--blue">${ICONS.scale}</div>
+          <div class="sg__meta">
+            <div class="sg__title">UI Scale</div>
+            <div class="sg__desc">Adjust the size of all interface elements</div>
+          </div>
+        </div>
+        <div class="sg__body">
+          <div class="sg__row sg__row--column">
+            <div class="sg__row-info">
+              <span class="sg__label">
+                Interface Size
+                <span class="sg__badge" id="scale-value">${Math.round((s.uiScale ?? 1.0) * 100)}%</span>
+              </span>
+              <span class="sg__hint">Changes take effect immediately across the whole app</span>
+            </div>
+            <div class="sg__scale-group" role="radiogroup" aria-label="UI Scale">
+              ${([0.85, 0.9, 1.0, 1.1, 1.2, 1.35] as const).map(v => `
+                <label class="sg__scale-option${(s.uiScale ?? 1.0) === v ? ' sg__scale-option--active' : ''}">
+                  <input type="radio" name="uiScale" value="${v}" ${(s.uiScale ?? 1.0) === v ? 'checked' : ''}/>
+                  <span class="sg__scale-preview">
+                    <span class="sg__scale-preview-text">Aa</span>
+                  </span>
+                  <span class="sg__scale-label">${v === 0.85 ? 'XS' : v === 0.9 ? 'S' : v === 1.0 ? 'M' : v === 1.1 ? 'L' : v === 1.2 ? 'XL' : 'XXL'}</span>
+                </label>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Appearance ── -->
+      <div class="sg">        <div class="sg__header">
           <div class="sg__icon sg__icon--purple">${ICONS.appearance}</div>
           <div class="sg__meta">
             <div class="sg__title">Appearance</div>
@@ -313,6 +346,24 @@ export class SettingsView extends Component {
       if (!valid) { this.toasts.error(error ?? 'Invalid timeout'); return; }
       await IpcClient.setSettings({ autoDeclineTimeout: val });
       this.toasts.success('Settings saved');
+    });
+
+    this.element.querySelectorAll('input[name="uiScale"]').forEach(radio => {
+      radio.addEventListener('change', async () => {
+        const val = parseFloat((radio as HTMLInputElement).value) as import('../../shared/models/AppSettings').UiScale;
+        // Update active class
+        this.element?.querySelectorAll('.sg__scale-option').forEach(opt => {
+          const optVal = parseFloat((opt.querySelector('input') as HTMLInputElement)?.value ?? '1');
+          opt.classList.toggle('sg__scale-option--active', optVal === val);
+        });
+        // Update badge
+        const badge = this.element?.querySelector('#scale-value');
+        if (badge) badge.textContent = `${Math.round(val * 100)}%`;
+        // Apply immediately
+        window.dispatchEvent(new CustomEvent('filedrop:scale-change', { detail: { scale: val } }));
+        await IpcClient.setSettings({ uiScale: val });
+        this.toasts.success('UI scale updated');
+      });
     });
 
     this.element.querySelectorAll('input[name="theme"]').forEach(radio => {

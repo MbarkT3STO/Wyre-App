@@ -16,6 +16,7 @@ import { IpcClient } from './core/IpcClient';
 import { StateManager } from './core/StateManager';
 import { Router } from './core/Router';
 import { ThemeEngine } from './theme/ThemeEngine';
+import { ScaleEngine } from './theme/ScaleEngine';
 import { ToastContainer } from './components/ToastContainer';
 import { IncomingDialog } from './components/IncomingDialog';
 import { HomeView } from './views/HomeView';
@@ -25,6 +26,7 @@ import type { Transfer } from '../shared/models/Transfer';
 import { TransferStatus } from '../shared/models/Transfer';
 
 const themeEngine = new ThemeEngine();
+const scaleEngine = new ScaleEngine();
 const toasts = new ToastContainer();
 const router = new Router();
 
@@ -33,6 +35,7 @@ async function bootstrap(): Promise<void> {
   const settings = await IpcClient.getSettings();
   StateManager.setState('settings', settings);
   themeEngine.apply(settings.theme);
+  scaleEngine.apply(settings.uiScale ?? 1.0);
 
   // Load initial devices
   const devices = await IpcClient.getDevices();
@@ -334,6 +337,11 @@ function wireCustomEvents(): void {
   window.addEventListener('filedrop:theme-change', (e) => {
     const theme = (e as CustomEvent<{ theme: 'dark' | 'light' | 'system' }>).detail.theme;
     themeEngine.apply(theme);
+  });
+
+  window.addEventListener('filedrop:scale-change', (e) => {
+    const scale = (e as CustomEvent<{ scale: import('../shared/models/AppSettings').UiScale }>).detail.scale;
+    scaleEngine.apply(scale);
   });
 }
 

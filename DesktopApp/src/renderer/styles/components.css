@@ -2057,6 +2057,82 @@
   transition: color var(--transition);
 }
 
+/* ── Scale group ── */
+.sg__scale-group {
+  display: flex;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.sg__scale-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+}
+
+.sg__scale-option input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.sg__scale-option--active .sg__scale-preview {
+  box-shadow: var(--nm-pressed), 0 0 0 2px var(--accent-mid);
+}
+.sg__scale-option--active .sg__scale-label {
+  color: var(--accent-mid);
+  font-weight: var(--weight-bold);
+}
+
+.sg__scale-preview {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-md);
+  background: var(--bg-app);
+  box-shadow: var(--nm-raised);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+}
+
+.sg__scale-option:hover .sg__scale-preview {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Each option shows "Aa" at a progressively larger size */
+.sg__scale-option:nth-child(1) .sg__scale-preview-text { font-size: 13px; }
+.sg__scale-option:nth-child(2) .sg__scale-preview-text { font-size: 15px; }
+.sg__scale-option:nth-child(3) .sg__scale-preview-text { font-size: 17px; }
+.sg__scale-option:nth-child(4) .sg__scale-preview-text { font-size: 19px; }
+.sg__scale-option:nth-child(5) .sg__scale-preview-text { font-size: 21px; }
+.sg__scale-option:nth-child(6) .sg__scale-preview-text { font-size: 24px; }
+
+.sg__scale-preview-text {
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1;
+  transition: color var(--transition-fast);
+}
+.sg__scale-option--active .sg__scale-preview-text { color: var(--accent-mid); }
+
+.sg__scale-label {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: color var(--transition-fast);
+}
+
 
 /* ══════════════════════════════════════════════════════════
    15. RESPONSIVE — Settings group

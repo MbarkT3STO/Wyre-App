@@ -57,6 +57,7 @@ export class SettingsStore {
       trustedDeviceIds: this.store.get('trustedDeviceIds'),
       autoDeclineTimeout: this.store.get('autoDeclineTimeout'),
       showNotifications: this.store.get('showNotifications'),
+      uiScale: this.store.get('uiScale') ?? 1.0,
       version: this.store.get('version'),
     };
   }

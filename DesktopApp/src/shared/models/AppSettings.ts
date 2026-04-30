@@ -4,6 +4,7 @@
  */
 
 export type ThemePreference = 'dark' | 'light' | 'system';
+export type UiScale = 0.85 | 0.9 | 1.0 | 1.1 | 1.2 | 1.35;
 
 export interface AppSettings {
   /** Stable device identifier (UUID) */
@@ -24,6 +25,8 @@ export interface AppSettings {
   autoDeclineTimeout: number;
   /** Whether to show OS notifications on transfer complete */
   showNotifications: boolean;
+  /** UI zoom scale factor */
+  uiScale: UiScale;
   /** App version (for migration checks) */
   version: string;
 }
@@ -38,5 +41,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   trustedDeviceIds: [],
   autoDeclineTimeout: 30,
   showNotifications: true,
+  uiScale: 1.0,
   version: '1.0.0',
 };
