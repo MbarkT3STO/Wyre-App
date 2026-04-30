@@ -226,8 +226,8 @@ a:hover { text-decoration: none; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--gradient-accent);
-  box-shadow: 0 3px 14px var(--accent-glow-sm);
+  background: transparent;
+  box-shadow: none;
 }
 
 .sidebar__brand-icon img {
