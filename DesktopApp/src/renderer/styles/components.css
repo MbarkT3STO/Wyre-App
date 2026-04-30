@@ -575,12 +575,15 @@
   align-items: center;
   justify-content: center;
   gap: var(--sp-3);
-  padding: var(--sp-10) var(--sp-4);
+  padding: var(--sp-8) var(--sp-6);
   text-align: center;
   background: var(--bg-app);
   border: none;
   border-radius: var(--radius-lg);
   box-shadow: var(--nm-pressed);
+  width: 100%;
+  /* Span all grid columns when inside the grid */
+  grid-column: 1 / -1;
 }
 
 .device-list__empty-icon {
@@ -1516,6 +1519,12 @@
   grid-template-columns: repeat(auto-fit, minmax(130px, 150px));
   gap: var(--sp-3);
   justify-content: start;
+}
+
+/* Full-width grid when showing the empty/searching state */
+.home-view__devices-mount .device-list__grid:has(.device-list__empty) {
+  grid-template-columns: 1fr;
+  justify-content: stretch;
 }
 
 /* Send section */
