@@ -179,10 +179,15 @@ a:hover { text-decoration: underline; }
 
 .titlebar__btn svg { width: 13px; height: 13px; }
 
+/* ══════════════════════════════════════════════════════════
+   APP BODY + SIDEBAR
+   ══════════════════════════════════════════════════════════ */
+
 /* ── App Body ──────────────────────────────────────────────── */
 .app-body {
   display: flex;
   flex: 1;
+  min-height: 0;
   overflow: hidden;
   position: relative;
   z-index: 1;
@@ -202,6 +207,7 @@ a:hover { text-decoration: underline; }
   overflow: hidden;
   position: relative;
   z-index: 10;
+  transition: width var(--transition-slow);
 }
 
 /* ── Sidebar Header ── */
@@ -209,6 +215,7 @@ a:hover { text-decoration: underline; }
   padding: var(--sp-4) var(--sp-3) var(--sp-3);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  min-width: 0;
 }
 
 .sidebar__device-card {
@@ -220,15 +227,16 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   transition: border-color var(--transition);
+  min-width: 0;
+  overflow: hidden;
 }
 
-.sidebar__device-card:hover {
-  border-color: var(--border-default);
-}
+.sidebar__device-card:hover { border-color: var(--border-default); }
 
 .sidebar__device-avatar {
   width: 34px;
   height: 34px;
+  min-width: 34px;
   border-radius: var(--radius-sm);
   background: var(--gradient-accent);
   display: flex;
@@ -245,6 +253,7 @@ a:hover { text-decoration: underline; }
 .sidebar__device-info {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .sidebar__device-name {
@@ -263,11 +272,13 @@ a:hover { text-decoration: underline; }
   align-items: center;
   gap: var(--sp-1);
   margin-top: 3px;
+  min-width: 0;
 }
 
 .sidebar__status-dot {
   width: 6px;
   height: 6px;
+  min-width: 6px;
   background: var(--success);
   border-radius: 50%;
   animation: pulse 2.5s ease-in-out infinite;
@@ -282,20 +293,19 @@ a:hover { text-decoration: underline; }
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 /* ── Sidebar Nav ── */
 .sidebar__nav {
   flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   padding: var(--sp-3) var(--sp-2);
   overflow-y: auto;
+  overflow-x: hidden;
   gap: 2px;
-}
-
-.sidebar__nav-section {
-  margin-bottom: var(--sp-1);
 }
 
 .sidebar__nav-label {
@@ -306,6 +316,8 @@ a:hover { text-decoration: underline; }
   letter-spacing: 0.10em;
   padding: var(--sp-2) var(--sp-2) var(--sp-1);
   display: block;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .sidebar__nav-item {
@@ -324,9 +336,11 @@ a:hover { text-decoration: underline; }
   background: transparent;
   width: 100%;
   text-align: left;
-  position: relative;
   white-space: nowrap;
+  overflow: hidden;
   letter-spacing: -0.01em;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .sidebar__nav-item:hover {
@@ -340,21 +354,25 @@ a:hover { text-decoration: underline; }
   font-weight: var(--weight-semibold);
 }
 
-.sidebar__nav-item--active .sidebar__nav-item-icon {
-  color: var(--accent-base);
-}
+.sidebar__nav-item--active .sidebar__nav-item-icon { color: var(--accent-base); }
 
 .sidebar__nav-item-icon {
   width: 16px;
   height: 16px;
+  min-width: 16px;
   flex-shrink: 0;
   opacity: 0.65;
   transition: opacity var(--transition);
 }
 
 .sidebar__nav-item:hover .sidebar__nav-item-icon,
-.sidebar__nav-item--active .sidebar__nav-item-icon {
-  opacity: 1;
+.sidebar__nav-item--active .sidebar__nav-item-icon { opacity: 1; }
+
+.sidebar__nav-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar__nav-badge {
@@ -371,6 +389,7 @@ a:hover { text-decoration: underline; }
   align-items: center;
   justify-content: center;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 /* ── Sidebar Footer ── */
@@ -378,6 +397,7 @@ a:hover { text-decoration: underline; }
   padding: var(--sp-3) var(--sp-3) var(--sp-4);
   border-top: 1px solid var(--border-subtle);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .sidebar__version {
@@ -387,6 +407,37 @@ a:hover { text-decoration: underline; }
   padding: var(--sp-1);
   font-family: var(--font-mono);
   letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Sidebar responsive collapse ── */
+@media (max-width: 600px) {
+  .sidebar {
+    width: 52px;
+  }
+  .sidebar__device-info,
+  .sidebar__nav-label,
+  .sidebar__nav-item-label,
+  .sidebar__nav-badge,
+  .sidebar__version {
+    display: none;
+  }
+  .sidebar__header { padding: var(--sp-3) var(--sp-2); }
+  .sidebar__device-card {
+    justify-content: center;
+    padding: var(--sp-2);
+    gap: 0;
+  }
+  .sidebar__nav { padding: var(--sp-2) var(--sp-1); }
+  .sidebar__nav-item {
+    justify-content: center;
+    padding: var(--sp-2);
+    gap: 0;
+  }
+  .sidebar__nav-item-icon { opacity: 1; }
+  .sidebar__footer { padding: var(--sp-2); }
 }
 
 /* ══════════════════════════════════════════════════════════

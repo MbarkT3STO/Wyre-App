@@ -924,17 +924,22 @@
 .home-view {
   display: grid;
   grid-template-columns: 1fr 290px;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
+  width: 100%;
 }
 
 .home-view__left {
+  min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: var(--sp-5) var(--sp-6);
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
+  box-sizing: border-box;
 }
 
 .home-view__section-label {
@@ -949,6 +954,7 @@
 .home-view__right {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   overflow: hidden;
   background: var(--bg-surface);
 }
@@ -956,7 +962,8 @@
 .home-view__send-panel {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -981,12 +988,14 @@
 
 .home-view__panel-body {
   flex: 1;
+  min-height: 0;
   padding: var(--sp-4) var(--sp-5);
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);
   overflow-y: auto;
-  min-height: 0;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .home-view__target-label {
@@ -995,6 +1004,7 @@
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.10em;
+  flex-shrink: 0;
 }
 
 .home-view__no-device {
@@ -1005,6 +1015,7 @@
   border-radius: var(--radius-md);
   border: 1px dashed var(--border-subtle);
   text-align: center;
+  flex-shrink: 0;
 }
 
 .home-view__device-chip {
@@ -1015,11 +1026,14 @@
   border: 1px solid var(--accent-200);
   border-radius: var(--radius-md);
   padding: var(--sp-3) var(--sp-4);
+  flex-shrink: 0;
+  min-width: 0;
 }
 
 .home-view__device-chip-avatar {
   width: 28px;
   height: 28px;
+  min-width: 28px;
   border-radius: var(--radius-sm);
   background: var(--gradient-accent);
   display: flex;
@@ -1031,7 +1045,11 @@
   flex-shrink: 0;
 }
 
-.home-view__device-chip-info { flex: 1; min-width: 0; }
+.home-view__device-chip-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
 
 .home-view__device-chip-name {
   font-size: var(--text-sm);
@@ -1047,11 +1065,15 @@
   font-size: var(--text-xs);
   color: var(--text-muted);
   font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .home-view__device-chip-dot {
   width: 7px;
   height: 7px;
+  min-width: 7px;
   background: var(--success);
   border-radius: 50%;
   flex-shrink: 0;
@@ -1078,13 +1100,14 @@
 .home-view__transfer-list {
   border-top: 1px solid var(--border-subtle);
   padding: var(--sp-4) var(--sp-5);
+  flex-shrink: 0;
 }
 
 /* Hide history section in the inline transfer list on home */
 .home-view__transfer-list .transfer-list__section:last-child { display: none; }
 
-/* ── Responsive ── */
-@media (max-width: 700px) {
+/* ── Home responsive ── */
+@media (max-width: 760px) {
   .home-view {
     grid-template-columns: 1fr;
     grid-template-rows: 1fr auto;
@@ -1092,13 +1115,64 @@
   .home-view__left {
     border-right: none;
     border-bottom: 1px solid var(--border-subtle);
+    padding: var(--sp-4);
   }
-  .home-view__right { max-height: 300px; }
+  .home-view__right {
+    max-height: 320px;
+    flex-shrink: 0;
+  }
+  .home-view__panel-body { padding: var(--sp-3) var(--sp-4); }
+  .home-view__panel-footer { padding: var(--sp-3) var(--sp-4); }
 }
 
 @media (max-width: 480px) {
-  .home-view__right { max-height: 260px; }
-  .device-list__grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .home-view__left { padding: var(--sp-3); }
+  .home-view__right { max-height: 280px; }
+  .home-view__panel-header { padding: var(--sp-3) var(--sp-3) var(--sp-2); }
+  .home-view__panel-body { padding: var(--sp-3); gap: var(--sp-3); }
+  .home-view__panel-footer { padding: var(--sp-3); }
+  .device-list__grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--sp-2); }
+  .file-drop-zone { min-height: 130px; padding: var(--sp-5) var(--sp-3); }
+}
+
+/* ══════════════════════════════════════════════════════════
+   TRANSFERS VIEW
+   ══════════════════════════════════════════════════════════ */
+
+.transfers-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.transfers-view .view__content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--sp-5) var(--sp-6) var(--sp-8);
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.transfers-view__list-mount {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Transfer list responsive */
+@media (max-width: 600px) {
+  .transfers-view .view__content { padding: var(--sp-4); }
+  .transfer-item__stats { display: none; }
+  .transfer-item__header { flex-wrap: wrap; gap: var(--sp-2); }
+}
+
+@media (max-width: 480px) {
+  .transfers-view .view__content { padding: var(--sp-3); }
+  .transfer-item { padding: var(--sp-3); }
+  .transfer-item__badge { display: none; }
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -1369,14 +1443,6 @@
 }
 
 /* ══════════════════════════════════════════════════════════
-   TRANSFERS VIEW
-   ══════════════════════════════════════════════════════════ */
-
-.transfers-view .view__content {
-  padding-top: var(--sp-5);
-}
-
-/* ══════════════════════════════════════════════════════════
    UTILITY — MISC
    ══════════════════════════════════════════════════════════ */
 
@@ -1385,45 +1451,4 @@
   width: 13px;
   height: 13px;
   display: block;
-}
-
-/* Sidebar responsive — collapse on very narrow windows */
-@media (max-width: 560px) {
-  .sidebar {
-    width: var(--sidebar-collapsed);
-  }
-  .sidebar__device-info,
-  .sidebar__nav-label,
-  .sidebar__version,
-  .sidebar__nav-item span:not(.sidebar__nav-item-icon),
-  .sidebar__nav-badge {
-    display: none;
-  }
-  .sidebar__device-avatar {
-    margin: 0 auto;
-  }
-  .sidebar__device-card {
-    justify-content: center;
-    padding: var(--sp-2);
-  }
-  .sidebar__nav-item {
-    justify-content: center;
-    padding: var(--sp-2);
-  }
-  .sidebar__nav-item-icon {
-    opacity: 1;
-  }
-  .sidebar__footer {
-    display: none;
-  }
-}
-
-/* Ensure view header doesn't overflow on small sizes */
-@media (max-width: 400px) {
-  .view__header {
-    padding: var(--sp-4) var(--sp-4) var(--sp-3);
-  }
-  .view__content {
-    padding: var(--sp-4);
-  }
 }
