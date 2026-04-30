@@ -11,6 +11,7 @@ import { StateManager } from '../core/StateManager';
 import { IpcClient } from '../core/IpcClient';
 import type { Device } from '../../shared/models/Device';
 import type { ToastContainer } from '../components/ToastContainer';
+import { TransferStatus } from '../../shared/models/Transfer';
 
 export class HomeView extends Component {
   private deviceList: DeviceList | null = null;
@@ -63,10 +64,7 @@ export class HomeView extends Component {
           </div>
         </div>
 
-        <div class="home-view__transfers-section">
-          <div class="home-view__section-header">
-            <span class="home-view__section-title">Active Transfers</span>
-          </div>
+        <div class="home-view__transfers-section home-view__transfers-section--hidden" id="transfers-section">
           <div id="transfer-list-mount"></div>
         </div>
 
@@ -100,6 +98,17 @@ export class HomeView extends Component {
     const transferListMount = this.element.querySelector('#transfer-list-mount') as HTMLElement;
     this.transferList = new TransferList({ activeOnly: true });
     this.transferList.mount(transferListMount);
+
+    // Show/hide the transfers section based on whether there are active transfers
+    const transfersSection = this.element.querySelector('#transfers-section') as HTMLElement;
+    const updateTransfersVisibility = (transfers: Map<string, import('../../shared/models/Transfer').Transfer>) => {
+      const activeStatuses = new Set([TransferStatus.Active, TransferStatus.Connecting, TransferStatus.Pending]);
+      const hasActive = Array.from(transfers.values()).some(t => activeStatuses.has(t.status));
+      transfersSection?.classList.toggle('home-view__transfers-section--hidden', !hasActive);
+    };
+    const unsubTransfers = StateManager.subscribe('activeTransfers', updateTransfersVisibility);
+    this.addCleanup(unsubTransfers);
+    updateTransfersVisibility(StateManager.get('activeTransfers'));
 
     // Send button
     this.sendBtn = this.element.querySelector('#send-btn') as HTMLButtonElement;

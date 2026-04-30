@@ -1633,6 +1633,8 @@
 /* Transfers section */
 .home-view__transfers-section { width: 100%; }
 
+.home-view__transfers-section--hidden { display: none; }
+
 /* Responsive */
 @media (max-width: 700px) {
   .home-view__scroll { padding: var(--sp-5) var(--sp-5) var(--sp-8); gap: var(--sp-5); }

@@ -32,7 +32,9 @@ export class TransferList extends Component {
     const wrapper = this.el('div', 'transfer-list');
 
     this.activeSection = this.el('div', 'transfer-list__section');
-    this.activeSection.innerHTML = `<h3 class="transfer-list__section-title">Active Transfers</h3>`;
+    if (!this.activeOnly) {
+      this.activeSection.innerHTML = `<h3 class="transfer-list__section-title">Active Transfers</h3>`;
+    }
     const activeContainer = this.el('div', 'transfer-list__items');
     this.activeSection.appendChild(activeContainer);
     wrapper.appendChild(this.activeSection);
