@@ -589,6 +589,38 @@
   opacity: 0.25;
 }
 
+/* ── Searching animation ── */
+.device-list__searching {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.device-list__empty-icon {
+  font-size: 32px;
+  color: var(--accent-mid);
+  position: relative;
+  z-index: 1;
+  animation: iconBreathe 2.4s ease-in-out infinite;
+}
+
+.device-list__radar-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--accent-mid);
+  opacity: 0;
+  animation: radarRing 2.4s ease-out infinite;
+}
+
+.device-list__radar-ring--1 { animation-delay: 0s; }
+.device-list__radar-ring--2 { animation-delay: 0.8s; }
+.device-list__radar-ring--3 { animation-delay: 1.6s; }
+
 .device-list__empty p {
   font-size: var(--text-base);
   color: var(--text-secondary);

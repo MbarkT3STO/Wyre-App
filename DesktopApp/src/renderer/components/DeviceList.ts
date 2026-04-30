@@ -58,7 +58,12 @@ export class DeviceList extends Component {
     if (devices.length === 0) {
       this.gridEl.innerHTML = `
         <div class="device-list__empty">
-          <i class="fa-solid fa-tower-broadcast device-list__empty-icon"></i>
+          <div class="device-list__searching">
+            <div class="device-list__radar-ring device-list__radar-ring--1"></div>
+            <div class="device-list__radar-ring device-list__radar-ring--2"></div>
+            <div class="device-list__radar-ring device-list__radar-ring--3"></div>
+            <i class="fa-solid fa-tower-broadcast device-list__empty-icon"></i>
+          </div>
           <p>Searching for devices…</p>
           <span>Make sure other devices are on the same network and have Wyre open.</span>
         </div>
