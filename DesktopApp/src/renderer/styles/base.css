@@ -199,6 +199,11 @@ a:hover { text-decoration: none; }
   flex-shrink: 0;
 }
 
+/* On macOS, push the brand below the native traffic light buttons */
+.sidebar--macos .sidebar__brand {
+  padding-top: 52px;
+}
+
 .sidebar__brand--draggable {
   -webkit-app-region: drag;
 }

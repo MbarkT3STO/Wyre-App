@@ -124,7 +124,7 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
     </div>
     ` : ''}
     <div class="app-body">
-      <nav class="sidebar" role="navigation" aria-label="Main navigation">
+      <nav class="sidebar${isMac ? ' sidebar--macos' : ''}" role="navigation" aria-label="Main navigation">
         <div class="sidebar__brand sidebar__brand--draggable">
           <div class="sidebar__brand-icon">
             <img src="${appIconUrl}" alt="Wyre" draggable="false" />
