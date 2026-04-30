@@ -1684,19 +1684,26 @@
   color: var(--text-tertiary);
 }
 
-/* ── Devices section — full width ── */
+/* ── Devices section — full width, centered content ── */
 .home-view__devices-section {
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .home-view__devices-mount {
   width: 100%;
+  max-width: 800px;
 }
 
-/* Override device list grid to use more columns since we have full width */
+/* Override device list grid: auto-fit so it shrinks to content width,
+   then center it with margin auto */
 .home-view__devices-mount .device-list__grid {
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 140px));
   gap: var(--sp-3);
+  justify-content: center;
+  width: 100%;
 }
 
 /* ── Send section ── */
@@ -1853,8 +1860,9 @@
   }
 
   .home-view__devices-mount .device-list__grid {
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(110px, 130px));
     gap: var(--sp-2);
+    justify-content: center;
   }
 }
 
@@ -1880,8 +1888,9 @@
   }
 
   .home-view__devices-mount .device-list__grid {
-    grid-template-columns: repeat(auto-fill, minmax(95px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(95px, 115px));
     gap: var(--sp-2);
+    justify-content: center;
   }
 }
 
@@ -1896,8 +1905,9 @@
   }
 
   .home-view__devices-mount .device-list__grid {
-    grid-template-columns: repeat(auto-fill, minmax(85px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(85px, 105px));
     gap: var(--sp-2);
+    justify-content: center;
   }
 }
 
