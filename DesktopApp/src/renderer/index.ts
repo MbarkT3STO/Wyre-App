@@ -22,6 +22,7 @@ import { IncomingDialog } from './components/IncomingDialog';
 import { HomeView } from './views/HomeView';
 import { TransfersView } from './views/TransfersView';
 import { SettingsView } from './views/SettingsView';
+import { AboutModal } from './components/AboutModal';
 import type { Transfer } from '../shared/models/Transfer';
 import { TransferStatus } from '../shared/models/Transfer';
 
@@ -60,6 +61,9 @@ async function bootstrap(): Promise<void> {
 
   // Wire sidebar toggle
   wireSidebar();
+
+  // Wire about modal
+  wireAbout();
 
   // Wire IPC listeners
   wireIpcListeners();
@@ -132,9 +136,9 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
     <div class="app-body">
       <nav class="sidebar${isMac ? ' sidebar--macos' : ''}" role="navigation" aria-label="Main navigation">
         <div class="sidebar__brand sidebar__brand--draggable">
-          <div class="sidebar__brand-icon">
+          <button class="sidebar__brand-icon" id="about-logo-btn" aria-label="About Wyre">
             <img src="${appIconUrl}" alt="Wyre" draggable="false" />
-          </div>
+          </button>
           <span class="sidebar__brand-name">Wyre</span>
         </div>
 
@@ -200,6 +204,20 @@ function wireSidebar(): void {
   toggleBtn.addEventListener('click', () => {
     const collapsed = sidebar.classList.toggle('sidebar--collapsed');
     localStorage.setItem(STORAGE_KEY, String(collapsed));
+  });
+}
+
+function wireAbout(): void {
+  const logoBtn = document.getElementById('about-logo-btn');
+  const dialogMount = document.getElementById('dialog-mount');
+  if (!logoBtn || !dialogMount) return;
+
+  let modal: import('./components/AboutModal').AboutModal | null = null;
+
+  logoBtn.addEventListener('click', () => {
+    if (modal) return; // already open
+    modal = new AboutModal(() => { modal = null; });
+    modal.mount(dialogMount);
   });
 }
 

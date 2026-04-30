@@ -228,6 +228,16 @@ a:hover { text-decoration: none; }
   justify-content: center;
   background: transparent;
   box-shadow: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  -webkit-app-region: no-drag;
+  transition: transform var(--transition-fast), opacity var(--transition-fast);
+}
+
+.sidebar__brand-icon:hover {
+  transform: scale(1.10);
+  opacity: 0.85;
 }
 
 .sidebar__brand-icon img {
