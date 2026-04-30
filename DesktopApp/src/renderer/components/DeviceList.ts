@@ -24,7 +24,6 @@ export class DeviceList extends Component {
 
   render(): HTMLElement {
     const wrapper = this.el('div', 'device-list');
-    wrapper.style.cssText = 'padding: var(--sp-5) var(--sp-4); height: 100%; overflow-y: auto; box-sizing: border-box;';
 
     const heading = this.el('div', 'device-list__heading');
     heading.textContent = 'Nearby Devices';
@@ -98,9 +97,7 @@ export class DeviceList extends Component {
           selected: device.id === selectedId,
           onClick: (d) => this.options.onDeviceSelect(d),
         });
-        const cardContainer = this.el('div', 'device-list__card-wrapper');
-        this.gridEl.appendChild(cardContainer);
-        card.mount(cardContainer);
+        card.mount(this.gridEl);
         this.cards.set(device.id, card);
       }
     }
