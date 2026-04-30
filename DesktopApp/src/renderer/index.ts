@@ -58,6 +58,9 @@ async function bootstrap(): Promise<void> {
   // Wire title bar controls
   wireTitleBar();
 
+  // Wire sidebar toggle
+  wireSidebar();
+
   // Wire IPC listeners
   wireIpcListeners();
 
@@ -151,21 +154,24 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
         <span class="sidebar__nav-label">Navigation</span>
 
         <div class="sidebar__nav" role="menubar">
-          <a href="#/home" class="sidebar__nav-item sidebar__nav-item--active" data-route="/home" role="menuitem">
+          <a href="#/home" class="sidebar__nav-item sidebar__nav-item--active" data-route="/home" data-tooltip="Home" role="menuitem">
             <i class="fa-solid fa-house sidebar__nav-item-icon" aria-hidden="true"></i>
             <span class="sidebar__nav-item-label">Home</span>
           </a>
-          <a href="#/transfers" class="sidebar__nav-item" data-route="/transfers" role="menuitem">
+          <a href="#/transfers" class="sidebar__nav-item" data-route="/transfers" data-tooltip="Transfers" role="menuitem">
             <i class="fa-solid fa-arrow-right-arrow-left sidebar__nav-item-icon" aria-hidden="true"></i>
             <span class="sidebar__nav-item-label">Transfers</span>
           </a>
-          <a href="#/settings" class="sidebar__nav-item" data-route="/settings" role="menuitem">
+          <a href="#/settings" class="sidebar__nav-item" data-route="/settings" data-tooltip="Settings" role="menuitem">
             <i class="fa-solid fa-gear sidebar__nav-item-icon" aria-hidden="true"></i>
             <span class="sidebar__nav-item-label">Settings</span>
           </a>
         </div>
 
         <div class="sidebar__footer">
+          <button class="sidebar__toggle" id="sidebar-toggle" aria-label="Toggle sidebar">
+            <i class="fa-solid fa-chevron-left sidebar__toggle-icon"></i>
+          </button>
           <span class="sidebar__version">v1.0.0</span>
         </div>
       </nav>
@@ -180,6 +186,21 @@ function wireTitleBar(): void {
   document.getElementById('btn-minimize')?.addEventListener('click', () => IpcClient.minimizeWindow());
   document.getElementById('btn-maximize')?.addEventListener('click', () => IpcClient.maximizeWindow());
   document.getElementById('btn-close')?.addEventListener('click', () => IpcClient.closeWindow());
+}
+
+function wireSidebar(): void {
+  const sidebar = document.querySelector('.sidebar') as HTMLElement | null;
+  const toggleBtn = document.getElementById('sidebar-toggle');
+  if (!sidebar || !toggleBtn) return;
+
+  const STORAGE_KEY = 'wyre-sidebar-collapsed';
+  const isCollapsed = localStorage.getItem(STORAGE_KEY) === 'true';
+  if (isCollapsed) sidebar.classList.add('sidebar--collapsed');
+
+  toggleBtn.addEventListener('click', () => {
+    const collapsed = sidebar.classList.toggle('sidebar--collapsed');
+    localStorage.setItem(STORAGE_KEY, String(collapsed));
+  });
 }
 
 function wireNav(): void {

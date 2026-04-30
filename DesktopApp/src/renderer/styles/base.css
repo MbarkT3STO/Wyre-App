@@ -177,6 +177,7 @@ a:hover { text-decoration: none; }
   position: relative;
   z-index: 10;
   overflow: hidden;
+  transition: width 260ms var(--ease-in-out);
 }
 
 /* Subtle top-edge highlight */
@@ -191,6 +192,11 @@ a:hover { text-decoration: none; }
   pointer-events: none;
 }
 
+/* ── Collapsed state ── */
+.sidebar--collapsed {
+  width: 68px;
+}
+
 /* ── Brand ── */
 .sidebar__brand {
   display: flex;
@@ -198,6 +204,7 @@ a:hover { text-decoration: none; }
   gap: var(--sp-3);
   padding: var(--sp-5) var(--sp-5) var(--sp-4);
   flex-shrink: 0;
+  position: relative;
 }
 
 /* On macOS, push the brand below the native traffic light buttons */
@@ -239,12 +246,49 @@ a:hover { text-decoration: none; }
   -webkit-text-fill-color: transparent;
   background-clip: text;
   white-space: nowrap;
+  transition: opacity 180ms var(--ease-in-out), width 180ms var(--ease-in-out);
+  overflow: hidden;
+}
+
+/* ── Toggle button ── */
+.sidebar__toggle {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: var(--radius-full);
+  background: transparent;
+  box-shadow: none;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  transition: color var(--transition-fast), transform var(--transition-fast);
+  flex-shrink: 0;
+  margin-left: auto;
+  -webkit-app-region: no-drag;
+}
+
+.sidebar__toggle:hover {
+  color: var(--accent-mid);
+  transform: scale(1.15);
+}
+
+.sidebar__toggle-icon {
+  transition: transform 260ms var(--ease-in-out);
+}
+
+.sidebar--collapsed .sidebar__toggle-icon {
+  transform: rotate(180deg);
 }
 
 /* ── Device card ── */
 .sidebar__header {
   padding: 0 var(--sp-3) var(--sp-4);
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .sidebar__device-card {
@@ -283,6 +327,7 @@ a:hover { text-decoration: none; }
   gap: 3px;
   min-width: 0;
   overflow: hidden;
+  transition: opacity 180ms var(--ease-in-out);
 }
 
 .sidebar__device-name {
@@ -331,6 +376,9 @@ a:hover { text-decoration: none; }
   letter-spacing: 0.12em;
   padding: var(--sp-3) var(--sp-5) var(--sp-2);
   flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 180ms var(--ease-in-out);
 }
 
 /* ── Nav ── */
@@ -363,6 +411,7 @@ a:hover { text-decoration: none; }
   flex-shrink: 0;
   -webkit-app-region: no-drag;
   width: 100%;
+  overflow: hidden;
 }
 
 .sidebar__nav-item:hover {
@@ -395,6 +444,7 @@ a:hover { text-decoration: none; }
 .sidebar__nav-item-icon {
   font-size: 15px;
   width: 16px;
+  min-width: 16px;
   text-align: center;
   flex-shrink: 0;
   opacity: 0.45;
@@ -407,6 +457,7 @@ a:hover { text-decoration: none; }
 .sidebar__nav-item-label {
   white-space: nowrap;
   flex: 1;
+  transition: opacity 180ms var(--ease-in-out);
 }
 
 .sidebar__nav-badge {
@@ -424,12 +475,17 @@ a:hover { text-decoration: none; }
   line-height: 1;
   flex-shrink: 0;
   box-shadow: 0 2px 8px var(--accent-glow-sm);
+  transition: opacity 180ms var(--ease-in-out);
 }
 
 /* ── Footer ── */
 .sidebar__footer {
-  padding: var(--sp-4) var(--sp-5);
+  padding: var(--sp-3) var(--sp-4);
   flex-shrink: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
 }
 
 .sidebar__version {
@@ -437,11 +493,163 @@ a:hover { text-decoration: none; }
   color: var(--text-tertiary);
   font-family: var(--font-mono);
   letter-spacing: 0.02em;
+  white-space: nowrap;
+  transition: opacity 180ms var(--ease-in-out);
+  flex: 1;
 }
 
-/* ══════════════════════════════════════════════════════════
-   MAIN CONTENT
-   ══════════════════════════════════════════════════════════ */
+/* ── Tooltip on collapsed items ── */
+.sidebar__nav-item[data-tooltip] {
+  position: relative;
+}
+
+.sidebar__nav-item[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%) scale(0.92);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--nm-raised);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out);
+  z-index: 200;
+}
+
+.sidebar--collapsed .sidebar__nav-item[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateY(-50%) scale(1);
+}
+
+/* ── Collapsed state — hide text, center icons ── */
+.sidebar--collapsed .sidebar__brand-name,
+.sidebar--collapsed .sidebar__device-info,
+.sidebar--collapsed .sidebar__nav-label,
+.sidebar--collapsed .sidebar__nav-item-label,
+.sidebar--collapsed .sidebar__nav-badge,
+.sidebar--collapsed .sidebar__version {
+  opacity: 0;
+  width: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* Fully remove brand name from layout so logo centers perfectly */
+.sidebar--collapsed .sidebar__brand-name {
+  display: none;
+}
+
+/* Fully remove version from layout so toggle button centers perfectly */
+.sidebar--collapsed .sidebar__version {
+  display: none;
+}
+
+.sidebar--collapsed .sidebar__brand {
+  justify-content: center;
+  padding-left: var(--sp-3);
+  padding-right: var(--sp-3);
+  gap: 0;
+}
+
+.sidebar--collapsed .sidebar__toggle {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.sidebar--collapsed .sidebar__header {
+  padding-left: var(--sp-2);
+  padding-right: var(--sp-2);
+}
+
+.sidebar--collapsed .sidebar__device-card {
+  justify-content: center;
+  padding: var(--sp-2);
+  gap: 0;
+}
+
+.sidebar--collapsed .sidebar__nav {
+  padding: 0 var(--sp-2);
+  align-items: center;
+}
+
+.sidebar--collapsed .sidebar__nav-item {
+  justify-content: center;
+  padding: 16px;
+  width: auto;
+  gap: 0;
+}
+
+.sidebar--collapsed .sidebar__nav-item-icon {
+  font-size: 18px;
+  width: 18px;
+  opacity: 1;
+}
+
+.sidebar--collapsed .sidebar__footer {
+  padding: var(--sp-3) var(--sp-2);
+  justify-content: center;
+  gap: 0;
+}
+
+/* ── Responsive sidebar (small screens auto-collapse) ── */
+@media (max-width: 680px) {
+  .sidebar {
+    width: 68px;
+  }
+
+  .sidebar__brand-name,
+  .sidebar__device-info,
+  .sidebar__nav-label,
+  .sidebar__nav-item-label,
+  .sidebar__nav-badge,
+  .sidebar__version {
+    display: none !important;
+  }
+
+  .sidebar__brand {
+    justify-content: center;
+    padding: var(--sp-4) var(--sp-3);
+  }
+
+  .sidebar__header {
+    padding: 0 var(--sp-2) var(--sp-3);
+  }
+
+  .sidebar__device-card {
+    justify-content: center;
+    padding: var(--sp-2);
+  }
+
+  .sidebar__nav {
+    padding: 0 var(--sp-2);
+    align-items: center;
+  }
+
+  .sidebar__nav-item {
+    justify-content: center;
+    padding: 16px;
+    width: auto;
+  }
+
+  .sidebar__nav-item-icon {
+    font-size: 18px;
+    width: 18px;
+    opacity: 1;
+  }
+
+  .sidebar__footer {
+    padding: var(--sp-3) var(--sp-2);
+    display: flex;
+    justify-content: center;
+  }
+}
 
 .main-content {
   flex: 1;
