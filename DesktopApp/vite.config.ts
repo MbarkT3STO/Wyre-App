@@ -29,6 +29,7 @@ export default defineConfig(({ command }) => {
                   // Node built-ins
                   'path', 'fs', 'os', 'net', 'dgram', 'crypto', 'events',
                   'stream', 'util', 'url', 'http', 'https', 'child_process',
+                  'worker_threads',
                 ],
               },
             },
@@ -36,6 +37,27 @@ export default defineConfig(({ command }) => {
               alias: {
                 '@main': resolve(__dirname, 'src/main'),
                 '@shared': resolve(__dirname, 'src/shared'),
+              },
+            },
+          },
+        },
+        {
+          // Checksum worker — bundled as a standalone script so it can be
+          // loaded by Worker() at runtime from dist/main/checksumWorker.js
+          entry: 'src/main/transfer/checksumWorker.ts',
+          vite: {
+            build: {
+              sourcemap: !isBuild,
+              minify: isBuild,
+              outDir: 'dist/main',
+              rollupOptions: {
+                external: [
+                  'worker_threads',
+                  'fs',
+                  'crypto',
+                  'path',
+                  'stream',
+                ],
               },
             },
           },

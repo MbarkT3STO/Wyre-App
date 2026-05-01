@@ -196,6 +196,10 @@ export class TransferServer extends EventEmitter {
   }
 
   private handleConnection(socket: Socket): void {
+    // Disable Nagle's algorithm: progress feedback JSON lines are small and
+    // must be sent immediately so the sender's UI stays responsive.
+    socket.setNoDelay(true);
+
     let headerBuffer = Buffer.alloc(0);
     let headerParsed = false;
     let transferId: string | null = null;
@@ -294,9 +298,13 @@ export class TransferServer extends EventEmitter {
 
       // Write any file data that arrived in the same packet as the header
       if (remainingBuffer.length > 0) {
-        writeStream.write(remainingBuffer);
         hash.update(remainingBuffer);
         bytesReceived += remainingBuffer.length;
+        const canContinue = writeStream.write(remainingBuffer);
+        if (!canContinue) {
+          socket.pause();
+          writeStream.once('drain', () => socket.resume());
+        }
       }
 
       let progressInterval: ReturnType<typeof setInterval> | null = setInterval(() => {
@@ -318,9 +326,16 @@ export class TransferServer extends EventEmitter {
       socket.on('data', (chunk: Buffer | string) => {
         if (cancelled) return;
         const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-        writeStream.write(buf);
         hash.update(buf);
         bytesReceived += buf.length;
+        // Respect write-stream backpressure: if the write buffer is full,
+        // pause the socket until the stream drains to avoid unbounded memory
+        // growth and keep disk I/O from becoming the bottleneck.
+        const canContinue = writeStream.write(buf);
+        if (!canContinue) {
+          socket.pause();
+          writeStream.once('drain', () => socket.resume());
+        }
       });
 
       socket.on('end', () => {

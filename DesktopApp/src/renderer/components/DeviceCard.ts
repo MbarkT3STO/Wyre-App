@@ -17,6 +17,7 @@ const PLATFORM_ICONS: Record<string, string> = {
   windows: `<i class="fa-brands fa-windows"></i>`,
   macos:   `<i class="fa-brands fa-apple"></i>`,
   linux:   `<i class="fa-brands fa-linux"></i>`,
+  android: `<i class="fa-brands fa-android"></i>`,
   unknown: `<i class="fa-solid fa-desktop"></i>`,
 };
 

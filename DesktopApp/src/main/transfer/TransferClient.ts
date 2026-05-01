@@ -10,8 +10,6 @@ import { EventEmitter } from 'events';
 import { FileChunker } from './FileChunker';
 import { randomUUID } from 'crypto';
 
-const PROGRESS_EMIT_INTERVAL_MS = 100;
-
 export interface SendFileOptions {
   filePath: string;
   fileName: string;
@@ -76,6 +74,11 @@ export class TransferClient extends EventEmitter {
     const { filePath, fileName, fileSize, checksum, peerIp, peerPort, senderDeviceId, senderName } = options;
 
     const socket = connect({ host: peerIp, port: peerPort }, () => {
+      // Disable Nagle's algorithm so small writes (header, feedback ACKs) are
+      // sent immediately without waiting to coalesce into a larger segment.
+      // For bulk data the kernel will still batch full-sized segments.
+      socket.setNoDelay(true);
+
       // Send JSON header
       const header = JSON.stringify({
         transferId,
@@ -182,11 +185,13 @@ export class TransferClient extends EventEmitter {
       }
     });
 
-    readStream.on('data', (chunk: Buffer | string) => {
-      if (cancelled) return;
-      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-      socket.write(buf);
-    });
+    // Use pipe() so Node.js stream backpressure is respected automatically:
+    // when the socket's write buffer is full, the read stream pauses until the
+    // kernel drains the buffer — preventing unbounded memory growth and keeping
+    // the event loop free for other work.
+    // `end: false` because we call socket.end() manually after the stream
+    // finishes so we can emit the correct events in the right order.
+    readStream.pipe(socket, { end: false });
 
     readStream.on('end', () => {
       if (cancelled) {

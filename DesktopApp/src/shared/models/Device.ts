@@ -3,7 +3,7 @@
  * Represents a discovered peer device on the local network.
  */
 
-export type Platform = 'windows' | 'macos' | 'linux' | 'unknown';
+export type Platform = 'windows' | 'macos' | 'linux' | 'android' | 'unknown';
 
 export interface Device {
   /** Stable UUID persisted across restarts */
