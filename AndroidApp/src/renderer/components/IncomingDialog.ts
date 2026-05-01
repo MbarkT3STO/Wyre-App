@@ -138,21 +138,14 @@ export class IncomingDialog extends Component {
     }
 
     try {
-      // Use the file picker to select a folder — pick any file in the target folder
-      // then extract the directory path from it
-      const files = await AppBridge.pickFiles();
-      if (files.length > 0 && files[0]) {
-        const filePath = files[0].path;
-        // Extract directory from the picked file path
-        const dir = filePath.substring(0, filePath.lastIndexOf('/'));
-        if (dir) {
-          this.customSavePath = dir;
-          const label = this.element?.querySelector('#save-path-label');
-          if (label) {
-            // Show last two path segments for readability
-            const parts = dir.split('/').filter(Boolean);
-            label.textContent = parts.slice(-2).join('/') || dir;
-          }
+      const folderPath = await AppBridge.pickFolder();
+      if (folderPath) {
+        this.customSavePath = folderPath;
+        const label = this.element?.querySelector('#save-path-label');
+        if (label) {
+          // Show last two path segments for readability
+          const parts = folderPath.split('/').filter(Boolean);
+          label.textContent = parts.slice(-2).join('/') || folderPath;
         }
       }
     } catch (_) {
@@ -169,11 +162,11 @@ export class IncomingDialog extends Component {
 
   private async handleAccept(): Promise<void> {
     this.cleanup();
-    // If user picked a custom save location, update settings first
-    if (this.customSavePath) {
-      await AppBridge.setSettings({ saveDirectory: this.customSavePath });
-    }
-    await AppBridge.respondToIncoming({ transferId: this.request.transferId, accepted: true });
+    await AppBridge.respondToIncoming({
+      transferId: this.request.transferId,
+      accepted: true,
+      ...(this.customSavePath ? { savePath: this.customSavePath } : {}),
+    });
     this.unmount();
   }
 

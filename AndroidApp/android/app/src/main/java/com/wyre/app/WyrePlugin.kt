@@ -137,7 +137,13 @@ class WyrePlugin : Plugin() {
         val m = manager ?: run { call.reject("Service not ready"); return }
         val transferId = call.getString("transferId") ?: run { call.reject("transferId required"); return }
         val accepted   = call.getBoolean("accepted", false) ?: false
-        m.respondToIncoming(transferId, accepted)
+        // Use custom save path if provided, otherwise fall back to settings
+        val customPath = call.getString("savePath")
+        if (customPath != null && customPath.isNotEmpty()) {
+            m.respondToIncomingWithPath(transferId, accepted, customPath)
+        } else {
+            m.respondToIncoming(transferId, accepted)
+        }
         call.resolve()
     }
 
@@ -168,6 +174,55 @@ class WyrePlugin : Plugin() {
             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
         }
         startActivityForResult(call, intent, "onPickFileResult")
+    }
+
+    // ── Folder picker (ACTION_OPEN_DOCUMENT_TREE) ─────────────────────────────
+
+    @PluginMethod
+    fun pickFolder(call: PluginCall) {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+        }
+        startActivityForResult(call, intent, "onPickFolderResult")
+    }
+
+    @ActivityCallback
+    fun onPickFolderResult(call: PluginCall, result: androidx.activity.result.ActivityResult) {
+        if (result.resultCode != Activity.RESULT_OK || result.data?.data == null) {
+            val empty = JSObject()
+            empty.put("path", "")
+            call.resolve(empty)
+            return
+        }
+
+        val treeUri = result.data!!.data!!
+
+        // Persist permission so we can write to this folder later
+        val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        context.contentResolver.takePersistableUriPermission(treeUri, flags)
+
+        // Convert the tree URI to a real file system path
+        // e.g. content://com.android.externalstorage.documents/tree/primary%3ADownload%2FWyre
+        // → /storage/emulated/0/Download/Wyre
+        val path = uriToPath(treeUri)
+
+        val res = JSObject()
+        res.put("path", path)
+        res.put("uri", treeUri.toString())
+        call.resolve(res)
+    }
+
+    private fun uriToPath(uri: android.net.Uri): String {
+        // DocumentsContract tree URI format:
+        // content://com.android.externalstorage.documents/tree/primary%3APath%2FTo%2FFolder
+        val docId = android.provider.DocumentsContract.getTreeDocumentId(uri)
+        // docId is like "primary:Download/Wyre" or "primary:Download"
+        return if (docId.startsWith("primary:")) {
+            "/storage/emulated/0/${docId.removePrefix("primary:")}"
+        } else {
+            // External SD or other storage — use the raw path
+            "/storage/${docId.replace(":", "/")}"
+        }
     }
 
     @ActivityCallback

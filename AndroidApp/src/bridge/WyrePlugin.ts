@@ -77,7 +77,7 @@ export interface WyrePluginInterface {
   // ── File transfer ─────────────────────────────────────────────────────────
   sendFile(options: { deviceId: string; filePath: string; fileName: string; fileSize: number }): Promise<{ transferId: string }>;
   cancelTransfer(options: { transferId: string }): Promise<void>;
-  respondToIncoming(options: { transferId: string; accepted: boolean }): Promise<void>;
+  respondToIncoming(options: { transferId: string; accepted: boolean; savePath?: string }): Promise<void>;
 
   // ── History ───────────────────────────────────────────────────────────────
   getHistory(): Promise<{ history: import('../shared/models/Transfer').TransferRecord[] }>;
@@ -85,6 +85,7 @@ export interface WyrePluginInterface {
 
   // ── File picker ───────────────────────────────────────────────────────────
   pickFile(): Promise<{ files: Array<{ path: string; name: string; size: number }> }>;
+  pickFolder(): Promise<{ path: string; uri: string }>;
 
   // ── Shell actions ─────────────────────────────────────────────────────────
   openFile(options: { path: string }): Promise<void>;

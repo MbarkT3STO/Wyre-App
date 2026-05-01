@@ -136,6 +136,10 @@ class WyreManager(
             saveDir = settings.getString("saveDirectory", getDownloadsDir()))
     }
 
+    fun respondToIncomingWithPath(transferId: String, accepted: Boolean, savePath: String) {
+        transferServer?.respond(transferId, accepted, saveDir = savePath)
+    }
+
     // ── History ───────────────────────────────────────────────────────────────
 
     fun getHistoryJson(): JSArray {

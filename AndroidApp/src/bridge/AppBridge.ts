@@ -49,7 +49,7 @@ export const AppBridge = {
   cancelTransfer: (options: { transferId: string }): Promise<void> =>
     WyrePlugin.cancelTransfer(options),
 
-  respondToIncoming: (options: { transferId: string; accepted: boolean }): Promise<void> =>
+  respondToIncoming: (options: { transferId: string; accepted: boolean; savePath?: string }): Promise<void> =>
     WyrePlugin.respondToIncoming(options),
 
   onTransferStarted: async (cb: (data: TransferStartedEvent) => void): Promise<() => void> => {
@@ -97,6 +97,11 @@ export const AppBridge = {
     if (!result || !('files' in result)) return [];
     const files = (result as unknown as { files: Array<{ path: string; name: string; size: number }> }).files;
     return Array.isArray(files) ? files : [];
+  },
+
+  pickFolder: async (): Promise<string | null> => {
+    const result = await WyrePlugin.pickFolder();
+    return result?.path || null;
   },
 
   // ── Shell actions ─────────────────────────────────────────────────────────
