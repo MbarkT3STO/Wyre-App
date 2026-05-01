@@ -26,7 +26,6 @@ class WyreManager(
 ) {
     private val executor = Executors.newCachedThreadPool()
     private val settings = SettingsStore(context)
-    private val devices  = ConcurrentHashMap<String, DeviceInfo>()
     private val history  = mutableListOf<JSObject>()
 
     private var discoveryService: DiscoveryService? = null
@@ -97,7 +96,7 @@ class WyreManager(
 
     // ── Devices ───────────────────────────────────────────────────────────────
 
-    fun getDevicesJson(): JSArray = buildDevicesArray(devices.values.filter { it.online })
+    fun getDevicesJson(): JSArray = buildDevicesArray(discoveryService?.getDevices() ?: emptyList())
 
     fun startDiscovery()  { discoveryService?.start() }
     fun stopDiscovery()   { discoveryService?.stop() }
@@ -105,7 +104,8 @@ class WyreManager(
     // ── Transfers ─────────────────────────────────────────────────────────────
 
     fun sendFile(deviceId: String, filePath: String, fileName: String, fileSize: Long): String? {
-        val device = devices.values.find { it.id == deviceId && it.online } ?: return null
+        val device = discoveryService?.getDevices()?.find { it.id == deviceId && it.online }
+            ?: return null
         val transferId = UUID.randomUUID().toString()
 
         executor.submit {

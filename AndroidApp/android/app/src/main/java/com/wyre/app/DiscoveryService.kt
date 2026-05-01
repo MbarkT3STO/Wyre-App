@@ -47,8 +47,7 @@ class DiscoveryService(
     @Volatile private var running = false
 
     fun start() {
-        if (running) return
-        running = true
+        if (running) return        running = true
         startBroadcasting()
         startListening()
         startEviction()
@@ -63,6 +62,9 @@ class DiscoveryService(
     }
 
     fun updateName(name: String) { deviceName = name }
+
+    /** Returns all currently online devices */
+    fun getDevices(): List<DeviceInfo> = devices.values.filter { it.online }
 
     private fun startBroadcasting() {
         broadcastFuture = scheduler.scheduleAtFixedRate({
