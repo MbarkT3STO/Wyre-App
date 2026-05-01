@@ -1263,9 +1263,11 @@
 /* File row */
 .incoming-dialog__file-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--sp-3);
   width: 100%;
+  min-width: 0;
+  overflow: hidden;
   padding: var(--sp-3) var(--sp-4);
   background: var(--bg-app);
   border: none;
@@ -1287,16 +1289,29 @@
 }
 .incoming-dialog__file-icon svg { width: 20px; height: 20px; }
 
-.incoming-dialog__file-info { flex: 1; min-width: 0; }
+.incoming-dialog__file-info {
+  flex: 1;
+  min-width: 0;
+  /* Prevent the info column from pushing outside the dialog */
+  overflow: hidden;
+}
 
 .incoming-dialog__file-name {
+  display: block;
   font-size: var(--text-base);
   font-weight: var(--weight-semibold);
   color: var(--text-primary);
-  white-space: nowrap;
+  /* Allow wrapping so long names stay inside the dialog.
+     Clamp to 3 lines max then ellipsis — covers even extreme filenames. */
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-all;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
   letter-spacing: -0.01em;
+  line-height: var(--leading-snug);
 }
 
 .incoming-dialog__file-size {
