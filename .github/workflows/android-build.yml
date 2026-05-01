@@ -19,11 +19,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Node.js ─────────────────────────────────────────────────────────
+      # ── 2. Node.js 24 ──────────────────────────────────────────────────────
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       # ── 3. JDK 17 ──────────────────────────────────────────────────────────
       - name: Set up JDK 17
@@ -33,10 +33,15 @@ jobs:
           distribution: 'temurin'
 
       # ── 4. Android SDK ─────────────────────────────────────────────────────
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platform-tools platforms;android-34 build-tools;34.0.0'
+      # ubuntu-latest already has the Android SDK at $ANDROID_HOME.
+      # We just need to install the specific platform + build-tools.
+      - name: Install Android SDK packages
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager \
+            "platforms;android-34" \
+            "build-tools;34.0.0" \
+            "platform-tools" \
+            --sdk_root=$ANDROID_HOME
 
       # ── 5. Cache Gradle ────────────────────────────────────────────────────
       - name: Cache Gradle
@@ -48,7 +53,7 @@ jobs:
           key: gradle-${{ runner.os }}-${{ hashFiles('AndroidApp/android/**/*.gradle*', 'AndroidApp/android/gradle/wrapper/gradle-wrapper.properties') }}
           restore-keys: gradle-${{ runner.os }}-
 
-      # ── 6. Install JS dependencies ─────────────────────────────────────────
+      # ── 6. Install JS dependencies (includes @capacitor/cli) ───────────────
       - name: Install JS dependencies
         working-directory: AndroidApp
         run: npm install
@@ -58,10 +63,10 @@ jobs:
         working-directory: AndroidApp
         run: npm run build
 
-      # ── 8. Capacitor sync ──────────────────────────────────────────────────
+      # ── 8. Capacitor sync (use local binary, not npx) ──────────────────────
       - name: Capacitor sync
         working-directory: AndroidApp
-        run: npx cap sync android
+        run: ./node_modules/.bin/cap sync android
 
       # ── 9. Gradle wrapper jar ──────────────────────────────────────────────
       - name: Download Gradle wrapper jar
@@ -77,14 +82,14 @@ jobs:
         working-directory: AndroidApp/android
         run: ./gradlew assembleDebug --no-daemon --stacktrace
 
-      # ── 11. Rename APK to include version/commit ───────────────────────────
+      # ── 11. Rename APK ─────────────────────────────────────────────────────
       - name: Rename APK
         run: |
           mkdir -p output
           cp AndroidApp/android/app/build/outputs/apk/debug/app-debug.apk \
              output/Wyre-${{ github.ref_name }}-${{ github.sha }}.apk
 
-      # ── 12. Upload APK as artifact (every build) ───────────────────────────
+      # ── 12. Upload APK artifact ────────────────────────────────────────────
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
@@ -92,7 +97,7 @@ jobs:
           path: output/Wyre-*.apk
           retention-days: 30
 
-      # ── 13. Create GitHub Release with APK attached (on version tags) ──────
+      # ── 13. Create GitHub Release (on version tags only) ───────────────────
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -103,7 +108,7 @@ jobs:
 
             ### Install
             1. Download `Wyre-${{ github.ref_name }}.apk` below
-            2. On your Android phone: **Settings → Security → Install unknown apps** → enable for your browser/file manager
+            2. On your Android phone: **Settings → Security → Install unknown apps** → enable for your browser or Files app
             3. Open the downloaded APK and tap Install
 
             ### Requirements
