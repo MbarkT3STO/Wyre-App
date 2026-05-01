@@ -2,6 +2,8 @@ package com.wyre.app
 
 import android.app.Activity
 import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
@@ -14,10 +16,15 @@ import com.getcapacitor.annotation.CapacitorPlugin
 class WyrePlugin : Plugin() {
 
     private lateinit var manager: WyreManager
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     override fun load() {
         manager = WyreManager(context) { event, data ->
-            notifyListeners(event, data)
+            // notifyListeners MUST run on the main thread —
+            // TransferClient fires events from a background executor thread
+            mainHandler.post {
+                notifyListeners(event, data)
+            }
         }
         manager.start()
     }

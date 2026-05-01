@@ -209,12 +209,12 @@ class WyreManager(
                 notifyFn("transferStarted", obj)
             }
             is TransferEvent.Progress -> {
-                obj.put("transferId",       event.transferId)
-                obj.put("progress",         event.progress)
-                obj.put("speed",            event.speed)
-                obj.put("eta",              event.eta)
-                obj.put("bytesTransferred", event.bytesTransferred)
-                obj.put("totalBytes",       event.totalBytes)
+                obj.put("transferId",        event.transferId)
+                obj.put("progress",          event.progress)
+                obj.put("speed",             event.speed)
+                obj.put("eta",               event.eta)
+                obj.put("bytesTransferred",  event.bytesTransferred)
+                obj.put("totalBytes",        event.totalBytes)
                 notifyFn("transferProgress", obj)
             }
             is TransferEvent.Complete -> {
