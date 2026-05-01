@@ -78,10 +78,16 @@ export class TransferItem extends Component {
       ${isActive ? `
         <div class="transfer-item__progress-wrap">
           <div class="transfer-item__progress-bar" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
-            <div class="transfer-item__progress-fill${t.status === TransferStatus.Active ? ' transfer-item__progress-fill--active' : ''}" data-progress="${progress}"></div>
+            <div class="transfer-item__progress-fill${
+              t.status === TransferStatus.Active
+                ? ' transfer-item__progress-fill--active'
+                : t.status === TransferStatus.Connecting
+                  ? ' transfer-item__progress-fill--connecting'
+                  : ''
+            }" data-progress="${progress}"></div>
           </div>
           <div class="transfer-item__progress-stats">
-            <span class="transfer-item__progress-pct">${progress}%</span>
+            <span class="transfer-item__progress-pct">${t.status === TransferStatus.Connecting ? '—' : `${progress}%`}</span>
             ${speed > 0 ? `<span class="transfer-item__size">${formatSpeed(speed)} · ${formatEta(eta)} left</span>` : ''}
           </div>
         </div>
@@ -120,6 +126,8 @@ export class TransferItem extends Component {
   /** Set progress bar width via CSS custom property — avoids unsafe-inline style */
   private applyProgressWidth(): void {
     if (!this.element) return;
+    // Skip for connecting state — the indeterminate animation handles width
+    if (isActiveTransfer(this.data) && this.data.status === TransferStatus.Connecting) return;
     const fill = this.element.querySelector<HTMLElement>('.transfer-item__progress-fill');
     if (!fill) return;
     const progress = isActiveTransfer(this.data) ? this.data.progress : (this.data.status === TransferStatus.Completed ? 100 : 0);
@@ -156,9 +164,10 @@ export class TransferItem extends Component {
   }
 
   private renderStatusBadge(status: TransferStatus): string {
+    const isSend = this.data.direction === 'send';
     const labels: Record<TransferStatus, string> = {
       [TransferStatus.Pending]: 'Waiting',
-      [TransferStatus.Connecting]: 'Connecting',
+      [TransferStatus.Connecting]: isSend ? 'Awaiting acceptance' : 'Connecting',
       [TransferStatus.Active]: 'Transferring',
       [TransferStatus.Completed]: 'Done',
       [TransferStatus.Failed]: 'Failed',

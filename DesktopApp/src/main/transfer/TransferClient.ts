@@ -24,7 +24,7 @@ export interface SendFileOptions {
 }
 
 export interface TransferClientEvents {
-  progress: (transferId: string, bytesSent: number, totalBytes: number, speed: number, eta: number) => void;
+  progress: (transferId: string, bytesSent: number, totalBytes: number, speed: number, eta: number, progress: number) => void;
   complete: (transferId: string) => void;
   error: (transferId: string, err: Error) => void;
   cancelled: (transferId: string) => void;
@@ -145,11 +145,8 @@ export class TransferClient extends EventEmitter {
 
   private streamFile(socket: Socket, transferId: string, filePath: string, fileSize: number): void {
     const readStream = FileChunker.createReadStream(filePath);
-    let bytesSent = 0;
-    let lastProgressTime = Date.now();
-    let lastBytes = 0;
-    let speed = 0;
     let cancelled = false;
+    let streamDone = false;
 
     // Update cancel handler to also destroy the read stream
     const existing = this.activeSends.get(transferId);
@@ -164,39 +161,62 @@ export class TransferClient extends EventEmitter {
       });
     }
 
-    const progressInterval = setInterval(() => {
-      const now = Date.now();
-      const elapsed = (now - lastProgressTime) / 1000;
-      speed = elapsed > 0 ? (bytesSent - lastBytes) / elapsed : 0;
-      lastProgressTime = now;
-      lastBytes = bytesSent;
-      const eta = speed > 0 ? (fileSize - bytesSent) / speed : Infinity;
-      this.emit('progress', transferId, bytesSent, fileSize, speed, eta);
-    }, PROGRESS_EMIT_INTERVAL_MS);
+    // The receiver writes progress-feedback JSON lines back on the same socket
+    // while it receives data. We read those here to drive the sender's progress.
+    // Format: {"p":<0-100>,"b":<bytesReceived>,"s":<speed>,"e":<eta>}\n
+    let feedbackBuffer = '';
+    socket.on('data', (chunk: Buffer) => {
+      feedbackBuffer += chunk.toString('utf8');
+      let newlineIdx: number;
+      while ((newlineIdx = feedbackBuffer.indexOf('\n')) !== -1) {
+        const line = feedbackBuffer.slice(0, newlineIdx);
+        feedbackBuffer = feedbackBuffer.slice(newlineIdx + 1);
+        try {
+          const fb = JSON.parse(line) as { p: number; b: number; s: number; e: number };
+          if (typeof fb.p === 'number') {
+            this.emit('progress', transferId, fb.b, fileSize, fb.s, fb.e, fb.p);
+          }
+        } catch {
+          // ignore malformed feedback
+        }
+      }
+    });
 
     readStream.on('data', (chunk: Buffer | string) => {
       if (cancelled) return;
       const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       socket.write(buf);
-      bytesSent += buf.length;
     });
 
     readStream.on('end', () => {
-      clearInterval(progressInterval);
-      if (!cancelled) {
-        socket.end();
-        this.emit('complete', transferId);
+      if (cancelled) {
+        this.activeSends.delete(transferId);
+        return;
       }
-      this.activeSends.delete(transferId);
+
+      streamDone = true;
+
+      // Half-close the write side — signals end of file data to the receiver.
+      // The socket read side stays open so we keep receiving progress feedback.
+      socket.end();
+
+      socket.once('close', (hadError: boolean) => {
+        if (!cancelled && !hadError) {
+          this.emit('progress', transferId, fileSize, fileSize, 0, 0, 100);
+          this.emit('complete', transferId);
+        }
+        this.activeSends.delete(transferId);
+      });
     });
 
     readStream.on('error', (err) => {
-      clearInterval(progressInterval);
       if (!cancelled) {
         socket.destroy(err);
         this.emit('error', transferId, err);
       }
       this.activeSends.delete(transferId);
     });
+
+    void streamDone;
   }
 }

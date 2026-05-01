@@ -306,7 +306,13 @@ export class TransferServer extends EventEmitter {
         lastProgressTime = now;
         lastBytes = bytesReceived;
         const eta = speed > 0 ? (fileSize - bytesReceived) / speed : Infinity;
+        const progress = fileSize > 0 ? Math.min(Math.round((bytesReceived / fileSize) * 100), 99) : 0;
         this.emit('progress', transferId, bytesReceived, fileSize, speed, eta);
+        // Write progress feedback back to the sender on the same socket so the
+        // sender can display accurate receive-side progress in its own UI.
+        if (!socket.destroyed && socket.writable) {
+          socket.write(JSON.stringify({ p: progress, b: bytesReceived, s: Math.round(speed), e: Math.round(eta) }) + '\n');
+        }
       }, PROGRESS_EMIT_INTERVAL_MS);
 
       socket.on('data', (chunk: Buffer | string) => {

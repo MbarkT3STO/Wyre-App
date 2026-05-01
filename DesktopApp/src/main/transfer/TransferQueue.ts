@@ -38,11 +38,11 @@ export class TransferQueue extends EventEmitter {
   }
 
   private wireClientEvents(): void {
-    this.client.on('progress', (transferId, bytesSent, totalBytes, speed, eta) => {
+    this.client.on('progress', (transferId, bytesSent, totalBytes, speed, eta, progress) => {
       this.updateTransfer(transferId, {
         status: TransferStatus.Active,
         bytesTransferred: bytesSent,
-        progress: totalBytes > 0 ? Math.round((bytesSent / totalBytes) * 100) : 0,
+        progress,
         speed,
         eta,
       });

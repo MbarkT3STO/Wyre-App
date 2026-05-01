@@ -241,10 +241,13 @@ function wireIpcListeners(): void {
     StateManager.setState('devices', devices);
   });
 
-  // Transfer started — seeds the renderer state so progress events can land
+  // Transfer started — seeds the renderer state so progress events can land.
+  // Also fires when a transfer transitions to Active, acting as a re-seed
+  // to ensure the sender's entry is always present before progress events arrive.
   const unsubStarted = IpcClient.onTransferStarted((payload) => {
     const existing = StateManager.get('activeTransfers').get(payload.transferId);
     if (!existing) {
+      // New transfer — create the entry
       StateManager.updateTransfer({
         id: payload.transferId,
         direction: payload.direction,
@@ -260,6 +263,15 @@ function wireIpcListeners(): void {
         eta: 0,
         startedAt: Date.now(),
         checksum: '',
+      });
+    } else {
+      // Re-seed: update status and metadata in case it changed (e.g. Connecting → Active)
+      StateManager.updateTransfer({
+        ...existing,
+        status: payload.status,
+        peerName: payload.peerName,
+        fileName: payload.fileName,
+        fileSize: payload.fileSize,
       });
     }
   });
@@ -277,6 +289,8 @@ function wireIpcListeners(): void {
         eta: payload.eta,
       });
     }
+    // If existing is not found, the TRANSFER_STARTED re-seed (sent just before
+    // this event by IpcBridge) will arrive momentarily and create the entry.
   });
 
   // Transfer complete

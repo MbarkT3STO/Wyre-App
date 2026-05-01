@@ -84,6 +84,17 @@ export class IpcBridge {
           break;
 
         case TransferStatus.Active:
+          // Re-seed the renderer entry on the first Active event in case the
+          // initial TRANSFER_STARTED was missed (e.g. race during navigation).
+          this.send(IpcChannels.TRANSFER_STARTED, {
+            transferId: transfer.id,
+            direction: transfer.direction,
+            peerId: transfer.peerId,
+            peerName: transfer.peerName,
+            fileName: transfer.fileName,
+            fileSize: transfer.fileSize,
+            status: transfer.status,
+          });
           this.send(IpcChannels.TRANSFER_PROGRESS, {
             transferId: transfer.id,
             progress: transfer.progress,
