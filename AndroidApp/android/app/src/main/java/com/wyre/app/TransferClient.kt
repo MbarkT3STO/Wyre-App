@@ -5,12 +5,18 @@ import java.net.Socket
 import java.security.MessageDigest
 
 private const val CHUNK_SIZE = 64 * 1024
-private const val PROGRESS_INTERVAL_MS = 100L
+private const val PROGRESS_INTERVAL_MS = 150L
 
 /**
  * TransferClient.kt
- * TCP client — mirrors the desktop TransferClient.ts.
- * Connects to a peer's TransferServer, sends header, streams file.
+ * TCP client — connects to a peer's TransferServer and streams a file.
+ *
+ * Progress is emitted based on bytes written to the socket (sender-side),
+ * not on receiver feedback. This avoids the need to read the input stream
+ * concurrently while writing, which would require two threads.
+ *
+ * The receiver feedback is still drained after shutdownOutput so the
+ * socket closes cleanly, but it is not used for progress reporting.
  */
 class TransferClient(
     private val transferId: String,
@@ -34,6 +40,7 @@ class TransferClient(
 
     fun send() {
         val startedAt = System.currentTimeMillis()
+
         onEvent(TransferEvent.Started(
             transferId = transferId,
             direction  = "send",
@@ -51,12 +58,12 @@ class TransferClient(
             val out = sock.getOutputStream()
             val inp = sock.getInputStream()
 
-            // Send JSON header
+            // ── 1. Send JSON header ───────────────────────────────────────────
             val header = buildHeader() + "\n"
             out.write(header.toByteArray(Charsets.UTF_8))
             out.flush()
 
-            // Read accept/decline response (newline-terminated JSON)
+            // ── 2. Read accept/decline (newline-terminated JSON) ──────────────
             val responseLine = readLine(inp) ?: throw Exception("No response from peer")
             val accepted = org.json.JSONObject(responseLine).optBoolean("accepted", false)
             if (!accepted) {
@@ -75,43 +82,55 @@ class TransferClient(
                 status     = "active"
             ))
 
-            // Stream file
+            // ── 3. Stream file, emitting progress from sender side ────────────
             val file = File(filePath)
             var bytesSent = 0L
             var lastProgressTime = System.currentTimeMillis()
-            var lastBytes = 0L
+            var lastProgressBytes = 0L
             val buf = ByteArray(CHUNK_SIZE)
 
             file.inputStream().use { fis ->
                 var read: Int
                 while (fis.read(buf).also { read = it } != -1) {
                     if (cancelled) { sock.close(); return }
+
                     out.write(buf, 0, read)
                     bytesSent += read
 
                     val now = System.currentTimeMillis()
-                    if (now - lastProgressTime >= PROGRESS_INTERVAL_MS) {
-                        val elapsed = (now - lastProgressTime) / 1000.0
-                        val speed = if (elapsed > 0) ((bytesSent - lastBytes) / elapsed).toLong() else 0L
+                    val elapsed = now - lastProgressTime
+
+                    if (elapsed >= PROGRESS_INTERVAL_MS) {
+                        val bytesInInterval = bytesSent - lastProgressBytes
+                        val speed = if (elapsed > 0) (bytesInInterval * 1000L / elapsed) else 0L
+                        val progress = if (fileSize > 0) ((bytesSent * 100L) / fileSize).toInt().coerceIn(0, 99) else 0
                         val eta = if (speed > 0) (fileSize - bytesSent) / speed else 0L
-                        val progress = if (fileSize > 0) ((bytesSent * 100) / fileSize).toInt() else 0
-                        onEvent(TransferEvent.Progress(transferId, progress, speed, eta, bytesSent, fileSize))
+
+                        onEvent(TransferEvent.Progress(
+                            transferId      = transferId,
+                            progress        = progress,
+                            speed           = speed,
+                            eta             = eta,
+                            bytesTransferred = bytesSent,
+                            totalBytes      = fileSize
+                        ))
+
                         lastProgressTime = now
-                        lastBytes = bytesSent
+                        lastProgressBytes = bytesSent
                     }
                 }
             }
 
             out.flush()
+            // Half-close write side — signals EOF to receiver
             sock.shutdownOutput()
 
-            // Read final feedback from receiver
+            // ── 4. Drain receiver feedback until socket closes ────────────────
+            // The desktop receiver sends progress JSON lines back; we drain them
+            // so the TCP connection closes cleanly, but we don't use them for UI.
             try {
-                while (true) {
-                    val line = readLine(inp) ?: break
-                    val fb = org.json.JSONObject(line)
-                    if (fb.optInt("p", -1) == 100) break
-                }
+                val drainBuf = ByteArray(4096)
+                while (inp.read(drainBuf) != -1) { /* drain */ }
             } catch (_: Exception) {}
 
             if (!cancelled) {
@@ -155,6 +174,8 @@ class TransferClient(
         return md.digest().joinToString("") { "%02x".format(it) }
     }
 
+    // Reads one newline-terminated line from the stream.
+    // Only used for the initial accept/decline handshake.
     private fun readLine(inp: java.io.InputStream): String? {
         val sb = StringBuilder()
         var b: Int
