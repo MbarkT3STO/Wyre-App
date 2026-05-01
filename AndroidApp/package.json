@@ -1,0 +1,28 @@
+{
+  "name": "wyre-android",
+  "version": "1.0.0",
+  "description": "Wyre — peer-to-peer file transfer for Android",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "sync": "npm run build && npx cap sync android",
+    "open": "npx cap open android",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.0.0",
+    "@capacitor/core": "^6.0.0",
+    "@capacitor/filesystem": "^6.0.0",
+    "@capacitor/local-notifications": "^6.0.0",
+    "@capacitor/preferences": "^6.0.0",
+    "@fortawesome/fontawesome-free": "6.5.0"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "eslint": "^8.57.0",
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0"
+  }
+}

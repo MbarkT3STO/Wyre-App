@@ -1,0 +1,119 @@
+name: Android APK Build
+
+on:
+  push:
+    branches: [main, master]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch: # allows manual trigger from GitHub UI
+
+jobs:
+  build:
+    name: Build & Sign APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Node.js setup ───────────────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: AndroidApp/package-lock.json
+
+      # ── 3. Java setup ──────────────────────────────────────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # ── 4. Android SDK setup ───────────────────────────────────────────────
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # ── 5. Install JS dependencies ─────────────────────────────────────────
+      - name: Install dependencies
+        working-directory: AndroidApp
+        run: npm ci
+
+      # ── 6. Build web layer (Vite) ──────────────────────────────────────────
+      - name: Build web layer
+        working-directory: AndroidApp
+        run: npm run build
+
+      # ── 7. Capacitor sync ──────────────────────────────────────────────────
+      - name: Sync Capacitor
+        working-directory: AndroidApp
+        run: npx cap sync android
+
+      # ── 8. Make Gradle wrapper executable ─────────────────────────────────
+      - name: Make gradlew executable
+        working-directory: AndroidApp/android
+        run: chmod +x gradlew
+
+      # ── 9. Cache Gradle dependencies ──────────────────────────────────────
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('AndroidApp/android/**/*.gradle*', 'AndroidApp/android/gradle-wrapper.properties') }}
+          restore-keys: gradle-
+
+      # ── 10. Build debug APK (always) ──────────────────────────────────────
+      - name: Build debug APK
+        working-directory: AndroidApp/android
+        run: ./gradlew assembleDebug --no-daemon
+
+      # ── 11. Sign & build release APK (only on tags or main branch) ─────────
+      - name: Decode keystore
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > AndroidApp/android/app/wyre-release.jks
+
+      - name: Build release APK
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
+        working-directory: AndroidApp/android
+        env:
+          KEYSTORE_PATH: app/wyre-release.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease --no-daemon
+
+      # ── 12. Upload debug APK as artifact ──────────────────────────────────
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: wyre-debug-${{ github.sha }}
+          path: AndroidApp/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+      # ── 13. Upload release APK as artifact ────────────────────────────────
+      - name: Upload release APK
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: wyre-release-${{ github.sha }}
+          path: AndroidApp/android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 30
+
+      # ── 14. Create GitHub Release on version tags ──────────────────────────
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            AndroidApp/android/app/build/outputs/apk/debug/app-debug.apk
+            AndroidApp/android/app/build/outputs/apk/release/app-release.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

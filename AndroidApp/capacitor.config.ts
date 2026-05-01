@@ -1,0 +1,18 @@
+import type { CapacitorConfig } from '@capacitor/cli';
+
+const config: CapacitorConfig = {
+  appId: 'com.wyre.app',
+  appName: 'Wyre',
+  webDir: 'dist',
+  server: {
+    androidScheme: 'https',
+  },
+  plugins: {
+    LocalNotifications: {
+      smallIcon: 'ic_stat_wyre',
+      iconColor: '#7C3AED',
+    },
+  },
+};
+
+export default config;

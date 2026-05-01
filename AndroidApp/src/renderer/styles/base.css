@@ -1,0 +1,157 @@
+/* ============================================================
+   base.css — Android version
+   Removes desktop sidebar/titlebar, keeps core reset + typography
+   ============================================================ */
+
+@import url('./tokens.css');
+@import '@fortawesome/fontawesome-free/css/all.min.css';
+
+/* ── Reset ─────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
+  font-family: var(--font-family);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+  background: var(--bg-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  /* Prevent text size adjustment on orientation change */
+  -webkit-text-size-adjust: 100%;
+}
+
+input, textarea, [contenteditable] { user-select: text; }
+
+/* ── Typography ────────────────────────────────────────────── */
+h1, h2, h3, h4, h5, h6 {
+  line-height: var(--leading-tight);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+h1 { font-size: var(--text-2xl); font-weight: var(--weight-black); }
+h2 { font-size: var(--text-xl);  font-weight: var(--weight-extrabold); }
+h3 { font-size: var(--text-lg);  font-weight: var(--weight-bold); }
+h4 { font-size: var(--text-md);  font-weight: var(--weight-bold); }
+
+p { color: var(--text-secondary); line-height: var(--leading-relaxed); }
+a { color: var(--accent-text); text-decoration: none; }
+
+/* ── Scrollbar ─────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: var(--radius-full);
+}
+
+/* ── Focus ─────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--accent-mid);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ── App root ──────────────────────────────────────────────── */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  width: 100vw;
+  overflow: hidden;
+  background: var(--bg-app);
+  position: relative;
+}
+
+/* Ambient glow */
+#app::before {
+  content: '';
+  position: fixed;
+  top: -15%;
+  left: -5%;
+  width: 60%;
+  height: 60%;
+  background: var(--gradient-glow);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── View base ─────────────────────────────────────────────── */
+.view-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── View page title ── */
+.view-page-title {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-bottom: var(--sp-5);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--sp-2);
+}
+
+.view-page-title__heading {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: -0.035em;
+  background: var(--gradient-accent);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1.15;
+}
+
+.view-page-title__sub {
+  font-size: var(--text-base);
+  color: var(--text-tertiary);
+  font-weight: var(--weight-normal);
+}
+
+/* ── Overflow safety ── */
+.device-card__name,
+.device-card__ip,
+.transfer-item__filename,
+.transfer-item__peer,
+.android-file-picker__item-name,
+.incoming-dialog__file-name,
+.home-view__device-chip-name,
+.home-view__device-chip-ip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-view,
+.transfers-view,
+.settings-view,
+.view,
+.view-wrapper,
+.android-content {
+  min-width: 0;
+}
