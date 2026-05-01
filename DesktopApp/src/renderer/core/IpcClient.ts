@@ -82,4 +82,7 @@ export const IpcClient = {
 
   // Local network info
   getLocalIp: (): Promise<string> => getApi().getLocalIp(),
+
+  // Native directory picker
+  openDirectory: (): Promise<string | null> => getApi().openDirectory(),
 } as const;

@@ -72,6 +72,9 @@ export interface FileDropApi {
 
   // Local network info
   getLocalIp: () => Promise<string>;
+
+  // Native directory picker
+  openDirectory: () => Promise<string | null>;
 }
 
 // ─── Helper: create a listener that returns an unsubscribe function ───────────
@@ -133,6 +136,9 @@ const api: FileDropApi = {
 
   // Local network info
   getLocalIp: () => ipcRenderer.invoke(IpcChannels.LOCAL_IP_GET),
+
+  // Native directory picker
+  openDirectory: () => ipcRenderer.invoke(IpcChannels.DIALOG_OPEN_DIRECTORY),
 };
 
 contextBridge.exposeInMainWorld('api', api);

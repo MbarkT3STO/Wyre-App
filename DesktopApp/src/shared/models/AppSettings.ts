@@ -21,6 +21,11 @@ export interface AppSettings {
   autoAccept: boolean;
   /** List of device IDs that are trusted for auto-accept */
   trustedDeviceIds: string[];
+  /**
+   * Human-readable names for trusted devices, keyed by device ID.
+   * Stored at trust-time so the name is visible even when the device is offline.
+   */
+  trustedDeviceNames: Record<string, string>;
   /** Seconds before auto-declining an incoming request */
   autoDeclineTimeout: number;
   /** Whether to show OS notifications on transfer complete */
@@ -39,6 +44,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
   autoAccept: false,
   trustedDeviceIds: [],
+  trustedDeviceNames: {},
   autoDeclineTimeout: 30,
   showNotifications: true,
   uiScale: 1.0,

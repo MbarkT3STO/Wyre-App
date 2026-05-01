@@ -484,6 +484,22 @@ function wireCustomEvents(): void {
     });
   });
 
+  // Retry a failed outgoing transfer — dispatched by TransferItem's Retry button.
+  // Looks up the target device from the live device list by peerId, then re-sends.
+  window.addEventListener('filedrop:retry-transfer', (e) => {
+    const { filePath, peerId } = (e as CustomEvent<{ filePath: string; peerId: string; peerName: string }>).detail;
+    const device = StateManager.get('devices').find(d => d.id === peerId);
+    if (!device) {
+      toasts.error('Device is no longer online — cannot retry');
+      return;
+    }
+    IpcClient.sendFile({ deviceId: peerId, filePath })
+      .then(() => toasts.success('Retrying transfer…'))
+      .catch((err: unknown) => {
+        toasts.error(`Retry failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
+  });
+
   window.addEventListener('filedrop:theme-change', (e) => {
     const theme = (e as CustomEvent<{ theme: 'dark' | 'light' | 'system' }>).detail.theme;
     themeEngine.apply(theme);

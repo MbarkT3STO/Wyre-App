@@ -196,7 +196,7 @@ export class SettingsView extends Component {
               <span class="sg__hint">Only these devices will be auto-accepted</span>
             </div>
             <div class="settings-view__trusted-list" id="trusted-list">
-              ${this.renderTrustedList(s.trustedDeviceIds)}
+              ${this.renderTrustedList(s.trustedDeviceIds, s.trustedDeviceNames ?? {})}
             </div>
           </div>
           <div class="sg__divider"></div>
@@ -359,21 +359,28 @@ export class SettingsView extends Component {
     `;
   }
 
-  private renderTrustedList(trustedIds: string[]): string {
+  private renderTrustedList(trustedIds: string[], trustedNames: Record<string, string>): string {
     if (trustedIds.length === 0) {
       return `<span class="sg__hint settings-view__trusted-empty">No trusted devices yet</span>`;
     }
-    return trustedIds.map(id => `
-      <div class="settings-view__trusted-item">
-        <i class="fa-solid fa-shield-halved settings-view__trusted-icon"></i>
-        <span class="settings-view__trusted-id" title="${escapeHtml(id)}">…${escapeHtml(id.slice(-8))}</span>
-        <button class="settings-view__trusted-remove btn btn--ghost btn--sm"
-          aria-label="Remove trusted device ${escapeHtml(id.slice(-8))}"
-          data-remove-trusted="${escapeHtml(id)}">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
-      </div>
-    `).join('');
+    return trustedIds.map(id => {
+      // Show the stored name if available, otherwise fall back to the truncated ID
+      const name = trustedNames[id];
+      const label = name
+        ? escapeHtml(name)
+        : `<span class="settings-view__trusted-id-fallback">…${escapeHtml(id.slice(-8))}</span>`;
+      return `
+        <div class="settings-view__trusted-item">
+          <i class="fa-solid fa-shield-halved settings-view__trusted-icon"></i>
+          <span class="settings-view__trusted-name" title="${escapeHtml(id)}">${label}</span>
+          <button class="settings-view__trusted-remove btn btn--ghost btn--sm"
+            aria-label="Remove trusted device ${name ? escapeHtml(name) : escapeHtml(id.slice(-8))}"
+            data-remove-trusted="${escapeHtml(id)}">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      `;
+    }).join('');
   }
 
   private renderDeviceOptions(trustedIds: string[]): string {
@@ -432,11 +439,13 @@ export class SettingsView extends Component {
           const idToRemove = (btn as HTMLElement).dataset['removeTrusted'] ?? '';
           const current = StateManager.get('settings');
           if (!current) return;
-          const updated = current.trustedDeviceIds.filter(id => id !== idToRemove);
-          await IpcClient.setSettings({ trustedDeviceIds: updated });
-          StateManager.setState('settings', { ...current, trustedDeviceIds: updated });
+          const updatedIds = current.trustedDeviceIds.filter(id => id !== idToRemove);
+          const updatedNames = { ...(current.trustedDeviceNames ?? {}) };
+          delete updatedNames[idToRemove];
+          await IpcClient.setSettings({ trustedDeviceIds: updatedIds, trustedDeviceNames: updatedNames });
+          StateManager.setState('settings', { ...current, trustedDeviceIds: updatedIds, trustedDeviceNames: updatedNames });
           const listEl = this.element?.querySelector('#trusted-list');
-          if (listEl) listEl.innerHTML = this.renderTrustedList(updated);
+          if (listEl) listEl.innerHTML = this.renderTrustedList(updatedIds, updatedNames);
           this.refreshTrustedDeviceDropdown();
           this.attachTrustedListEvents();
           this.toasts.success('Device removed from trusted list');
@@ -452,7 +461,7 @@ export class SettingsView extends Component {
       ?.addEventListener('click', () => { void this.saveDeviceName(); });
 
     this.element.querySelector('#browse-dir-btn')
-      ?.addEventListener('click', () => { void this.browseSaveDirectory(); });
+      ?.addEventListener('click', () => { this.browseSaveDirectory(); });
 
     this.element.querySelector('#save-port-btn')
       ?.addEventListener('click', () => { void this.savePort(); });
@@ -568,15 +577,19 @@ export class SettingsView extends Component {
             this.toasts.info('Device is already trusted');
             return;
           }
-          const updated = [...current.trustedDeviceIds, deviceId];
-          await IpcClient.setSettings({ trustedDeviceIds: updated });
-          StateManager.setState('settings', { ...current, trustedDeviceIds: updated });
+          // Capture the device name at trust-time so it's visible when offline
+          const device = StateManager.get('devices').find(d => d.id === deviceId);
+          const deviceName = device?.name ?? '';
+          const updatedIds = [...current.trustedDeviceIds, deviceId];
+          const updatedNames = { ...(current.trustedDeviceNames ?? {}), [deviceId]: deviceName };
+          await IpcClient.setSettings({ trustedDeviceIds: updatedIds, trustedDeviceNames: updatedNames });
+          StateManager.setState('settings', { ...current, trustedDeviceIds: updatedIds, trustedDeviceNames: updatedNames });
           // Re-render the trusted list in-place
           const listEl = this.element?.querySelector('#trusted-list');
-          if (listEl) listEl.innerHTML = this.renderTrustedList(updated);
+          if (listEl) listEl.innerHTML = this.renderTrustedList(updatedIds, updatedNames);
           this.refreshTrustedDeviceDropdown();
           this.attachTrustedListEvents();
-          this.toasts.success('Device added to trusted list');
+          this.toasts.success(`${deviceName || 'Device'} added to trusted list`);
         })();
       });
 
@@ -602,27 +615,18 @@ export class SettingsView extends Component {
   }
 
   private browseSaveDirectory(): void {
-    this.toasts.info('Use the file picker to select a folder');
-    const input = document.createElement('input');
-    input.type = 'file';
-    (input as HTMLInputElement & { webkitdirectory: boolean }).webkitdirectory = true;
-    input.onchange = () => {
-      const file = input.files?.[0];
-      if (file) {
-        const dirPath = (file as File & { path?: string }).path?.split('/').slice(0, -1).join('/') ?? '';
-        if (dirPath) {
-          void IpcClient.setSettings({ saveDirectory: dirPath }).then(() => {
-            // Fix 4: Patch StateManager slice and DOM input without triggering a full re-render
-            const current = StateManager.get('settings');
-            if (current) StateManager.setState('settings', { ...current, saveDirectory: dirPath });
-            const dirInput = this.element?.querySelector('#save-dir') as HTMLInputElement;
-            if (dirInput) dirInput.value = dirPath;
-            this.toasts.success('Save location updated');
-          });
-        }
-      }
-    };
-    input.click();
+    IpcClient.openDirectory().then((dirPath) => {
+      if (!dirPath) return; // user cancelled
+      void IpcClient.setSettings({ saveDirectory: dirPath }).then(() => {
+        const current = StateManager.get('settings');
+        if (current) StateManager.setState('settings', { ...current, saveDirectory: dirPath });
+        const dirInput = this.element?.querySelector('#save-dir') as HTMLInputElement;
+        if (dirInput) dirInput.value = dirPath;
+        this.toasts.success('Save location updated');
+      });
+    }).catch((err: unknown) => {
+      this.toasts.error(`Could not open folder picker: ${err instanceof Error ? err.message : String(err)}`);
+    });
   }
 
   private async savePort(): Promise<void> {

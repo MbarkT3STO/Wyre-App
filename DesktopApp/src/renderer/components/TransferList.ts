@@ -136,7 +136,12 @@ export class TransferList extends Component {
 
     if (activeTransfers.length === 0) {
       if (!container.querySelector('.transfer-list__empty')) {
-        container.innerHTML = `<p class="transfer-list__empty">No active transfers</p>`;
+        container.innerHTML = `
+          <div class="transfer-list__empty">
+            <i class="fa-solid fa-arrow-right-arrow-left transfer-list__empty-icon" aria-hidden="true"></i>
+            <p>No active transfers</p>
+            <span>Files you send or receive will appear here.</span>
+          </div>`;
       }
       return;
     }
@@ -208,7 +213,12 @@ export class TransferList extends Component {
 
     if (history.length === 0) {
       if (!container.querySelector('.transfer-list__empty')) {
-        container.innerHTML = `<p class="transfer-list__empty">No transfer history</p>`;
+        container.innerHTML = `
+          <div class="transfer-list__empty">
+            <i class="fa-solid fa-clock-rotate-left transfer-list__empty-icon" aria-hidden="true"></i>
+            <p>No transfer history</p>
+            <span>Completed, failed, and cancelled transfers will appear here.</span>
+          </div>`;
       }
       return;
     }

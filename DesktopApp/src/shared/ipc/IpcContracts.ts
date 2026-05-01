@@ -50,6 +50,9 @@ export const IpcChannels = {
 
   // Local network info
   LOCAL_IP_GET: 'local:ip:get',
+
+  // Native directory picker
+  DIALOG_OPEN_DIRECTORY: 'dialog:openDirectory',
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];
@@ -167,4 +170,5 @@ export interface IpcInvokeMap {
   [IpcChannels.SHELL_SHOW_IN_FOLDER]: [{ path: string }, void];
   [IpcChannels.LOGS_GET]: [void, LogsGetResponse];
   [IpcChannels.LOCAL_IP_GET]: [void, string];
+  [IpcChannels.DIALOG_OPEN_DIRECTORY]: [void, string | null];
 }

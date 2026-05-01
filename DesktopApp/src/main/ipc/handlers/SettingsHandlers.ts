@@ -3,7 +3,7 @@
  * IPC handlers for settings read/write, window controls, and shell actions.
  */
 
-import { IpcMain, BrowserWindow, shell } from 'electron';
+import { IpcMain, BrowserWindow, shell, dialog } from 'electron';
 import { IpcChannels } from '../../../shared/ipc/IpcContracts';
 import type { SettingsStore } from '../../store/SettingsStore';
 import type { AppSettings } from '../../../shared/models/AppSettings';
@@ -27,7 +27,7 @@ export function registerSettingsHandlers(
     // Only pass keys that are known AppSettings fields to prevent prototype pollution
     const allowed: (keyof AppSettings)[] = [
       'deviceName', 'transferPort', 'saveDirectory', 'theme',
-      'autoAccept', 'trustedDeviceIds', 'autoDeclineTimeout', 'showNotifications', 'uiScale',
+      'autoAccept', 'trustedDeviceIds', 'trustedDeviceNames', 'autoDeclineTimeout', 'showNotifications', 'uiScale',
     ];
     const safe: Partial<AppSettings> = {};
     for (const key of allowed) {
@@ -69,5 +69,16 @@ export function registerSettingsHandlers(
   ipcMain.handle(IpcChannels.SHELL_SHOW_IN_FOLDER, (_event, payload: unknown): void => {
     const { path } = validateShellPathPayload(payload);
     shell.showItemInFolder(path);
+  });
+
+  // Native directory picker — uses Electron's dialog API so the user selects
+  // a folder directly rather than a file inside it (the webkitdirectory hack).
+  ipcMain.handle(IpcChannels.DIALOG_OPEN_DIRECTORY, async (): Promise<string | null> => {
+    const win = getMainWindow();
+    const result = await dialog.showOpenDialog(win ?? new BrowserWindow({ show: false }), {
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Select Save Location',
+    });
+    return result.canceled || result.filePaths.length === 0 ? null : result.filePaths[0] ?? null;
   });
 }

@@ -150,6 +150,15 @@ export class TransferItem extends Component {
           <i class="fa-solid fa-xmark btn__icon transfer-item__btn-icon"></i>
           Cancel
         </button>` : ''}
+        ${t.status === TransferStatus.Failed && t.direction === 'send' ? `
+          <button class="btn btn--secondary btn--sm transfer-item__retry"
+            data-file-path="${escapeHtml('filePath' in t ? (t.filePath ?? '') : '')}"
+            data-peer-id="${escapeHtml(t.peerId)}"
+            data-peer-name="${escapeHtml(t.peerName)}">
+            <i class="fa-solid fa-rotate-right btn__icon transfer-item__btn-icon"></i>
+            Retry
+          </button>
+        ` : ''}
         ${t.status === TransferStatus.Completed && savedPath ? `
           <button class="btn btn--ghost btn--sm transfer-item__open-file" data-path="${escapeHtml(savedPath)}">
             <i class="fa-solid fa-arrow-up-right-from-square btn__icon transfer-item__btn-icon"></i>
@@ -192,6 +201,21 @@ export class TransferItem extends Component {
       cancelBtn.addEventListener('click', () => {
         const id = (cancelBtn as HTMLElement).dataset['id'];
         if (id) IpcClient.cancelTransfer({ transferId: id });
+      });
+    }
+
+    const retryBtn = this.element.querySelector('.transfer-item__retry');
+    if (retryBtn) {
+      retryBtn.addEventListener('click', () => {
+        const el = retryBtn as HTMLElement;
+        const filePath = el.dataset['filePath'] ?? '';
+        const peerId = el.dataset['peerId'] ?? '';
+        const peerName = el.dataset['peerName'] ?? '';
+        if (filePath && peerId) {
+          window.dispatchEvent(new CustomEvent('filedrop:retry-transfer', {
+            detail: { filePath, peerId, peerName },
+          }));
+        }
       });
     }
 

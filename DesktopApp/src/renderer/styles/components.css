@@ -539,6 +539,8 @@
 .device-card__platform-badge--macos   { color: #A8A5FF; }
 .device-card__platform-icon--linux,
 .device-card__platform-badge--linux   { color: #81C784; }
+.device-card__platform-icon--android,
+.device-card__platform-badge--android { color: #A4C639; }
 .device-card__platform-icon--unknown,
 .device-card__platform-badge--unknown { color: #8A90A4; }
 
@@ -1071,6 +1073,27 @@
   border: none;
   border-radius: var(--radius-lg);
   box-shadow: var(--nm-pressed);
+}
+
+.transfer-list__empty-icon {
+  font-size: 36px;
+  color: var(--accent-mid);
+  opacity: 0.22;
+  margin-bottom: var(--sp-1);
+}
+
+.transfer-list__empty p {
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.transfer-list__empty span {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  max-width: 260px;
+  line-height: var(--leading-relaxed);
 }
 
 .transfer-list__clear-btn {
@@ -1727,6 +1750,58 @@
 @media (max-width: 480px) {
   .transfers-view__scroll { padding: var(--sp-4) var(--sp-4) var(--sp-6); }
   .transfers-view__content { gap: var(--sp-3); }
+}
+
+/* ── Transfer stats bar ── */
+.transfers-view__stats {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--bg-app);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--nm-pressed);
+  padding: var(--sp-3) var(--sp-5);
+  flex-shrink: 0;
+}
+
+.transfers-view__stat {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  flex: 1;
+  justify-content: center;
+}
+
+.transfers-view__stat-icon {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+.transfers-view__stat-icon--send    { color: var(--accent-mid); }
+.transfers-view__stat-icon--receive { color: var(--success-text); }
+
+.transfers-view__stat-value {
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+}
+
+.transfers-view__stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.transfers-view__stat-divider {
+  width: 1px;
+  height: 28px;
+  background: var(--border-subtle);
+  flex-shrink: 0;
+  margin: 0 var(--sp-2);
 }
 
 
@@ -2680,15 +2755,24 @@
   flex-shrink: 0;
 }
 
-.settings-view__trusted-id {
+/* Trusted device name (stored at trust-time, shown instead of raw ID) */
+.settings-view__trusted-name {
   flex: 1;
-  font-family: var(--font-mono);
   font-size: var(--text-sm);
-  color: var(--text-secondary);
-  letter-spacing: 0.04em;
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Fallback when no name was stored — shows truncated ID in mono */
+.settings-view__trusted-id-fallback {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  letter-spacing: 0.04em;
 }
 
 .settings-view__trusted-remove {
