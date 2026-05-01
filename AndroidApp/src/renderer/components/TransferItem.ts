@@ -125,6 +125,10 @@ export class TransferItem extends Component {
           <button class="btn btn--ghost btn--sm transfer-item__open-file" data-path="${escapeHtml(savedPath)}">
             <i class="fa-solid fa-arrow-up-right-from-square btn__icon"></i> Open
           </button>
+          ${t.direction === 'receive' ? `
+          <button class="btn btn--ghost btn--sm transfer-item__show-folder" data-path="${escapeHtml(savedPath)}">
+            <i class="fa-solid fa-folder-open btn__icon"></i> Folder
+          </button>` : ''}
           <div class="transfer-item__saved-path" title="${escapeHtml(savedPath)}">
             <i class="fa-solid fa-folder btn__icon"></i>
             <span>${escapeHtml(savedPath.split('/').slice(-2).join('/'))}</span>
@@ -166,6 +170,14 @@ export class TransferItem extends Component {
       openFileBtn.addEventListener('click', () => {
         const path = (openFileBtn as HTMLElement).dataset['path'];
         if (path) void AppBridge.openFile(path);
+      });
+    }
+
+    const showFolderBtn = this.element.querySelector('.transfer-item__show-folder');
+    if (showFolderBtn) {
+      showFolderBtn.addEventListener('click', () => {
+        const path = (showFolderBtn as HTMLElement).dataset['path'];
+        if (path) void AppBridge.showInFolder(path);
       });
     }
   }

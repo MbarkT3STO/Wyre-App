@@ -160,17 +160,54 @@ class WyreManager(
 
     fun openFile(activity: Activity, path: String) {
         try {
-            val file = File(path)
-            val uri = FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
-            val mime = context.contentResolver.getType(uri) ?: "*/*"
+            val file = java.io.File(path)
+            if (!file.exists()) return
+
+            // For files in public Downloads, use MediaStore URI directly
+            // For files in app-private dirs, use FileProvider
+            val uri = if (path.startsWith(
+                    android.os.Environment.getExternalStoragePublicDirectory(
+                        android.os.Environment.DIRECTORY_DOWNLOADS).absolutePath)) {
+                android.net.Uri.fromFile(file)
+            } else {
+                FileProvider.getUriForFile(context, "${context.packageName}.provider", file)
+            }
+
+            val mime = context.contentResolver.getType(uri)
+                ?: android.webkit.MimeTypeMap.getSingleton()
+                    .getMimeTypeFromExtension(file.extension.lowercase())
+                ?: "*/*"
+
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, mime)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             activity.startActivity(intent)
-        } catch (e: Exception) {
-            // Silently ignore if no app can handle the file type
-        }
+        } catch (_: Exception) {}
+    }
+
+    fun showInFolder(activity: Activity, path: String) {
+        try {
+            // Open the Downloads folder in the Files app
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(
+                    android.net.Uri.parse("content://com.android.externalstorage.documents/document/primary%3ADownload"),
+                    "vnd.android.document/directory"
+                )
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            // Try the Files app intent first
+            try {
+                activity.startActivity(intent)
+                return
+            } catch (_: Exception) {}
+
+            // Fallback: open the Downloads app
+            val fallback = Intent(android.app.DownloadManager.ACTION_VIEW_DOWNLOADS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            activity.startActivity(fallback)
+        } catch (_: Exception) {}
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
@@ -311,6 +348,7 @@ class WyreManager(
     }
 
     private fun getDownloadsDir(): String =
-        context.getExternalFilesDir(android.os.Environment.DIRECTORY_DOWNLOADS)?.absolutePath
-            ?: context.filesDir.absolutePath
+        android.os.Environment
+            .getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+            .absolutePath
 }

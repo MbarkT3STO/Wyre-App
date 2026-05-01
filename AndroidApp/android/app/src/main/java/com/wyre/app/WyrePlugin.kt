@@ -174,7 +174,7 @@ class WyrePlugin : Plugin() {
     @PluginMethod
     fun showInFolder(call: PluginCall) {
         val path = call.getString("path") ?: run { call.reject("path required"); return }
-        manager.openFile(activity, path)
+        manager.showInFolder(activity, path)
         call.resolve()
     }
 }

@@ -1,8 +1,11 @@
 package com.wyre.app
 
+import android.content.ContentValues
 import android.content.Context
+import android.os.Build
+import android.provider.MediaStore
 import java.io.File
-import java.io.InputStream
+import java.io.OutputStream
 import java.net.ServerSocket
 import java.net.Socket
 import java.security.MessageDigest
@@ -135,16 +138,22 @@ class TransferServer(
             status     = "active"
         ))
 
-        val savePath = uniquePath(File(saveDir, req.fileName))
         val md = MessageDigest.getInstance("SHA-256")
         var bytesReceived = 0L
         var lastProgressTime = System.currentTimeMillis()
         var lastBytes = 0L
 
+        // On API 29+ use MediaStore to save directly to public Downloads
+        // On older versions write directly to the file path
+        val (outputStream, finalPath, cleanupOnError) = openOutputStream(req.fileName, saveDir)
+            ?: run {
+                onEvent(TransferEvent.Error(req.transferId, "Cannot open output stream", "PATH_ERROR"))
+                socket.close()
+                return
+            }
+
         try {
-            File(savePath.parent!!).mkdirs()
-            savePath.outputStream().use { fos ->
-                // Write bytes that arrived with the header
+            outputStream.use { fos ->
                 if (initial.isNotEmpty()) {
                     fos.write(initial)
                     md.update(initial)
@@ -168,7 +177,6 @@ class TransferServer(
                         val eta = if (speed > 0) (req.fileSize - bytesReceived) / speed else 0L
                         val progress = if (req.fileSize > 0) ((bytesReceived * 100) / req.fileSize).toInt().coerceAtMost(99) else 0
                         onEvent(TransferEvent.Progress(req.transferId, progress, speed, eta, bytesReceived, req.fileSize))
-                        // Send feedback to sender
                         try {
                             val fb = """{"p":$progress,"b":$bytesReceived,"s":$speed,"e":$eta}""" + "\n"
                             out.write(fb.toByteArray())
@@ -182,7 +190,7 @@ class TransferServer(
 
             val receivedChecksum = md.digest().joinToString("") { "%02x".format(it) }
             if (receivedChecksum != req.checksum) {
-                savePath.delete()
+                cleanupOnError()
                 onEvent(TransferEvent.Error(req.transferId, "Checksum mismatch — file corrupted", "CHECKSUM_ERROR"))
             } else {
                 onEvent(TransferEvent.Complete(
@@ -192,16 +200,66 @@ class TransferServer(
                     peerName   = req.senderName,
                     fileName   = req.fileName,
                     fileSize   = req.fileSize,
-                    savedPath  = savePath.absolutePath,
+                    savedPath  = finalPath,
                     startedAt  = startedAt
                 ))
             }
         } catch (e: Exception) {
-            savePath.delete()
+            cleanupOnError()
             onEvent(TransferEvent.Error(req.transferId, e.message ?: "Receive failed", "RECEIVE_ERROR"))
         } finally {
             socket.close()
         }
+    }
+
+    /**
+     * Opens an OutputStream for saving a received file.
+     * Returns (stream, displayPath, cleanupFn) or null on failure.
+     * On API 29+ uses MediaStore (saves to public Downloads, visible in Files app).
+     * On older APIs writes directly to the saveDir path.
+     */
+    private fun openOutputStream(fileName: String, saveDir: String): Triple<OutputStream, String, () -> Unit>? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Android 10+ — use MediaStore Downloads collection
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
+                put(MediaStore.Downloads.MIME_TYPE, guessMime(fileName))
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
+            val resolver = context.contentResolver
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: return null
+            val stream = resolver.openOutputStream(uri) ?: return null
+            val displayPath = "/storage/emulated/0/Download/$fileName"
+            val cleanup = {
+                resolver.delete(uri, null, null)
+            }
+            // Mark as not pending when done (called after stream closes)
+            // We do this in the complete path by updating the URI
+            Triple(object : OutputStream() {
+                override fun write(b: Int) = stream.write(b)
+                override fun write(b: ByteArray, off: Int, len: Int) = stream.write(b, off, len)
+                override fun flush() = stream.flush()
+                override fun close() {
+                    stream.close()
+                    // Mark file as available
+                    val update = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
+                    resolver.update(uri, update, null, null)
+                }
+            }, displayPath, cleanup)
+        } else {
+            // Android 9 and below — write directly
+            val dir = File(saveDir)
+            dir.mkdirs()
+            val file = uniquePath(File(dir, fileName))
+            val stream = file.outputStream()
+            Triple(stream, file.absolutePath, { file.delete() })
+        }
+    }
+
+    private fun guessMime(fileName: String): String {
+        val ext = fileName.substringAfterLast('.', "").lowercase()
+        return android.webkit.MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "*/*"
     }
 
     private fun sanitizeFileName(raw: String): String {

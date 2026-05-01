@@ -240,8 +240,8 @@ async function wireEventListeners(): Promise<void> {
       };
       StateManager.updateTransfer(completed);
       if (existing.direction === 'receive') {
-        toasts.success(`${existing.fileName} received`, 'Open', () => {
-          void AppBridge.openFile(payload.savedPath);
+        toasts.success(`${existing.fileName} received`, 'Open Folder', () => {
+          void AppBridge.showInFolder(payload.savedPath);
         });
       } else {
         toasts.success(`${existing.fileName} sent successfully`);
