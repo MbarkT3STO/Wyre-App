@@ -69,6 +69,9 @@ export interface FileDropApi {
 
   // Diagnostics (Feature 3)
   getLogs: () => Promise<LogsGetResponse>;
+
+  // Local network info
+  getLocalIp: () => Promise<string>;
 }
 
 // ─── Helper: create a listener that returns an unsubscribe function ───────────
@@ -127,6 +130,9 @@ const api: FileDropApi = {
 
   // Diagnostics (Feature 3)
   getLogs: () => ipcRenderer.invoke(IpcChannels.LOGS_GET),
+
+  // Local network info
+  getLocalIp: () => ipcRenderer.invoke(IpcChannels.LOCAL_IP_GET),
 };
 
 contextBridge.exposeInMainWorld('api', api);

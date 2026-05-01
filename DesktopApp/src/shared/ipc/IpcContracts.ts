@@ -47,6 +47,9 @@ export const IpcChannels = {
 
   // Diagnostics / logging (Feature 3)
   LOGS_GET: 'logs:get',
+
+  // Local network info
+  LOCAL_IP_GET: 'local:ip:get',
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];
@@ -163,4 +166,5 @@ export interface IpcInvokeMap {
   [IpcChannels.SHELL_OPEN_FILE]: [{ path: string }, void];
   [IpcChannels.SHELL_SHOW_IN_FOLDER]: [{ path: string }, void];
   [IpcChannels.LOGS_GET]: [void, LogsGetResponse];
+  [IpcChannels.LOCAL_IP_GET]: [void, string];
 }

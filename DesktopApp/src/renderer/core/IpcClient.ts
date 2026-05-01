@@ -79,4 +79,7 @@ export const IpcClient = {
 
   // Diagnostics (Feature 3)
   getLogs: (): Promise<LogsGetResponse> => getApi().getLogs(),
+
+  // Local network info
+  getLocalIp: (): Promise<string> => getApi().getLocalIp(),
 } as const;

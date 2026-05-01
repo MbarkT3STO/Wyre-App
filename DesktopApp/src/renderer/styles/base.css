@@ -508,17 +508,12 @@ a:hover { text-decoration: none; }
   flex: 1;
 }
 
-/* ── Tooltip on collapsed items ── */
-.sidebar__nav-item[data-tooltip] {
-  position: relative;
-}
-
-.sidebar__nav-item[data-tooltip]::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  left: calc(100% + 12px);
-  top: 50%;
-  transform: translateY(-50%) scale(0.92);
+/* ── Tooltip on collapsed items — rendered as a floating body-level div ── */
+/* The sidebar has overflow:hidden which clips ::after pseudo-elements,    */
+/* so tooltips are driven by JS (wireSidebar) and styled here.             */
+.sidebar-tooltip {
+  position: fixed;
+  z-index: 9999;
   background: var(--bg-elevated);
   color: var(--text-primary);
   font-size: var(--text-sm);
@@ -529,14 +524,19 @@ a:hover { text-decoration: none; }
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 160ms var(--ease-out), transform 160ms var(--ease-out);
-  z-index: 200;
+  transform: translateY(-50%) translateX(-4px);
+  transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
+  font-family: var(--font-family);
+  letter-spacing: -0.01em;
 }
 
-.sidebar--collapsed .sidebar__nav-item[data-tooltip]:hover::after {
+.sidebar-tooltip--visible {
   opacity: 1;
-  transform: translateY(-50%) scale(1);
+  transform: translateY(-50%) translateX(0);
 }
+
+/* ── Remove old CSS-only tooltip (clipped by overflow:hidden on sidebar) ── */
+.sidebar__nav-item[data-tooltip]::after { display: none; }
 
 /* ── Collapsed state — hide text, center icons ── */
 .sidebar--collapsed .sidebar__brand-name,

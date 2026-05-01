@@ -5,6 +5,7 @@
  */
 
 import { ipcMain, BrowserWindow } from 'electron';
+import { networkInterfaces } from 'os';
 import { IpcChannels } from '../../shared/ipc/IpcContracts';
 import type { DiscoveryService } from '../discovery/DiscoveryService';
 import type { TransferQueue } from '../transfer/TransferQueue';
@@ -56,6 +57,20 @@ export class IpcBridge {
       } catch {
         return { lines: [] };
       }
+    });
+
+    // LOCAL_IP_GET — returns the first non-internal IPv4 address
+    ipcMain.handle(IpcChannels.LOCAL_IP_GET, () => {
+      const nets = networkInterfaces();
+      for (const ifaces of Object.values(nets)) {
+        if (!ifaces) continue;
+        for (const iface of ifaces) {
+          if (iface.family === 'IPv4' && !iface.internal) {
+            return iface.address;
+          }
+        }
+      }
+      return '—';
     });
 
     // Wire service events → renderer pushes

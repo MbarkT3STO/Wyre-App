@@ -110,6 +110,12 @@ async function bootstrap(): Promise<void> {
       if (nameEl) nameEl.textContent = s.deviceName;
     }
   });
+
+  // Populate local IP in sidebar
+  IpcClient.getLocalIp().then((ip) => {
+    const ipEl = document.getElementById('sidebar-device-ip');
+    if (ipEl) ipEl.textContent = ip;
+  }).catch(() => { /* non-fatal */ });
 }
 
 function buildShell(deviceName: string, platform: NodeJS.Platform): string {
@@ -205,6 +211,49 @@ function wireSidebar(): void {
     const collapsed = sidebar.classList.toggle('sidebar--collapsed');
     localStorage.setItem(STORAGE_KEY, String(collapsed));
   });
+
+  // ── Floating tooltip for collapsed nav items ──────────────────────────────
+  // The sidebar has overflow:hidden which clips CSS ::after pseudo-elements.
+  // Instead we create a single floating div appended to <body> and position
+  // it next to the hovered item on mouseenter.
+  const tooltip = document.createElement('div');
+  tooltip.className = 'sidebar-tooltip';
+  tooltip.setAttribute('role', 'tooltip');
+  tooltip.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(tooltip);
+
+  let tooltipTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  const showTooltip = (item: HTMLElement): void => {
+    const label = item.dataset['tooltip'];
+    if (!label || !sidebar.classList.contains('sidebar--collapsed')) return;
+
+    tooltip.textContent = label;
+    tooltip.classList.add('sidebar-tooltip--visible');
+
+    const rect = item.getBoundingClientRect();
+    tooltip.style.top = `${rect.top + rect.height / 2}px`;
+    tooltip.style.left = `${rect.right + 12}px`;
+  };
+
+  const hideTooltip = (): void => {
+    tooltip.classList.remove('sidebar-tooltip--visible');
+  };
+
+  document.querySelectorAll<HTMLElement>('.sidebar__nav-item[data-tooltip]').forEach((item) => {
+    item.addEventListener('mouseenter', () => {
+      if (tooltipTimeout) clearTimeout(tooltipTimeout);
+      tooltipTimeout = setTimeout(() => showTooltip(item), 80);
+    });
+    item.addEventListener('mouseleave', () => {
+      if (tooltipTimeout) clearTimeout(tooltipTimeout);
+      hideTooltip();
+    });
+    item.addEventListener('click', hideTooltip);
+  });
+
+  // Hide tooltip when sidebar expands
+  toggleBtn.addEventListener('click', hideTooltip);
 }
 
 function wireAbout(): void {
