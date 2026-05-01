@@ -84,10 +84,13 @@ class TransferClient(
 
             // ── 3. Stream file, emitting progress from sender side ────────────
             val file = File(filePath)
+            // Use actual file size from disk — guards against fileSize=0 from JS
+            val actualFileSize = if (fileSize > 0) fileSize else file.length()
             var bytesSent = 0L
             var lastProgressTime = System.currentTimeMillis()
             var lastProgressBytes = 0L
             val buf = ByteArray(CHUNK_SIZE)
+            var chunksSinceFlush = 0
 
             file.inputStream().use { fis ->
                 var read: Int
@@ -96,23 +99,31 @@ class TransferClient(
 
                     out.write(buf, 0, read)
                     bytesSent += read
+                    chunksSinceFlush++
+
+                    // Flush every 8 chunks (~512 KB) so data actually flows
+                    if (chunksSinceFlush >= 8) {
+                        out.flush()
+                        chunksSinceFlush = 0
+                    }
 
                     val now = System.currentTimeMillis()
                     val elapsed = now - lastProgressTime
 
-                    if (elapsed >= PROGRESS_INTERVAL_MS) {
+                    // Only emit once we have real bytes and enough time has passed
+                    if (bytesSent > 0 && elapsed >= PROGRESS_INTERVAL_MS) {
                         val bytesInInterval = bytesSent - lastProgressBytes
                         val speed = if (elapsed > 0) (bytesInInterval * 1000L / elapsed) else 0L
-                        val progress = if (fileSize > 0) ((bytesSent * 100L) / fileSize).toInt().coerceIn(0, 99) else 0
-                        val eta = if (speed > 0) (fileSize - bytesSent) / speed else 0L
+                        val progress = if (actualFileSize > 0) ((bytesSent * 100L) / actualFileSize).toInt().coerceIn(1, 99) else 1
+                        val eta = if (speed > 0) (actualFileSize - bytesSent) / speed else 0L
 
                         onEvent(TransferEvent.Progress(
-                            transferId      = transferId,
-                            progress        = progress,
-                            speed           = speed,
-                            eta             = eta,
+                            transferId       = transferId,
+                            progress         = progress,
+                            speed            = speed,
+                            eta              = eta,
                             bytesTransferred = bytesSent,
-                            totalBytes      = fileSize
+                            totalBytes       = actualFileSize
                         ))
 
                         lastProgressTime = now
@@ -134,14 +145,14 @@ class TransferClient(
             } catch (_: Exception) {}
 
             if (!cancelled) {
-                onEvent(TransferEvent.Progress(transferId, 100, 0, 0, fileSize, fileSize))
+                onEvent(TransferEvent.Progress(transferId, 100, 0, 0, actualFileSize, actualFileSize))
                 onEvent(TransferEvent.Complete(
                     transferId = transferId,
                     direction  = "send",
                     peerId     = "",
                     peerName   = senderName,
                     fileName   = fileName,
-                    fileSize   = fileSize,
+                    fileSize   = actualFileSize,
                     savedPath  = "",
                     startedAt  = startedAt
                 ))

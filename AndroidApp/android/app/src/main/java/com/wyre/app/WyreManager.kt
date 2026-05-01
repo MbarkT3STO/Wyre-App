@@ -300,7 +300,9 @@ class WyreManager(
             val obj = JSObject()
             obj.put("path", cacheFile.absolutePath)
             obj.put("name", name)
-            obj.put("size", if (size > 0) size else cacheFile.length())
+            // Always use actual file size from disk — most reliable source
+            val actualSize = cacheFile.length().takeIf { it > 0 } ?: size
+            obj.put("size", actualSize)
             obj
         } catch (e: Exception) {
             android.util.Log.e("WyreManager", "resolveUri failed: ${e.message}", e)
