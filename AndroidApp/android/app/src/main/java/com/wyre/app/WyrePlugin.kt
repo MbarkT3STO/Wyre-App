@@ -22,16 +22,22 @@ class WyrePlugin : Plugin() {
         get() = WyrePluginBridge.serviceManager
 
     override fun load() {
-        // Start the background service (idempotent — safe to call multiple times)
-        WyreService.start(context)
-        // Register this plugin instance so the service can forward events to JS
-        WyrePluginBridge.registerPlugin(this)
-        // If service manager isn't ready yet, retry after a short delay
-        if (WyrePluginBridge.serviceManager == null) {
-            mainHandler.postDelayed({
-                WyrePluginBridge.registerPlugin(this)
-            }, 500)
+        // Only start the background service if the user has enabled it
+        if (WyreService.isEnabled(context)) {
+            WyreService.start(context)
+        } else if (WyrePluginBridge.serviceManager == null) {
+            // App is open but service isn't running — start a local manager
+            startLocalManager()
         }
+        WyrePluginBridge.registerPlugin(this)
+    }
+
+    private fun startLocalManager() {
+        val localManager = WyreManager(context) { event, data ->
+            mainHandler.post { notifyListeners(event, data) }
+        }
+        localManager.start()
+        WyrePluginBridge.serviceManager = localManager
     }
 
     override fun handleOnDestroy() {
@@ -58,6 +64,22 @@ class WyrePlugin : Plugin() {
     fun setSettings(call: PluginCall) {
         val m = manager ?: run { call.reject("Service not ready"); return }
         m.setSettings(call.data)
+
+        // Handle backgroundService toggle
+        if (call.data.has("backgroundService")) {
+            val enable = call.data.getBoolean("backgroundService") ?: false
+            if (enable) {
+                WyreService.start(context)
+            } else {
+                // Stop the foreground service but keep a local manager running
+                // so the app still works while open
+                WyreService.stop(context)
+                if (WyrePluginBridge.serviceManager == null) {
+                    startLocalManager()
+                }
+            }
+        }
+
         call.resolve()
     }
 

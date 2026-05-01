@@ -12,11 +12,15 @@ import type { AppSettings } from '../../shared/models/AppSettings';
 import type { ToastContainer } from '../components/ToastContainer';
 import { validateDeviceName, validateTimeout } from '../../shared/utils/validators';
 
+// Extended type that includes the Android-only backgroundService field
+type AppSettingsWithBackground = AppSettings & { backgroundService?: boolean };
+
 const ICONS = {
   identity:      `<i class="fa-solid fa-user"></i>`,
   incoming:      `<i class="fa-solid fa-inbox"></i>`,
   appearance:    `<i class="fa-solid fa-palette"></i>`,
   notifications: `<i class="fa-solid fa-bell"></i>`,
+  background:    `<i class="fa-solid fa-moon"></i>`,
   data:          `<i class="fa-solid fa-trash-can"></i>`,
   trusted:       `<i class="fa-solid fa-shield-halved"></i>`,
 };
@@ -216,6 +220,29 @@ export class SettingsView extends Component {
         </div>
       </div>
 
+      <!-- ── Background Service ── -->
+      <div class="sg">
+        <div class="sg__header">
+          <div class="sg__icon sg__icon--blue">${ICONS.background}</div>
+          <div class="sg__meta">
+            <div class="sg__title">Background Service</div>
+            <div class="sg__desc">Keep Wyre running when the app is closed</div>
+          </div>
+        </div>
+        <div class="sg__body">
+          <div class="sg__row sg__row--toggle">
+            <div class="sg__row-info">
+              <label class="sg__label" for="background-service">Run in Background</label>
+              <span class="sg__hint">Receive files and notifications even when Wyre is closed. Uses a persistent notification to stay active.</span>
+            </div>
+            <label class="toggle">
+              <input class="toggle__input" id="background-service" type="checkbox" ${(s as AppSettingsWithBackground).backgroundService ? 'checked' : ''}/>
+              <span class="toggle__track"><span class="toggle__thumb"></span></span>
+            </label>
+          </div>
+        </div>
+      </div>
+
       <!-- ── Data ── -->
       <div class="sg">
         <div class="sg__header">
@@ -361,6 +388,20 @@ export class SettingsView extends Component {
       const current = StateManager.get('settings');
       if (current) StateManager.setState('settings', { ...current, showNotifications: notifInput.checked });
       this.toasts.success('Settings saved');
+    });
+
+    const bgServiceInput = this.element.querySelector('#background-service') as HTMLInputElement;
+    bgServiceInput?.addEventListener('change', async () => {
+      const enabled = bgServiceInput.checked;
+      // Cast to extended type since backgroundService is Android-only
+      await AppBridge.setSettings({ backgroundService: enabled } as Partial<AppSettings>);
+      const current = StateManager.get('settings');
+      if (current) StateManager.setState('settings', { ...current, backgroundService: enabled } as AppSettings);
+      if (enabled) {
+        this.toasts.success('Background service enabled — Wyre will run in the background');
+      } else {
+        this.toasts.info('Background service disabled');
+      }
     });
 
     this.element.querySelector('#clear-history-btn')

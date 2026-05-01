@@ -21,8 +21,10 @@ class MainActivity : BridgeActivity() {
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
         )
 
-        // Start the background service early so it's ready before the plugin loads
-        WyreService.start(this)
+        // Start the background service only if the user has enabled it
+        if (WyreService.isEnabled(this)) {
+            WyreService.start(this)
+        }
 
         // Request storage permissions for Android 9 and below
         // Android 10+ uses MediaStore (no permission needed for Downloads)

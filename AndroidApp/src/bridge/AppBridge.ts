@@ -26,8 +26,8 @@ export const AppBridge = {
   getSettings: (): Promise<AppSettings> =>
     WyrePlugin.getSettings(),
 
-  setSettings: (partial: Partial<AppSettings>): Promise<void> =>
-    WyrePlugin.setSettings(partial),
+  setSettings: (partial: Partial<AppSettings> & { backgroundService?: boolean }): Promise<void> =>
+    WyrePlugin.setSettings(partial as Partial<AppSettings>),
 
   // ── Device discovery ──────────────────────────────────────────────────────
   getDevices: async (): Promise<Device[]> => {

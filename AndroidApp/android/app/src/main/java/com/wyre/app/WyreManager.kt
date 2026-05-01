@@ -71,6 +71,7 @@ class WyreManager(
         obj.put("trustedDeviceIds",   JSArray(settings.getStringList("trustedDeviceIds")))
         obj.put("autoDeclineTimeout", settings.getInt("autoDeclineTimeout",    30))
         obj.put("showNotifications",  settings.getBoolean("showNotifications", true))
+        obj.put("backgroundService",  settings.getBoolean("backgroundService",  false))
         obj.put("uiScale",            settings.getFloat("uiScale",             1.0f))
         obj.put("version",            "1.0.0")
         return obj
@@ -82,6 +83,7 @@ class WyreManager(
         if (data.has("autoAccept"))         settings.setBoolean("autoAccept",        data.getBoolean("autoAccept"))
         if (data.has("autoDeclineTimeout")) settings.setInt("autoDeclineTimeout",    data.getInt("autoDeclineTimeout"))
         if (data.has("showNotifications"))  settings.setBoolean("showNotifications", data.getBoolean("showNotifications"))
+        if (data.has("backgroundService"))  settings.setBoolean("backgroundService",  data.getBoolean("backgroundService"))
         if (data.has("uiScale"))            settings.setFloat("uiScale",             data.getDouble("uiScale").toFloat())
         if (data.has("trustedDeviceIds")) {
             val arr = data.getJSONArray("trustedDeviceIds")

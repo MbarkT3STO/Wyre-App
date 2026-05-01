@@ -16,6 +16,7 @@ export interface AppSettings {
   trustedDeviceIds: string[];
   autoDeclineTimeout: number;
   showNotifications: boolean;
+  backgroundService: boolean;
   uiScale: UiScale;
   version: string;
 }
@@ -30,6 +31,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   trustedDeviceIds: [],
   autoDeclineTimeout: 30,
   showNotifications: true,
+  backgroundService: false,
   uiScale: 1.0,
   version: '1.0.0',
 };

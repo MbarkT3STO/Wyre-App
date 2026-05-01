@@ -4,12 +4,9 @@
    ============================================================ */
 
 /* ── Safe area / status bar spacer ────────────────────────── */
+/* Not needed — header is position:fixed and handles safe-area-inset-top */
 .android-status-bar {
-  height: env(safe-area-inset-top, 0px);
-  background: transparent;
-  flex-shrink: 0;
-  position: relative;
-  z-index: 100;
+  display: none;
 }
 
 /* ── Top header bar ────────────────────────────────────────── */
@@ -24,7 +21,10 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   box-shadow: 0 1px 24px rgba(0, 0, 0, 0.35);
   flex-shrink: 0;
-  position: relative;
+  position: fixed;
+  top: env(safe-area-inset-top, 0px);
+  left: 0;
+  right: 0;
   z-index: 100;
   min-height: 56px;
 }
@@ -100,14 +100,19 @@
 
 /* ── Main content area ─────────────────────────────────────── */
 .android-content {
-  flex: 1;
-  min-height: 0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   overflow: hidden;
-  position: relative;
   background: var(--bg-base);
   display: flex;
   flex-direction: column;
   z-index: 1;
+  /* Push content below header and above bottom nav */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 56px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 56px);
 }
 
 /* ── Bottom navigation bar ─────────────────────────────────── */
@@ -119,8 +124,10 @@
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-top: 1px solid rgba(255, 255, 255, 0.07);
   box-shadow: 0 -1px 24px rgba(0, 0, 0, 0.35);
-  flex-shrink: 0;
-  position: relative;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 100;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -183,6 +190,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: var(--sp-5);
+  padding-bottom: calc(var(--sp-5) + 16px);
   display: flex;
   flex-direction: column;
   gap: var(--sp-6);
@@ -460,6 +468,7 @@
 
 .transfers-view__content {
   padding: var(--sp-5);
+  padding-bottom: calc(var(--sp-5) + 16px);
   display: flex;
   flex-direction: column;
   gap: var(--sp-4);
@@ -480,7 +489,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
-  padding-bottom: var(--sp-10);
+  padding-bottom: calc(var(--sp-10) + 16px);
 }
 
 /* ── Settings groups ────────────────────────────────────────── */
