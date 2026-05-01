@@ -1,9 +1,7 @@
 package com.wyre.app
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
@@ -11,13 +9,9 @@ import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import org.json.JSONObject
 import java.io.File
-import java.net.InetAddress
-import java.net.NetworkInterface
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
-
-const val REQUEST_CODE_PICK_FILE = 9001
 
 /**
  * WyreManager.kt
@@ -148,41 +142,9 @@ class WyreManager(
     fun clearHistory() { synchronized(history) { history.clear() } }
 
     // ── File picker ───────────────────────────────────────────────────────────
-    // Callback-based — WyrePlugin owns the PluginCall, not WyreManager
-    private var pickFileCallback: ((JSArray) -> Unit)? = null
-
-    fun launchFilePicker(activity: Activity, callback: (JSArray) -> Unit) {
-        pickFileCallback = callback
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            type = "*/*"
-            addCategory(Intent.CATEGORY_OPENABLE)
-            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-        }
-        activity.startActivityForResult(intent, REQUEST_CODE_PICK_FILE)
-    }
-
-    /** Called from WyrePlugin.handleOnActivityResult */
-    fun handlePickFileResult(resultCode: Int, data: android.content.Intent?) {
-        val callback = pickFileCallback ?: return
-        pickFileCallback = null
-
-        if (resultCode != Activity.RESULT_OK || data == null) {
-            callback(JSArray())
-            return
-        }
-
-        // Collect all selected URIs
-        val uris = mutableListOf<Uri>()
-        val clipData = data.clipData
-        if (clipData != null) {
-            for (i in 0 until clipData.itemCount) uris.add(clipData.getItemAt(i).uri)
-        } else {
-            data.data?.let { uris.add(it) }
-        }
-
-        if (uris.isEmpty()) { callback(JSArray()); return }
-
-        // Copy files on background thread — can be slow for large files
+    // Resolves a list of content URIs to file objects on a background thread.
+    // Called by WyrePlugin after it receives the activity result.
+    fun resolveUris(uris: List<android.net.Uri>, callback: (JSArray) -> Unit) {
         executor.submit {
             val filesArray = JSArray()
             for (uri in uris) {
@@ -309,7 +271,7 @@ class WyreManager(
         return arr
     }
 
-    private fun resolveUri(uri: Uri): JSObject? {
+    fun resolveUri(uri: android.net.Uri): JSObject? {
         return try {
             val cursor = context.contentResolver.query(uri, null, null, null, null) ?: return null
             var name = "file"

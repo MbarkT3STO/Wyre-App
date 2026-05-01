@@ -1,31 +1,15 @@
 package com.wyre.app
 
+import android.app.Activity
+import android.content.Intent
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
+import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
-/**
- * WyrePlugin.kt
- *
- * Capacitor plugin that bridges the WebView (TypeScript) to native Android
- * networking and file I/O. Delegates all heavy work to WyreManager.
- *
- * Exposed methods (called from JS via Capacitor):
- *  - getSettings / setSettings
- *  - getDevices / startDiscovery / stopDiscovery
- *  - sendFile / cancelTransfer / respondToIncoming
- *  - getHistory / clearHistory
- *  - pickFile
- *  - openFile / showInFolder
- *
- * Events pushed to JS:
- *  - devicesUpdated
- *  - transferStarted / transferProgress / transferComplete / transferError
- *  - incomingRequest
- *  - transferQueueUpdated
- */
+
 @CapacitorPlugin(name = "WyrePlugin")
 class WyrePlugin : Plugin() {
 
@@ -40,12 +24,6 @@ class WyrePlugin : Plugin() {
 
     override fun handleOnDestroy() {
         manager.stop()
-    }
-
-    override fun handleOnActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
-        if (requestCode == REQUEST_CODE_PICK_FILE) {
-            manager.handlePickFileResult(resultCode, data)
-        }
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
@@ -132,15 +110,48 @@ class WyrePlugin : Plugin() {
     }
 
     // ── File picker ───────────────────────────────────────────────────────────
+    // Uses Capacitor's bridge startActivityForResult so the result is routed
+    // back through @ActivityCallback — the correct Capacitor 6 pattern.
 
     @PluginMethod
     fun pickFile(call: PluginCall) {
-        // Save the call — it will be resolved from handleOnActivityResult via callback
-        call.save()
-        manager.launchFilePicker(activity) { filesArray ->
-            val result = JSObject()
-            result.put("files", filesArray)
-            call.resolve(result)
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            type = "*/*"
+            addCategory(Intent.CATEGORY_OPENABLE)
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+        }
+        startActivityForResult(call, intent, "onPickFileResult")
+    }
+
+    @ActivityCallback
+    private fun onPickFileResult(call: PluginCall, result: androidx.activity.result.ActivityResult) {
+        if (result.resultCode != Activity.RESULT_OK || result.data == null) {
+            val empty = JSObject()
+            empty.put("files", JSArray())
+            call.resolve(empty)
+            return
+        }
+
+        val data = result.data!!
+        val uris = mutableListOf<android.net.Uri>()
+        val clipData = data.clipData
+        if (clipData != null) {
+            for (i in 0 until clipData.itemCount) uris.add(clipData.getItemAt(i).uri)
+        } else {
+            data.data?.let { uris.add(it) }
+        }
+
+        if (uris.isEmpty()) {
+            val empty = JSObject()
+            empty.put("files", JSArray())
+            call.resolve(empty)
+            return
+        }
+
+        manager.resolveUris(uris) { filesArray ->
+            val res = JSObject()
+            res.put("files", filesArray)
+            call.resolve(res)
         }
     }
 
@@ -156,7 +167,7 @@ class WyrePlugin : Plugin() {
     @PluginMethod
     fun showInFolder(call: PluginCall) {
         val path = call.getString("path") ?: run { call.reject("path required"); return }
-        manager.openFile(activity, path) // On Android, "show in folder" = open the file
+        manager.openFile(activity, path)
         call.resolve()
     }
 }
