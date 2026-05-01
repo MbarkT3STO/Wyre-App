@@ -44,6 +44,10 @@ export class AppBootstrapper {
   async bootstrap(): Promise<void> {
     await app.whenReady();
 
+    // Remove the default Electron application menu on every platform.
+    // Must be called before any window is created so it takes effect immediately.
+    Menu.setApplicationMenu(null);
+
     const settings = this.settingsStore.get();
 
     // Initialize services
