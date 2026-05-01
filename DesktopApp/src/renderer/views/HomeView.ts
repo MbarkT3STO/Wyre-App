@@ -211,29 +211,15 @@ export class HomeView extends Component {
       this.sendBtn.disabled = true;
       this.sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane btn__icon"></i> Sending…`;
 
-      // Send files sequentially — each awaited before the next starts
+      // Send files sequentially — each awaited before the next starts.
+      // We do NOT seed StateManager here — the main process emits TRANSFER_STARTED
+      // for every transfer (immediate or drained from queue) and index.ts handles
+      // that push. Seeding here with a placeholder ID for queued files was the
+      // cause of duplicate entries in the transfer list.
       for (const file of files) {
-        const transferId = await IpcClient.sendFile({
+        await IpcClient.sendFile({
           deviceId,
           filePath: file.path,
-        });
-
-        // Seed StateManager immediately so TransfersView has the entry
-        StateManager.updateTransfer({
-          id: transferId,
-          direction: 'send',
-          status: TransferStatus.Connecting,
-          peerId: deviceId,
-          peerName: '',
-          fileName: file.name,
-          fileSize: file.size,
-          filePath: file.path,
-          bytesTransferred: 0,
-          progress: 0,
-          speed: 0,
-          eta: 0,
-          startedAt: Date.now(),
-          checksum: '',
         });
       }
 
