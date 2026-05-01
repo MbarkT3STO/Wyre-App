@@ -75,6 +75,7 @@ jobs:
           mkdir -p gradle/wrapper
           curl -sL "https://github.com/gradle/gradle/raw/v8.4.0/gradle/wrapper/gradle-wrapper.jar" \
             -o gradle/wrapper/gradle-wrapper.jar
+          git update-index --chmod=+x gradlew 2>/dev/null || true
           chmod +x gradlew
 
       # ── 10. Build APK ──────────────────────────────────────────────────────
