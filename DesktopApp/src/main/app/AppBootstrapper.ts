@@ -4,7 +4,7 @@
  * This is the composition root — wires all services together.
  */
 
-import { app, Tray, Menu, nativeImage, ipcMain } from 'electron';
+import { app, Tray, Menu, nativeImage } from 'electron';
 import { join } from 'path';
 import { WindowManager } from './WindowManager';
 import { SettingsStore } from '../store/SettingsStore';
@@ -14,7 +14,6 @@ import { TransferClient } from '../transfer/TransferClient';
 import { TransferQueue } from '../transfer/TransferQueue';
 import { NotificationManager } from '../notifications/NotificationManager';
 import { IpcBridge } from '../ipc/IpcBridge';
-import { IpcChannels } from '../../shared/ipc/IpcContracts';
 import type { Platform } from '../../shared/models/Device';
 
 function getElectronPlatform(): Platform {
@@ -140,12 +139,11 @@ export class AppBootstrapper {
   }
 
   private watchSettingsChanges(): void {
-    // Re-read settings on every SETTINGS_SET so live changes propagate to services.
-    // SettingsHandlers calls settingsStore.set() synchronously before this fires,
-    // so settingsStore.get() already reflects the new values.
-    ipcMain.on(IpcChannels.SETTINGS_SET, () => {
-      const updated = this.settingsStore.get();
-
+    // Fix 5: Subscribe to the typed SettingsStore 'changed' event instead of
+    // listening on the raw IpcChannels.SETTINGS_SET channel. This removes the
+    // direct ipcMain dependency from AppBootstrapper and ensures the handler
+    // fires after settingsStore.set() has already persisted the new values.
+    this.settingsStore.on('changed', (updated) => {
       // Propagate device name / port changes to the discovery broadcaster
       this.discoveryService?.updateAnnouncement({
         name: updated.deviceName,

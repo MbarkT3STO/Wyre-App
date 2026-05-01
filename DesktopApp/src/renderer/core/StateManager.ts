@@ -17,7 +17,8 @@ export interface AppState {
   settings: AppSettings | null;
   currentRoute: string;
   selectedDeviceId: string | null;
-  pendingIncoming: IncomingRequestPayload | null;
+  /** Fix 7: Queue of pending incoming requests (replaces single pendingIncoming slot) */
+  pendingIncomingQueue: IncomingRequestPayload[];
   isLoading: boolean;
 }
 
@@ -31,7 +32,7 @@ const initialState: AppState = {
   settings: null,
   currentRoute: '/home',
   selectedDeviceId: null,
-  pendingIncoming: null,
+  pendingIncomingQueue: [],
   isLoading: false,
 };
 

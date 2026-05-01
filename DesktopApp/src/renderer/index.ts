@@ -288,9 +288,26 @@ function wireIpcListeners(): void {
         speed: payload.speed,
         eta: payload.eta,
       });
+    } else {
+      // Fix 1B: Belt-and-suspenders defence — if TRANSFER_STARTED hasn't arrived
+      // yet, create a minimal entry so this progress event is not silently dropped.
+      StateManager.updateTransfer({
+        id: payload.transferId,
+        direction: 'send',
+        status: TransferStatus.Active,
+        peerId: '',
+        peerName: '',
+        fileName: '',
+        fileSize: payload.totalBytes,
+        filePath: '',
+        bytesTransferred: payload.bytesTransferred,
+        progress: payload.progress,
+        speed: payload.speed,
+        eta: payload.eta,
+        startedAt: Date.now(),
+        checksum: '',
+      });
     }
-    // If existing is not found, the TRANSFER_STARTED re-seed (sent just before
-    // this event by IpcBridge) will arrive momentarily and create the entry.
   });
 
   // Transfer complete
@@ -305,13 +322,18 @@ function wireIpcListeners(): void {
         savedPath: payload.savedPath,
       };
       StateManager.updateTransfer(completed);
-      toasts.success(
-        `${existing.fileName} transferred`,
-        existing.direction === 'receive' ? 'Show in folder' : undefined,
-        existing.direction === 'receive' && payload.savedPath
-          ? () => window.dispatchEvent(new CustomEvent('filedrop:show-in-folder', { detail: { path: payload.savedPath } }))
-          : undefined,
-      );
+      if (existing.direction === 'receive') {
+        toasts.success(
+          `${existing.fileName} transferred`,
+          'Show in folder',
+          payload.savedPath
+            ? () => window.dispatchEvent(new CustomEvent('filedrop:show-in-folder', { detail: { path: payload.savedPath } }))
+            : undefined,
+        );
+      } else {
+        // Fix 1C: senders also get a completion toast
+        toasts.success(`${existing.fileName} sent successfully`);
+      }
     }
     // Refresh history
     IpcClient.getHistory().then(h => StateManager.setState('transferHistory', h));
@@ -337,8 +359,16 @@ function wireIpcListeners(): void {
 
   // Incoming request
   const unsubIncoming = IpcClient.onIncomingRequest((payload) => {
-    StateManager.setState('pendingIncoming', payload);
-    showIncomingDialog(payload);
+    // Fix 7: Push onto the queue rather than replacing a single slot.
+    // showIncomingDialog() drains the queue one dialog at a time.
+    const queue = StateManager.get('pendingIncomingQueue');
+    StateManager.setState('pendingIncomingQueue', [...queue, payload]);
+    // Only show a dialog immediately if this is the only item in the queue
+    // (i.e. no dialog is currently open). If a dialog is already open it will
+    // call showNextIncomingDialog() when it closes.
+    if (queue.length === 0) {
+      showIncomingDialog(payload);
+    }
   });
 
   // Cleanup on unload
@@ -360,15 +390,31 @@ function showIncomingDialog(payload: import('../shared/ipc/IpcContracts').Incomi
   const timeout = settings?.autoDeclineTimeout ?? 30;
 
   const dialog = new IncomingDialog(payload, timeout);
-  dialog.mount(dialogMount);
 
-  // Remove dialog when pending incoming is cleared
-  const unsub = StateManager.subscribe('pendingIncoming', (pending) => {
-    if (!pending) {
-      dialog.unmount();
-      unsub();
-    }
-  });
+  // Fix 7: Override unmount so that when the dialog closes (accept, decline, or
+  // timeout) it dequeues the front entry and shows the next dialog if present.
+  const originalUnmount = dialog.unmount.bind(dialog);
+  dialog.unmount = () => {
+    originalUnmount();
+    showNextIncomingDialog();
+  };
+
+  dialog.mount(dialogMount);
+}
+
+/** Fix 7: Dequeue the front entry and show the next dialog if the queue is non-empty. */
+function showNextIncomingDialog(): void {
+  const queue = StateManager.get('pendingIncomingQueue');
+  if (queue.length === 0) return;
+
+  // Remove the front item (the one that just resolved)
+  const [, ...remaining] = queue;
+  StateManager.setState('pendingIncomingQueue', remaining);
+
+  // Show the next one if present
+  if (remaining.length > 0) {
+    showIncomingDialog(remaining[0]);
+  }
 }
 
 function wireCustomEvents(): void {

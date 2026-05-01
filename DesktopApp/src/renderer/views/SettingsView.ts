@@ -293,10 +293,14 @@ export class SettingsView extends Component {
   }
 
   protected onMount(): void {
+    // Fix 4: Subscribe to settings changes only to keep our local cache in sync.
+    // Do NOT call super.update() here — that would rebuild the entire form via
+    // innerHTML, losing scroll position and focused fields. The form elements
+    // already reflect the current values because they were rendered from state.
     const unsub = StateManager.subscribe('settings', (settings) => {
       if (settings) {
         this.settings = settings;
-        super.update();
+        // Re-attach events in case the element was replaced by an external update
         this.attachEvents();
       }
     });
@@ -305,7 +309,6 @@ export class SettingsView extends Component {
     const current = StateManager.get('settings');
     if (current) {
       this.settings = current;
-      super.update();
     }
 
     this.attachEvents();
@@ -332,6 +335,9 @@ export class SettingsView extends Component {
     const autoAcceptInput = this.element.querySelector('#auto-accept') as HTMLInputElement;
     autoAcceptInput?.addEventListener('change', async () => {
       await IpcClient.setSettings({ autoAccept: autoAcceptInput.checked });
+      // Fix 4: Patch StateManager slice without triggering a full re-render
+      const current = StateManager.get('settings');
+      if (current) StateManager.setState('settings', { ...current, autoAccept: autoAcceptInput.checked });
       this.toasts.success('Settings saved');
     });
 
@@ -345,6 +351,9 @@ export class SettingsView extends Component {
       const { valid, error } = validateTimeout(val);
       if (!valid) { this.toasts.error(error ?? 'Invalid timeout'); return; }
       await IpcClient.setSettings({ autoDeclineTimeout: val });
+      // Fix 4: Patch StateManager slice without triggering a full re-render
+      const current = StateManager.get('settings');
+      if (current) StateManager.setState('settings', { ...current, autoDeclineTimeout: val });
       this.toasts.success('Settings saved');
     });
 
@@ -362,6 +371,9 @@ export class SettingsView extends Component {
         // Apply immediately
         window.dispatchEvent(new CustomEvent('filedrop:scale-change', { detail: { scale: val } }));
         await IpcClient.setSettings({ uiScale: val });
+        // Fix 4: Patch StateManager slice without triggering a full re-render
+        const current = StateManager.get('settings');
+        if (current) StateManager.setState('settings', { ...current, uiScale: val });
         this.toasts.success('UI scale updated');
       });
     });
@@ -375,6 +387,9 @@ export class SettingsView extends Component {
             (opt.querySelector('input') as HTMLInputElement)?.value === val);
         });
         await IpcClient.setSettings({ theme: val });
+        // Fix 4: Patch StateManager slice without triggering a full re-render
+        const current = StateManager.get('settings');
+        if (current) StateManager.setState('settings', { ...current, theme: val });
         window.dispatchEvent(new CustomEvent('filedrop:theme-change', { detail: { theme: val } }));
         this.toasts.success('Theme updated');
       });
@@ -383,6 +398,9 @@ export class SettingsView extends Component {
     const notifInput = this.element.querySelector('#show-notifications') as HTMLInputElement;
     notifInput?.addEventListener('change', async () => {
       await IpcClient.setSettings({ showNotifications: notifInput.checked });
+      // Fix 4: Patch StateManager slice without triggering a full re-render
+      const current = StateManager.get('settings');
+      if (current) StateManager.setState('settings', { ...current, showNotifications: notifInput.checked });
       this.toasts.success('Settings saved');
     });
 
@@ -400,6 +418,9 @@ export class SettingsView extends Component {
     const { valid, error } = validateDeviceName(input.value);
     if (!valid) { this.toasts.error(error ?? 'Invalid name'); return; }
     await IpcClient.setSettings({ deviceName: input.value });
+    // Fix 4: Patch StateManager slice without triggering a full re-render
+    const current = StateManager.get('settings');
+    if (current) StateManager.setState('settings', { ...current, deviceName: input.value });
     this.toasts.success('Device name saved');
   }
 
@@ -414,6 +435,9 @@ export class SettingsView extends Component {
         const dirPath = (file as File & { path?: string }).path?.split('/').slice(0, -1).join('/') ?? '';
         if (dirPath) {
           await IpcClient.setSettings({ saveDirectory: dirPath });
+          // Fix 4: Patch StateManager slice and DOM input without triggering a full re-render
+          const current = StateManager.get('settings');
+          if (current) StateManager.setState('settings', { ...current, saveDirectory: dirPath });
           const dirInput = this.element?.querySelector('#save-dir') as HTMLInputElement;
           if (dirInput) dirInput.value = dirPath;
           this.toasts.success('Save location updated');
@@ -430,6 +454,9 @@ export class SettingsView extends Component {
     const { valid, error } = validatePort(val);
     if (!valid) { this.toasts.error(error ?? 'Invalid port'); return; }
     await IpcClient.setSettings({ transferPort: val });
+    // Fix 4: Patch StateManager slice without triggering a full re-render
+    const current = StateManager.get('settings');
+    if (current) StateManager.setState('settings', { ...current, transferPort: val });
     this.toasts.success('Port saved — restart required');
   }
 }

@@ -8,15 +8,22 @@ import Store from 'electron-store';
 import { randomUUID } from 'crypto';
 import { hostname } from 'os';
 import { app } from 'electron';
+import { EventEmitter } from 'events';
 import type { AppSettings } from '../../shared/models/AppSettings';
 import { DEFAULT_SETTINGS } from '../../shared/models/AppSettings';
 
 type StoreSchema = AppSettings;
 
-export class SettingsStore {
+// Fix 5: Typed event map for SettingsStore
+interface SettingsStoreEvents {
+  changed: (updated: AppSettings) => void;
+}
+
+export class SettingsStore extends EventEmitter {
   private readonly store: Store<StoreSchema>;
 
   constructor() {
+    super();
     this.store = new Store<StoreSchema>({
       name: 'settings',
       defaults: {
@@ -29,6 +36,15 @@ export class SettingsStore {
     });
 
     this.ensureDefaults();
+  }
+
+  // Fix 5: Typed overloads so callers get the correct listener signature
+  on<K extends keyof SettingsStoreEvents>(event: K, listener: SettingsStoreEvents[K]): this {
+    return super.on(event, listener as (...args: unknown[]) => void);
+  }
+
+  emit<K extends keyof SettingsStoreEvents>(event: K, ...args: Parameters<SettingsStoreEvents[K]>): boolean {
+    return super.emit(event, ...args);
   }
 
   private ensureDefaults(): void {
@@ -68,6 +84,9 @@ export class SettingsStore {
         this.store.set(key, value as AppSettings[typeof key]);
       }
     }
+    // Fix 5: Emit typed 'changed' event after persisting so listeners
+    // (e.g. AppBootstrapper) can react without coupling to raw IPC channels.
+    this.emit('changed', this.get());
   }
 
   getDeviceId(): string {

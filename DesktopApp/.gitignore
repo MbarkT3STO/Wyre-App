@@ -77,3 +77,4 @@ coverage/
 # Misc
 # ===========================
 *.local
+*.DS_Store

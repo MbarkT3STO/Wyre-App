@@ -24,12 +24,63 @@ export class TransferItem extends Component {
   }
 
   updateData(data: TransferItemData): void {
+    const oldStatus = this.data.status;
+    const newStatus = data.status;
     this.data = data;
-    super.update();
-    // Re-attach action listeners — super.update() replaces the DOM element
-    // so the previous listeners are gone with the old element
-    this.attachActions();
-    this.applyProgressWidth();
+
+    // Fix 2: Only do a full DOM swap on status transitions (structural change).
+    // For Active→Active updates, patch in-place to preserve CSS transitions.
+    const bothActive =
+      oldStatus === TransferStatus.Active && newStatus === TransferStatus.Active;
+
+    if (bothActive) {
+      this.patchProgress(data);
+    } else {
+      super.update();
+      this.attachActions();
+      this.applyProgressWidth();
+    }
+  }
+
+  /**
+   * Fix 2: Surgical in-place DOM patch for progress-only updates.
+   * Avoids replaceChild so CSS transitions on the fill element are preserved.
+   */
+  private patchProgress(data: TransferItemData): void {
+    if (!this.element) return;
+    if (!isActiveTransfer(data)) return;
+
+    const { progress, speed, eta } = data;
+
+    // Update CSS custom property on the fill (drives the width transition)
+    const fill = this.element.querySelector<HTMLElement>('.transfer-item__progress-fill');
+    if (fill) {
+      fill.style.setProperty('--progress-width', `${progress}%`);
+    }
+
+    // Update aria-valuenow on the progress bar
+    const bar = this.element.querySelector<HTMLElement>('.transfer-item__progress-bar');
+    if (bar) {
+      bar.setAttribute('aria-valuenow', String(progress));
+    }
+
+    // Update percentage text
+    const pct = this.element.querySelector<HTMLElement>('.transfer-item__progress-pct');
+    if (pct) {
+      pct.textContent = `${progress}%`;
+    }
+
+    // Update speed text (in the stats row)
+    const speedEl = this.element.querySelector<HTMLElement>('.transfer-item__speed');
+    if (speedEl && speed > 0) {
+      speedEl.textContent = formatSpeed(speed);
+    }
+
+    // Update ETA text
+    const etaEl = this.element.querySelector<HTMLElement>('.transfer-item__eta');
+    if (etaEl && eta > 0) {
+      etaEl.textContent = formatEta(eta);
+    }
   }
 
   render(): HTMLElement {

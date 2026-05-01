@@ -132,24 +132,42 @@ export class TransferList extends Component {
     const container = this.historySection?.querySelector('.transfer-list__items');
     if (!container) return;
 
-    // Unmount all and re-render (history is append-only from top)
-    for (const item of this.historyItems.values()) {
-      item.unmount();
+    // Fix 3: Keyed diff — avoid unmounting unchanged items.
+    const newIds = new Set(history.map(r => r.id));
+
+    // (a) Remove items whose IDs are no longer in the new history array
+    for (const [id, item] of this.historyItems) {
+      if (!newIds.has(id)) {
+        item.unmount();
+        this.historyItems.delete(id);
+      }
     }
-    this.historyItems.clear();
-    container.innerHTML = '';
 
     if (history.length === 0) {
-      container.innerHTML = `<p class="transfer-list__empty">No transfer history</p>`;
+      if (!container.querySelector('.transfer-list__empty')) {
+        container.innerHTML = `<p class="transfer-list__empty">No transfer history</p>`;
+      }
       return;
     }
 
+    // Clear empty state placeholder if present
+    const emptyEl = container.querySelector('.transfer-list__empty');
+    if (emptyEl) emptyEl.remove();
+
+    // (b) Update existing items; (c) prepend new items to the top
     for (const record of history) {
-      const item = new TransferItem(record);
-      const wrapper = this.el('div');
-      container.appendChild(wrapper);
-      item.mount(wrapper);
-      this.historyItems.set(record.id, item);
+      const existing = this.historyItems.get(record.id);
+      if (existing) {
+        // Update in-place if anything changed
+        existing.updateData(record);
+      } else {
+        // New item — prepend to top of container
+        const item = new TransferItem(record);
+        const wrapper = this.el('div');
+        container.insertBefore(wrapper, container.firstChild);
+        item.mount(wrapper);
+        this.historyItems.set(record.id, item);
+      }
     }
   }
 

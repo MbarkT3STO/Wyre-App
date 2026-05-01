@@ -173,9 +173,29 @@ export class HomeView extends Component {
       this.sendBtn!.disabled = true;
       this.sendBtn!.textContent = 'Sending…';
 
-      await IpcClient.sendFile({
+      const transferId = await IpcClient.sendFile({
         deviceId,
         filePath: file.path,
+      });
+
+      // Fix 1A: Seed StateManager immediately with the returned transferId so
+      // TransfersView has the entry in state before TRANSFER_STARTED arrives
+      // via the separate push channel (arrival order is not guaranteed).
+      StateManager.updateTransfer({
+        id: transferId,
+        direction: 'send',
+        status: TransferStatus.Connecting,
+        peerId: deviceId,
+        peerName: '',
+        fileName: file.name,
+        fileSize: file.size,
+        filePath: file.path,
+        bytesTransferred: 0,
+        progress: 0,
+        speed: 0,
+        eta: 0,
+        startedAt: Date.now(),
+        checksum: '',
       });
 
       this.toasts.success(`Sending ${file.name}…`);

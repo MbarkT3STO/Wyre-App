@@ -6,7 +6,6 @@
 
 import { Component } from './base/Component';
 import { IpcClient } from '../core/IpcClient';
-import { StateManager } from '../core/StateManager';
 import { formatFileSize } from '../../shared/utils/formatters';
 import type { IncomingRequestPayload } from '../../shared/ipc/IpcContracts';
 
@@ -141,13 +140,16 @@ export class IncomingDialog extends Component {
   private async handleAccept(): Promise<void> {
     this.cleanup();
     await IpcClient.respondToIncoming({ transferId: this.request.transferId, accepted: true });
-    StateManager.setState('pendingIncoming', null);
+    // Fix 7: Trigger unmount so the queue-aware wrapper in index.ts can dequeue
+    // and show the next dialog. Do not touch pendingIncomingQueue directly here.
+    this.unmount();
   }
 
   private async handleDecline(): Promise<void> {
     this.cleanup();
     await IpcClient.respondToIncoming({ transferId: this.request.transferId, accepted: false });
-    StateManager.setState('pendingIncoming', null);
+    // Fix 7: Same as above — let the unmount hook drive the queue.
+    this.unmount();
   }
 
   private cleanup(): void {
