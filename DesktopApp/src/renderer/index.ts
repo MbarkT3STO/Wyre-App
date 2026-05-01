@@ -359,16 +359,17 @@ function wireIpcListeners(): void {
 
   // Incoming request
   const unsubIncoming = IpcClient.onIncomingRequest((payload) => {
-    // Fix 7: Push onto the queue rather than replacing a single slot.
-    // showIncomingDialog() drains the queue one dialog at a time.
+    // Push onto the queue rather than replacing a single slot.
     const queue = StateManager.get('pendingIncomingQueue');
     StateManager.setState('pendingIncomingQueue', [...queue, payload]);
-    // Only show a dialog immediately if this is the only item in the queue
-    // (i.e. no dialog is currently open). If a dialog is already open it will
-    // call showNextIncomingDialog() when it closes.
     if (queue.length === 0) {
       showIncomingDialog(payload);
     }
+  });
+
+  // Outgoing send queue — keep StateManager in sync so TransferList can render it
+  const unsubSendQueue = IpcClient.onTransferQueueUpdated((payload) => {
+    StateManager.setState('sendQueue', payload.queue);
   });
 
   // Cleanup on unload
@@ -379,6 +380,7 @@ function wireIpcListeners(): void {
     unsubComplete();
     unsubError();
     unsubIncoming();
+    unsubSendQueue();
   });
 }
 

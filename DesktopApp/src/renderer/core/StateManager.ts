@@ -8,7 +8,7 @@
 import type { Device } from '../../shared/models/Device';
 import type { AppSettings } from '../../shared/models/AppSettings';
 import type { Transfer, TransferRecord } from '../../shared/models/Transfer';
-import type { IncomingRequestPayload } from '../../shared/ipc/IpcContracts';
+import type { IncomingRequestPayload, TransferQueueUpdatedPayload } from '../../shared/ipc/IpcContracts';
 
 export interface AppState {
   devices: Device[];
@@ -17,8 +17,10 @@ export interface AppState {
   settings: AppSettings | null;
   currentRoute: string;
   selectedDeviceId: string | null;
-  /** Fix 7: Queue of pending incoming requests (replaces single pendingIncoming slot) */
+  /** Queue of pending incoming requests */
   pendingIncomingQueue: IncomingRequestPayload[];
+  /** Pending outgoing sends waiting for the active transfer to finish */
+  sendQueue: TransferQueueUpdatedPayload['queue'];
   isLoading: boolean;
 }
 
@@ -33,6 +35,7 @@ const initialState: AppState = {
   currentRoute: '/home',
   selectedDeviceId: null,
   pendingIncomingQueue: [],
+  sendQueue: [],
   isLoading: false,
 };
 
