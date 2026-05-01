@@ -385,11 +385,12 @@ export class SettingsView extends Component {
   }
 
   protected onMount(): void {
-    // Fix 4: Subscribe to settings changes only to keep our local cache in sync.
+    // Subscribe to settings changes only to keep our local cache in sync.
+    // Do NOT call attachEvents() here — the DOM elements don't change on save,
+    // so re-attaching would stack duplicate listeners and cause exponential toasts.
     const unsub = StateManager.subscribe('settings', (settings) => {
       if (settings) {
         this.settings = settings;
-        this.attachEvents();
       }
     });
     this.addCleanup(unsub);
@@ -416,6 +417,32 @@ export class SettingsView extends Component {
     const trustedIds = current?.trustedDeviceIds ?? [];
     const placeholder = `<option value="">Select a device…</option>`;
     select.innerHTML = placeholder + this.renderDeviceOptions(trustedIds);
+  }
+
+  /**
+   * Re-attach click handlers only on the trusted-list remove buttons.
+   * Called after the list's innerHTML is replaced in-place so the new nodes
+   * get listeners without touching the rest of the form.
+   */
+  private attachTrustedListEvents(): void {
+    if (!this.element) return;
+    this.element.querySelectorAll('[data-remove-trusted]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        void (async () => {
+          const idToRemove = (btn as HTMLElement).dataset['removeTrusted'] ?? '';
+          const current = StateManager.get('settings');
+          if (!current) return;
+          const updated = current.trustedDeviceIds.filter(id => id !== idToRemove);
+          await IpcClient.setSettings({ trustedDeviceIds: updated });
+          StateManager.setState('settings', { ...current, trustedDeviceIds: updated });
+          const listEl = this.element?.querySelector('#trusted-list');
+          if (listEl) listEl.innerHTML = this.renderTrustedList(updated);
+          this.refreshTrustedDeviceDropdown();
+          this.attachTrustedListEvents();
+          this.toasts.success('Device removed from trusted list');
+        })();
+      });
+    });
   }
 
   private attachEvents(): void {
@@ -522,26 +549,8 @@ export class SettingsView extends Component {
 
     // ── Feature 2: Trusted Devices ──────────────────────────────────────────
 
-    // Remove trusted device buttons
-    this.element.querySelectorAll('[data-remove-trusted]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        void (async () => {
-          const idToRemove = (btn as HTMLElement).dataset['removeTrusted'] ?? '';
-          const current = StateManager.get('settings');
-          if (!current) return;
-          const updated = current.trustedDeviceIds.filter(id => id !== idToRemove);
-          await IpcClient.setSettings({ trustedDeviceIds: updated });
-          StateManager.setState('settings', { ...current, trustedDeviceIds: updated });
-          // Re-render the trusted list in-place
-          const listEl = this.element?.querySelector('#trusted-list');
-          if (listEl) listEl.innerHTML = this.renderTrustedList(updated);
-          this.refreshTrustedDeviceDropdown();
-          // Re-attach remove buttons
-          this.attachEvents();
-          this.toasts.success('Device removed from trusted list');
-        })();
-      });
-    });
+    // Wire initial remove buttons (subsequent re-renders call attachTrustedListEvents directly)
+    this.attachTrustedListEvents();
 
     // Trust this device button
     this.element.querySelector('#trust-device-btn')
@@ -566,7 +575,7 @@ export class SettingsView extends Component {
           const listEl = this.element?.querySelector('#trusted-list');
           if (listEl) listEl.innerHTML = this.renderTrustedList(updated);
           this.refreshTrustedDeviceDropdown();
-          this.attachEvents();
+          this.attachTrustedListEvents();
           this.toasts.success('Device added to trusted list');
         })();
       });
