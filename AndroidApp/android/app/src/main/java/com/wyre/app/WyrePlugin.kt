@@ -135,10 +135,13 @@ class WyrePlugin : Plugin() {
 
     @PluginMethod
     fun pickFile(call: PluginCall) {
-        // Save the call so we can resolve it from handleOnActivityResult
+        // Save the call — it will be resolved from handleOnActivityResult via callback
         call.save()
-        manager.registerPickCall(call)
-        manager.launchFilePicker(activity)
+        manager.launchFilePicker(activity) { filesArray ->
+            val result = JSObject()
+            result.put("files", filesArray)
+            call.resolve(result)
+        }
     }
 
     // ── Shell actions ─────────────────────────────────────────────────────────
