@@ -231,8 +231,9 @@ class TransferServer(
                 ?: return null
             val stream = resolver.openOutputStream(uri) ?: return null
             val displayPath = "/storage/emulated/0/Download/$fileName"
-            val cleanup = {
+            val cleanup: () -> Unit = {
                 resolver.delete(uri, null, null)
+                Unit
             }
             // Mark as not pending when done (called after stream closes)
             // We do this in the complete path by updating the URI
@@ -253,7 +254,7 @@ class TransferServer(
             dir.mkdirs()
             val file = uniquePath(File(dir, fileName))
             val stream = file.outputStream()
-            Triple(stream, file.absolutePath, { file.delete() })
+            Triple(stream, file.absolutePath, { file.delete(); Unit })
         }
     }
 
