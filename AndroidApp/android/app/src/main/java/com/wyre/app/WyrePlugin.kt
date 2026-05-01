@@ -6,7 +6,6 @@ import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
-
 /**
  * WyrePlugin.kt
  *
@@ -33,7 +32,7 @@ class WyrePlugin : Plugin() {
     private lateinit var manager: WyreManager
 
     override fun load() {
-        manager = WyreManager(context, bridge) { event, data ->
+        manager = WyreManager(context) { event, data ->
             notifyListeners(event, data)
         }
         manager.start()
@@ -41,6 +40,12 @@ class WyrePlugin : Plugin() {
 
     override fun handleOnDestroy() {
         manager.stop()
+    }
+
+    override fun handleOnActivityResult(requestCode: Int, resultCode: Int, data: android.content.Intent?) {
+        if (requestCode == REQUEST_CODE_PICK_FILE) {
+            manager.handlePickFileResult(resultCode, data)
+        }
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
@@ -132,7 +137,7 @@ class WyrePlugin : Plugin() {
     fun pickFile(call: PluginCall) {
         manager.pickFile(activity) { file ->
             if (file == null) {
-                call.resolve(JSObject()) // null result
+                call.resolve(JSObject())
             } else {
                 call.resolve(file)
             }

@@ -7,7 +7,6 @@ import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
-import com.getcapacitor.Bridge
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import org.json.JSONObject
@@ -18,6 +17,8 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
+const val REQUEST_CODE_PICK_FILE = 9001
+
 /**
  * WyreManager.kt
  * Central coordinator — owns discovery, transfer server/client, settings, history.
@@ -25,7 +26,6 @@ import java.util.concurrent.Executors
  */
 class WyreManager(
     private val context: Context,
-    private val bridge: Bridge,
     private val notifyFn: (event: String, data: JSObject) -> Unit
 ) {
     private val executor = Executors.newCachedThreadPool()
@@ -148,19 +148,26 @@ class WyreManager(
     fun clearHistory() { synchronized(history) { history.clear() } }
 
     // ── File picker ───────────────────────────────────────────────────────────
+    // Store callback for activity result
+    private var pickFileCallback: ((JSObject?) -> Unit)? = null
 
     fun pickFile(activity: Activity, callback: (JSObject?) -> Unit) {
+        pickFileCallback = callback
         val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
             type = "*/*"
             addCategory(Intent.CATEGORY_OPENABLE)
             putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false)
         }
-        bridge.startActivityForResult(null, intent) { result ->
-            if (result.resultCode != Activity.RESULT_OK) { callback(null); return@startActivityForResult }
-            val uri = result.data?.data ?: run { callback(null); return@startActivityForResult }
-            val info = resolveUri(uri) ?: run { callback(null); return@startActivityForResult }
-            callback(info)
-        }
+        activity.startActivityForResult(intent, REQUEST_CODE_PICK_FILE)
+    }
+
+    /** Called from WyrePlugin.handleOnActivityResult */
+    fun handlePickFileResult(resultCode: Int, data: android.content.Intent?) {
+        val callback = pickFileCallback ?: return
+        pickFileCallback = null
+        if (resultCode != Activity.RESULT_OK) { callback(null); return }
+        val uri = data?.data ?: run { callback(null); return }
+        callback(resolveUri(uri))
     }
 
     // ── Shell ─────────────────────────────────────────────────────────────────
