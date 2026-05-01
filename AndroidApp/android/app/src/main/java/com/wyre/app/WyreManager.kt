@@ -1,7 +1,9 @@
 package com.wyre.app
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
@@ -144,7 +146,7 @@ class WyreManager(
     // ── File picker ───────────────────────────────────────────────────────────
     // Resolves a list of content URIs to file objects on a background thread.
     // Called by WyrePlugin after it receives the activity result.
-    fun resolveUris(uris: List<android.net.Uri>, callback: (JSArray) -> Unit) {
+    fun resolveUris(uris: List<Uri>, callback: (JSArray) -> Unit) {
         executor.submit {
             val filesArray = JSArray()
             for (uri in uris) {
@@ -271,7 +273,7 @@ class WyreManager(
         return arr
     }
 
-    fun resolveUri(uri: android.net.Uri): JSObject? {
+    fun resolveUri(uri: Uri): JSObject? {
         return try {
             val cursor = context.contentResolver.query(uri, null, null, null, null) ?: return null
             var name = "file"
