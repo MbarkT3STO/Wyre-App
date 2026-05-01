@@ -15,34 +15,49 @@ import com.getcapacitor.annotation.CapacitorPlugin
 @CapacitorPlugin(name = "WyrePlugin")
 class WyrePlugin : Plugin() {
 
-    private lateinit var manager: WyreManager
     private val mainHandler = Handler(Looper.getMainLooper())
 
+    /** The manager is owned by WyreService; we just hold a reference */
+    private val manager: WyreManager?
+        get() = WyrePluginBridge.serviceManager
+
     override fun load() {
-        manager = WyreManager(context) { event, data ->
-            // notifyListeners MUST run on the main thread —
-            // TransferClient fires events from a background executor thread
-            mainHandler.post {
-                notifyListeners(event, data)
-            }
+        // Start the background service (idempotent — safe to call multiple times)
+        WyreService.start(context)
+        // Register this plugin instance so the service can forward events to JS
+        WyrePluginBridge.registerPlugin(this)
+        // If service manager isn't ready yet, retry after a short delay
+        if (WyrePluginBridge.serviceManager == null) {
+            mainHandler.postDelayed({
+                WyrePluginBridge.registerPlugin(this)
+            }, 500)
         }
-        manager.start()
     }
 
     override fun handleOnDestroy() {
-        manager.stop()
+        WyrePluginBridge.unregisterPlugin()
+        // Do NOT stop the service here — it should keep running in the background
+    }
+
+    /** Called by WyrePluginBridge from the service thread — posts to main thread */
+    fun notifyFromService(event: String, data: JSObject) {
+        mainHandler.post {
+            notifyListeners(event, data)
+        }
     }
 
     // ── Settings ──────────────────────────────────────────────────────────────
 
     @PluginMethod
     fun getSettings(call: PluginCall) {
-        call.resolve(manager.getSettings())
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        call.resolve(m.getSettings())
     }
 
     @PluginMethod
     fun setSettings(call: PluginCall) {
-        manager.setSettings(call.data)
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        m.setSettings(call.data)
         call.resolve()
     }
 
@@ -50,20 +65,21 @@ class WyrePlugin : Plugin() {
 
     @PluginMethod
     fun getDevices(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
         val result = JSObject()
-        result.put("devices", manager.getDevicesJson())
+        result.put("devices", m.getDevicesJson())
         call.resolve(result)
     }
 
     @PluginMethod
     fun startDiscovery(call: PluginCall) {
-        manager.startDiscovery()
+        manager?.startDiscovery()
         call.resolve()
     }
 
     @PluginMethod
     fun stopDiscovery(call: PluginCall) {
-        manager.stopDiscovery()
+        manager?.stopDiscovery()
         call.resolve()
     }
 
@@ -71,12 +87,13 @@ class WyrePlugin : Plugin() {
 
     @PluginMethod
     fun sendFile(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
         val deviceId = call.getString("deviceId") ?: run { call.reject("deviceId required"); return }
         val filePath  = call.getString("filePath")  ?: run { call.reject("filePath required");  return }
         val fileName  = call.getString("fileName")  ?: run { call.reject("fileName required");  return }
         val fileSize  = call.getLong("fileSize")    ?: 0L
 
-        val transferId = manager.sendFile(deviceId, filePath, fileName, fileSize)
+        val transferId = m.sendFile(deviceId, filePath, fileName, fileSize)
         if (transferId == null) {
             call.reject("Device not found or offline")
             return
@@ -89,15 +106,16 @@ class WyrePlugin : Plugin() {
     @PluginMethod
     fun cancelTransfer(call: PluginCall) {
         val transferId = call.getString("transferId") ?: run { call.reject("transferId required"); return }
-        manager.cancelTransfer(transferId)
+        manager?.cancelTransfer(transferId)
         call.resolve()
     }
 
     @PluginMethod
     fun respondToIncoming(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
         val transferId = call.getString("transferId") ?: run { call.reject("transferId required"); return }
         val accepted   = call.getBoolean("accepted", false) ?: false
-        manager.respondToIncoming(transferId, accepted)
+        m.respondToIncoming(transferId, accepted)
         call.resolve()
     }
 
@@ -105,23 +123,23 @@ class WyrePlugin : Plugin() {
 
     @PluginMethod
     fun getHistory(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
         val result = JSObject()
-        result.put("history", manager.getHistoryJson())
+        result.put("history", m.getHistoryJson())
         call.resolve(result)
     }
 
     @PluginMethod
     fun clearHistory(call: PluginCall) {
-        manager.clearHistory()
+        manager?.clearHistory()
         call.resolve()
     }
 
     // ── File picker ───────────────────────────────────────────────────────────
-    // Uses Capacitor's bridge startActivityForResult so the result is routed
-    // back through @ActivityCallback — the correct Capacitor 6 pattern.
 
     @PluginMethod
     fun pickFile(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             type = "*/*"
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -131,7 +149,9 @@ class WyrePlugin : Plugin() {
     }
 
     @ActivityCallback
-    private fun onPickFileResult(call: PluginCall, result: androidx.activity.result.ActivityResult) {
+    fun onPickFileResult(call: PluginCall, result: androidx.activity.result.ActivityResult) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+
         if (result.resultCode != Activity.RESULT_OK || result.data == null) {
             val empty = JSObject()
             empty.put("files", JSArray())
@@ -155,7 +175,7 @@ class WyrePlugin : Plugin() {
             return
         }
 
-        manager.resolveUris(uris) { filesArray ->
+        m.resolveUris(uris) { filesArray ->
             val res = JSObject()
             res.put("files", filesArray)
             call.resolve(res)
@@ -166,15 +186,17 @@ class WyrePlugin : Plugin() {
 
     @PluginMethod
     fun openFile(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
         val path = call.getString("path") ?: run { call.reject("path required"); return }
-        manager.openFile(activity, path)
+        m.openFile(activity, path)
         call.resolve()
     }
 
     @PluginMethod
     fun showInFolder(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
         val path = call.getString("path") ?: run { call.reject("path required"); return }
-        manager.showInFolder(activity, path)
+        m.showInFolder(activity, path)
         call.resolve()
     }
 }

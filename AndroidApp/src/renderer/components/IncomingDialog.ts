@@ -4,7 +4,7 @@
 
 import { Component } from './base/Component';
 import { AppBridge } from '../../bridge/AppBridge';
-import { formatFileSize } from '../../shared/utils/formatters';
+import { formatFileSize, truncateFilename } from '../../shared/utils/formatters';
 import type { IncomingRequestEvent } from '../../bridge/WyrePlugin';
 
 export class IncomingDialog extends Component {
@@ -58,7 +58,7 @@ export class IncomingDialog extends Component {
               <i class="fa-solid fa-file-lines"></i>
             </div>
             <div class="incoming-dialog__file-info">
-              <span class="incoming-dialog__file-name" title="${escapeHtml(fileName)}">${escapeHtml(fileName)}</span>
+              <span class="incoming-dialog__file-name" title="${escapeHtml(fileName)}">${escapeHtml(truncateFilename(fileName, 40))}</span>
               <span class="incoming-dialog__file-size">${formatFileSize(fileSize)}</span>
             </div>
           </div>
