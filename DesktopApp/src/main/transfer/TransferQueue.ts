@@ -10,12 +10,28 @@ import { join } from 'path';
 import { TransferClient } from './TransferClient';
 import { TransferServer } from './TransferServer';
 import { FileChunker } from './FileChunker';
+import { Logger } from '../logging/Logger';
 import type { Transfer, TransferRecord } from '../../shared/models/Transfer';
 import { TransferStatus } from '../../shared/models/Transfer';
+
+/** A send that is waiting for the current active outgoing transfer to finish */
+interface QueuedSend {
+  filePath: string;
+  fileName: string;
+  fileSize: number;
+  peerId: string;
+  peerIp: string;
+  peerPort: number;
+  peerName: string;
+  senderDeviceId: string;
+  senderName: string;
+}
 
 export interface TransferQueueEvents {
   transferUpdated: (transfer: Transfer) => void;
   historyUpdated: (history: TransferRecord[]) => void;
+  /** Emitted whenever the pending-send queue changes (Feature 1) */
+  queueUpdated: (queue: QueuedSend[]) => void;
 }
 
 export declare interface TransferQueue {
@@ -28,6 +44,8 @@ export class TransferQueue extends EventEmitter {
   private history: TransferRecord[] = [];
   private client: TransferClient;
   private server: TransferServer;
+  /** Pending outgoing sends waiting for the active transfer to finish (Feature 1) */
+  private pendingSends: QueuedSend[] = [];
 
   constructor(client: TransferClient, server: TransferServer) {
     super();
@@ -35,6 +53,10 @@ export class TransferQueue extends EventEmitter {
     this.server = server;
     this.wireClientEvents();
     this.wireServerEvents();
+  }
+
+  private logger(): Logger | null {
+    try { return Logger.getInstance(); } catch { return null; }
   }
 
   private wireClientEvents(): void {
@@ -60,16 +82,44 @@ export class TransferQueue extends EventEmitter {
       this.transfers.set(transferId, completed);
       this.addToHistory(completed);
       this.emit('transferUpdated', completed);
+      this.logger()?.info('Transfer completed', {
+        transferId,
+        direction: completed.direction,
+        fileName: completed.fileName,
+        fileSize: completed.fileSize,
+        peerName: completed.peerName,
+      });
+      this.drainQueue();
     });
 
     this.client.on('error', (transferId, err) => {
+      const transfer = this.transfers.get(transferId);
+      this.logger()?.warn('Transfer failed', {
+        transferId,
+        direction: transfer?.direction ?? 'send',
+        fileName: transfer?.fileName ?? '',
+        fileSize: transfer?.fileSize ?? 0,
+        peerName: transfer?.peerName ?? '',
+        error: err.message,
+      });
       this.failTransfer(transferId, err.message, 'SEND_ERROR');
+      this.drainQueue();
     });
 
     this.client.on('cancelled', (transferId) => {
       this.updateTransfer(transferId, { status: TransferStatus.Cancelled, completedAt: Date.now() });
       const t = this.transfers.get(transferId);
-      if (t) this.addToHistory(t);
+      if (t) {
+        this.addToHistory(t);
+        this.logger()?.info('Transfer cancelled', {
+          transferId,
+          direction: t.direction,
+          fileName: t.fileName,
+          fileSize: t.fileSize,
+          peerName: t.peerName,
+        });
+      }
+      this.drainQueue();
     });
 
     this.client.on('declined', (transferId) => {
@@ -79,7 +129,17 @@ export class TransferQueue extends EventEmitter {
         errorMessage: 'Transfer was declined by the recipient',
       });
       const t = this.transfers.get(transferId);
-      if (t) this.addToHistory(t);
+      if (t) {
+        this.addToHistory(t);
+        this.logger()?.info('Transfer declined', {
+          transferId,
+          direction: t.direction,
+          fileName: t.fileName,
+          fileSize: t.fileSize,
+          peerName: t.peerName,
+        });
+      }
+      this.drainQueue();
     });
   }
 
@@ -107,20 +167,47 @@ export class TransferQueue extends EventEmitter {
       this.transfers.set(transferId, completed);
       this.addToHistory(completed);
       this.emit('transferUpdated', completed);
+      this.logger()?.info('Transfer completed', {
+        transferId,
+        direction: completed.direction,
+        fileName: completed.fileName,
+        fileSize: completed.fileSize,
+        peerName: completed.peerName,
+      });
     });
 
     this.server.on('error', (transferId, err) => {
-      if (transferId) this.failTransfer(transferId, err.message, 'RECEIVE_ERROR');
+      if (transferId) {
+        const transfer = this.transfers.get(transferId);
+        this.logger()?.warn('Transfer failed', {
+          transferId,
+          direction: transfer?.direction ?? 'receive',
+          fileName: transfer?.fileName ?? '',
+          fileSize: transfer?.fileSize ?? 0,
+          peerName: transfer?.peerName ?? '',
+          error: err.message,
+        });
+        this.failTransfer(transferId, err.message, 'RECEIVE_ERROR');
+      }
     });
 
     this.server.on('cancelled', (transferId) => {
       this.updateTransfer(transferId, { status: TransferStatus.Cancelled, completedAt: Date.now() });
       const t = this.transfers.get(transferId);
-      if (t) this.addToHistory(t);
+      if (t) {
+        this.addToHistory(t);
+        this.logger()?.info('Transfer cancelled', {
+          transferId,
+          direction: t.direction,
+          fileName: t.fileName,
+          fileSize: t.fileSize,
+          peerName: t.peerName,
+        });
+      }
     });
   }
 
-  /** Queue a new outgoing transfer */
+  /** Queue a new outgoing transfer (Feature 1: defers if one is already active) */
   async enqueueSend(options: {
     filePath: string;
     peerIp: string;
@@ -134,18 +221,71 @@ export class TransferQueue extends EventEmitter {
 
     const fileName = filePath.split('/').pop() ?? filePath.split('\\').pop() ?? 'file';
 
+    // Check whether there is already an active outgoing transfer
+    const hasActiveOutgoing = Array.from(this.transfers.values()).some(
+      t => t.direction === 'send' &&
+           (t.status === TransferStatus.Active ||
+            t.status === TransferStatus.Connecting),
+    );
+
+    if (hasActiveOutgoing) {
+      // Compute size now so the queue indicator can show it immediately
+      const fileSize = await FileChunker.getFileSize(filePath);
+      const queued: QueuedSend = {
+        filePath, fileName, fileSize, peerId, peerIp, peerPort, peerName, senderDeviceId, senderName,
+      };
+      this.pendingSends.push(queued);
+      this.emit('queueUpdated', [...this.pendingSends]);
+      this.logger()?.info('Transfer queued (pending)', {
+        fileName,
+        fileSize,
+        peerName,
+        queueDepth: this.pendingSends.length,
+      });
+      // Return a placeholder id so the caller has something to track
+      const { randomUUID } = await import('crypto');
+      return randomUUID();
+    }
+
+    return this.startSend({ filePath, fileName, peerIp, peerPort, peerId, peerName, senderDeviceId, senderName });
+  }
+
+  /** Start the next pending send if one exists (Feature 1) */
+  private drainQueue(): void {
+    if (this.pendingSends.length === 0) return;
+
+    const next = this.pendingSends.shift()!;
+    this.emit('queueUpdated', [...this.pendingSends]);
+    this.logger()?.info('Draining send queue', {
+      fileName: next.fileName,
+      remaining: this.pendingSends.length,
+    });
+
+    this.startSend(next).catch((err: Error) => {
+      this.logger()?.error('Failed to start queued send', { fileName: next.fileName, error: err.message });
+    });
+  }
+
+  /** Internal: actually start a send transfer (no queue check) */
+  private async startSend(options: {
+    filePath: string;
+    fileName: string;
+    peerIp: string;
+    peerPort: number;
+    peerId: string;
+    peerName: string;
+    senderDeviceId: string;
+    senderName: string;
+  }): Promise<string> {
+    const { filePath, fileName, peerIp, peerPort, peerId, peerName, senderDeviceId, senderName } = options;
+
     // Compute size and checksum BEFORE starting the TCP connection.
-    // This ensures the transfer is registered in this.transfers before
-    // any progress events can fire from TransferClient.
     const fileSize = await FileChunker.getFileSize(filePath);
     const checksum = await FileChunker.computeChecksum(filePath);
 
-    // Generate the transferId ourselves so we can register it first
     const { randomUUID } = await import('crypto');
     const transferId = randomUUID();
 
-    // Register in the map BEFORE calling sendFile — progress events
-    // from TransferClient reference this id and must find it here
     const transfer: Transfer = {
       id: transferId,
       direction: 'send',
@@ -166,7 +306,14 @@ export class TransferQueue extends EventEmitter {
     this.transfers.set(transferId, transfer);
     this.emit('transferUpdated', transfer);
 
-    // Now start the TCP connection — progress events will find the entry above
+    this.logger()?.info('Transfer started', {
+      transferId,
+      direction: 'send',
+      fileName,
+      fileSize,
+      peerName,
+    });
+
     this.client.sendFileWithId(transferId, {
       filePath,
       fileName,
@@ -236,7 +383,16 @@ export class TransferQueue extends EventEmitter {
       completedAt: Date.now(),
     });
     const t = this.transfers.get(transferId);
-    if (t) this.addToHistory(t);
+    if (t) {
+      this.addToHistory(t);
+      this.logger()?.info('Transfer declined', {
+        transferId,
+        direction: t.direction,
+        fileName: t.fileName,
+        fileSize: t.fileSize,
+        peerName: t.peerName,
+      });
+    }
   }
 
   cancelTransfer(transferId: string): void {
@@ -256,6 +412,15 @@ export class TransferQueue extends EventEmitter {
            t.status === TransferStatus.Pending ||
            t.status === TransferStatus.Connecting,
     );
+  }
+
+  /** Return a snapshot of the pending send queue (Feature 1) */
+  getPendingQueue(): Array<{ fileName: string; fileSize: number; deviceId: string }> {
+    return this.pendingSends.map(s => ({
+      fileName: s.fileName,
+      fileSize: s.fileSize,
+      deviceId: s.peerId,
+    }));
   }
 
   getHistory(): TransferRecord[] {

@@ -9,6 +9,7 @@ import { EventEmitter } from 'events';
 import { networkInterfaces } from 'os';
 import { UdpBroadcaster } from './UdpBroadcaster';
 import { UdpListener } from './UdpListener';
+import { Logger } from '../logging/Logger';
 import type { Device, DeviceAnnouncement, Platform } from '../../shared/models/Device';
 
 const DEVICE_TIMEOUT_MS = 10_000;
@@ -87,6 +88,10 @@ export class DiscoveryService extends EventEmitter {
     return this.detectLocalIp();
   }
 
+  private logger(): Logger | null {
+    try { return Logger.getInstance(); } catch { return null; }
+  }
+
   private handleAnnouncement(ann: DeviceAnnouncement, senderIp: string): void {
     // Ignore our own announcements (second line of defence after UdpListener)
     if (ann.id === this.ownDeviceId) return;
@@ -116,6 +121,9 @@ export class DiscoveryService extends EventEmitter {
     this.devices.set(ann.id, device);
 
     if (changed) {
+      if (wasOffline) {
+        this.logger()?.info('Device appeared', { deviceId: ann.id, name: ann.name, ip: senderIp });
+      }
       this.emit('devicesChanged', this.getDevices());
     }
   }
@@ -128,6 +136,7 @@ export class DiscoveryService extends EventEmitter {
       if (device.online && now - device.lastSeen > DEVICE_TIMEOUT_MS) {
         this.devices.set(id, { ...device, online: false });
         changed = true;
+        this.logger()?.info('Device evicted (stale)', { deviceId: id, name: device.name });
       }
     }
 

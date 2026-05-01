@@ -17,6 +17,8 @@ import type {
   TransferCompletePayload,
   TransferErrorPayload,
   IncomingRequestPayload,
+  TransferQueueUpdatedPayload,
+  LogsGetResponse,
 } from '../shared/ipc/IpcContracts';
 import type { Device } from '../shared/models/Device';
 import type { AppSettings } from '../shared/models/AppSettings';
@@ -36,6 +38,9 @@ export interface FileDropApi {
   onTransferProgress: (cb: (payload: TransferProgressPayload) => void) => () => void;
   onTransferComplete: (cb: (payload: TransferCompletePayload) => void) => () => void;
   onTransferError: (cb: (payload: TransferErrorPayload) => void) => () => void;
+
+  // Send queue (Feature 1)
+  onTransferQueueUpdated: (cb: (payload: TransferQueueUpdatedPayload) => void) => () => void;
 
   // Incoming transfers
   respondToIncoming: (payload: IncomingResponsePayload) => Promise<void>;
@@ -61,6 +66,9 @@ export interface FileDropApi {
 
   // Platform info
   platform: NodeJS.Platform;
+
+  // Diagnostics (Feature 3)
+  getLogs: () => Promise<LogsGetResponse>;
 }
 
 // ─── Helper: create a listener that returns an unsubscribe function ───────────
@@ -89,6 +97,9 @@ const api: FileDropApi = {
   onTransferComplete: (cb) => createListener(IpcChannels.TRANSFER_COMPLETE, cb),
   onTransferError: (cb) => createListener(IpcChannels.TRANSFER_ERROR, cb),
 
+  // Send queue (Feature 1)
+  onTransferQueueUpdated: (cb) => createListener(IpcChannels.TRANSFER_QUEUE_UPDATED, cb),
+
   // Incoming transfers
   respondToIncoming: (payload) => ipcRenderer.invoke(IpcChannels.INCOMING_RESPONSE, payload),
   onIncomingRequest: (cb) => createListener(IpcChannels.INCOMING_REQUEST, cb),
@@ -113,6 +124,9 @@ const api: FileDropApi = {
 
   // Platform info
   platform: process.platform,
+
+  // Diagnostics (Feature 3)
+  getLogs: () => ipcRenderer.invoke(IpcChannels.LOGS_GET),
 };
 
 contextBridge.exposeInMainWorld('api', api);

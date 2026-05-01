@@ -14,6 +14,7 @@ import type { SettingsStore } from '../store/SettingsStore';
 import { registerDeviceHandlers } from './handlers/DeviceHandlers';
 import { registerTransferHandlers } from './handlers/TransferHandlers';
 import { registerSettingsHandlers } from './handlers/SettingsHandlers';
+import { Logger } from '../logging/Logger';
 import type { Transfer } from '../../shared/models/Transfer';
 import { TransferStatus } from '../../shared/models/Transfer';
 
@@ -47,10 +48,21 @@ export class IpcBridge {
     registerTransferHandlers(ipcMain, this.transferQueue, this.discoveryService, this.settingsStore);
     registerSettingsHandlers(ipcMain, this.settingsStore, this.getMainWindow);
 
+    // LOGS_GET handler (Feature 3)
+    ipcMain.handle(IpcChannels.LOGS_GET, () => {
+      try {
+        const lines = Logger.getInstance().readLastLines(200);
+        return { lines };
+      } catch {
+        return { lines: [] };
+      }
+    });
+
     // Wire service events → renderer pushes
     this.wireDiscoveryEvents();
     this.wireTransferEvents();
     this.wireIncomingEvents();
+    this.wireQueueEvents();
   }
 
   private send(channel: string, payload: unknown): void {
@@ -60,9 +72,26 @@ export class IpcBridge {
     }
   }
 
+  private logger(): Logger | null {
+    try { return Logger.getInstance(); } catch { return null; }
+  }
+
   private wireDiscoveryEvents(): void {
     this.discoveryService.on('devicesChanged', (devices) => {
       this.send(IpcChannels.DEVICES_UPDATED, { devices });
+    });
+  }
+
+  /** Wire the pending-send queue updates to the renderer (Feature 1) */
+  private wireQueueEvents(): void {
+    this.transferQueue.on('queueUpdated', (queue) => {
+      this.send(IpcChannels.TRANSFER_QUEUE_UPDATED, {
+        queue: queue.map(item => ({
+          fileName: item.fileName,
+          fileSize: item.fileSize,
+          deviceId: item.peerId,
+        })),
+      });
     });
   }
 
@@ -120,6 +149,10 @@ export class IpcBridge {
             transferId: transfer.id,
             error: transfer.errorMessage ?? 'Unknown error',
             code: transfer.errorCode ?? 'UNKNOWN',
+          });
+          this.logger()?.warn('IPC: transfer error pushed to renderer', {
+            transferId: transfer.id,
+            error: transfer.errorMessage ?? 'Unknown error',
           });
           if (transfer.direction === 'receive') {
             this.notificationManager.notifyTransferFailed(transfer.fileName, transfer.errorMessage ?? 'Unknown error');

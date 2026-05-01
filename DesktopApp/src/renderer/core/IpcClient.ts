@@ -19,6 +19,8 @@ import type {
   TransferCompletePayload,
   TransferErrorPayload,
   IncomingRequestPayload,
+  TransferQueueUpdatedPayload,
+  LogsGetResponse,
 } from '../../shared/ipc/IpcContracts';
 
 function getApi(): FileDropApi {
@@ -43,6 +45,10 @@ export const IpcClient = {
     getApi().onTransferComplete(cb),
   onTransferError: (cb: (payload: TransferErrorPayload) => void): (() => void) =>
     getApi().onTransferError(cb),
+
+  // Send queue (Feature 1)
+  onTransferQueueUpdated: (cb: (payload: TransferQueueUpdatedPayload) => void): (() => void) =>
+    getApi().onTransferQueueUpdated(cb),
 
   // Incoming transfers
   respondToIncoming: (payload: IncomingResponsePayload): Promise<void> =>
@@ -70,4 +76,7 @@ export const IpcClient = {
 
   // Platform
   getPlatform: (): NodeJS.Platform => getApi().platform,
+
+  // Diagnostics (Feature 3)
+  getLogs: (): Promise<LogsGetResponse> => getApi().getLogs(),
 } as const;

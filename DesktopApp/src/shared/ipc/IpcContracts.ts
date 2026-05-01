@@ -20,6 +20,9 @@ export const IpcChannels = {
   TRANSFER_ERROR: 'transfer:error',
   TRANSFER_CANCEL: 'transfer:cancel',
 
+  // File transfer — send queue (Feature 1)
+  TRANSFER_QUEUE_UPDATED: 'transfer:queue:updated',
+
   // File transfer — incoming
   INCOMING_REQUEST: 'incoming:request',
   INCOMING_RESPONSE: 'incoming:response',
@@ -41,6 +44,9 @@ export const IpcChannels = {
   // Shell actions
   SHELL_OPEN_FILE: 'shell:openFile',
   SHELL_SHOW_IN_FOLDER: 'shell:showInFolder',
+
+  // Diagnostics / logging (Feature 3)
+  LOGS_GET: 'logs:get',
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];
@@ -116,6 +122,20 @@ export interface IncomingResponsePayload {
   accepted: boolean;
 }
 
+/** Main → renderer: pending send queue updated (Feature 1) */
+export interface TransferQueueUpdatedPayload {
+  queue: Array<{
+    fileName: string;
+    fileSize: number;
+    deviceId: string;
+  }>;
+}
+
+/** Main → renderer: last N lines of the log file (Feature 3) */
+export interface LogsGetResponse {
+  lines: string[];
+}
+
 /** Main → renderer: current settings */
 export type SettingsGetResponse = import('../models/AppSettings').AppSettings;
 
@@ -142,4 +162,5 @@ export interface IpcInvokeMap {
   [IpcChannels.WINDOW_IS_MAXIMIZED]: [void, boolean];
   [IpcChannels.SHELL_OPEN_FILE]: [{ path: string }, void];
   [IpcChannels.SHELL_SHOW_IN_FOLDER]: [{ path: string }, void];
+  [IpcChannels.LOGS_GET]: [void, LogsGetResponse];
 }
