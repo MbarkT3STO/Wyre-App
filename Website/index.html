@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wyre — Seamless Peer-to-Peer File Transfer</title>
+  <meta name="description" content="Transfer files instantly between devices on your local network. No internet, no accounts, no cloud. Just fast, direct, secure transfers." />
+  <meta property="og:title" content="Wyre — Seamless P2P File Transfer" />
+  <meta property="og:description" content="Transfer files instantly between devices on your local network." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" type="image/png" href="assets/icon.png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link rel="stylesheet" href="css/tokens.css" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+
+  <!-- ── NAV ─────────────────────────────────────────────── -->
+  <nav class="nav" id="nav">
+    <div class="nav__inner">
+      <a href="#" class="nav__logo">
+        <img src="assets/icon.png" alt="Wyre" class="nav__logo-img" />
+        <span class="nav__logo-text">Wyre</span>
+      </a>
+
+      <ul class="nav__links">
+        <li><a href="#features" class="nav__link">Features</a></li>
+        <li><a href="#how-it-works" class="nav__link">How it works</a></li>
+        <li><a href="#platforms" class="nav__link">Platforms</a></li>
+        <li><a href="#download" class="nav__link">Download</a></li>
+        <li><a href="#developer" class="nav__link">Developer</a></li>
+      </ul>
+
+      <div class="nav__sep"></div>
+
+      <div class="nav__actions">
+        <a href="https://github.com/MbarkT3STO/Wyre-App" target="_blank" rel="noopener" class="nav__icon-btn" aria-label="GitHub">
+          <i class="fa-brands fa-github"></i>
+        </a>
+        <button class="nav__icon-btn" id="themeToggle" aria-label="Toggle theme">
+          <i class="fa-solid fa-moon" id="themeIcon"></i>
+        </button>
+        <a href="#download" class="btn btn--primary btn--sm">
+          <i class="fa-solid fa-download btn__icon"></i>
+          Download
+        </a>
+      </div>
+
+      <button class="nav__hamburger" id="hamburger" aria-label="Open menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+
+    <!-- Mobile menu -->
+    <div class="nav__mobile" id="mobileMenu">
+      <ul>
+        <li><a href="#features" class="nav__mobile-link">
+          <i class="fa-solid fa-sparkles"></i> Features
+        </a></li>
+        <li><a href="#how-it-works" class="nav__mobile-link">
+          <i class="fa-solid fa-circle-play"></i> How it works
+        </a></li>
+        <li><a href="#platforms" class="nav__mobile-link">
+          <i class="fa-solid fa-layer-group"></i> Platforms
+        </a></li>
+        <li><a href="#download" class="nav__mobile-link">
+          <i class="fa-solid fa-download"></i> Download
+        </a></li>
+        <li><a href="#developer" class="nav__mobile-link">
+          <i class="fa-solid fa-code"></i> Developer
+        </a></li>
+      </ul>
+      <div class="nav__mobile__footer">
+        <a href="#download" class="btn btn--primary">
+          <i class="fa-solid fa-download btn__icon"></i>
+          Download Free
+        </a>
+        <a href="https://github.com/MbarkT3STO/Wyre-App" target="_blank" rel="noopener" class="nav__mobile__github">
+          <i class="fa-brands fa-github"></i>
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── HERO ─────────────────────────────────────────────── -->
+  <section class="hero" id="hero">
+    <div class="hero__glow hero__glow--1"></div>
+    <div class="hero__glow hero__glow--2"></div>
+    <div class="hero__glow hero__glow--3"></div>
+    <div class="container">
+      <h1 class="hero__title">
+        Transfer files at<br />
+        <span class="hero__title-gradient">lightning speed</span>
+      </h1>
+      <p class="hero__subtitle">
+        Wyre connects devices on your local network instantly. No accounts, no cloud, no limits —
+        just fast, direct, encrypted transfers between your devices.
+      </p>
+      <div class="hero__actions">
+        <a href="#download" class="btn btn--primary btn--lg">
+          <i class="fa-solid fa-download btn__icon"></i>
+          Download Free
+        </a>
+        <a href="#how-it-works" class="btn btn--secondary btn--lg">
+          <i class="fa-solid fa-play btn__icon"></i>
+          See how it works
+        </a>
+      </div>
+      <div class="hero__stats">
+        <div class="hero__stat">
+          <span class="hero__stat-value">0ms</span>
+          <span class="hero__stat-label">Setup time</span>
+        </div>
+        <div class="hero__stat-divider"></div>
+        <div class="hero__stat">
+          <span class="hero__stat-value">LAN</span>
+          <span class="hero__stat-label">Speed transfers</span>
+        </div>
+        <div class="hero__stat-divider"></div>
+        <div class="hero__stat">
+          <span class="hero__stat-value">SHA-256</span>
+          <span class="hero__stat-label">Integrity check</span>
+        </div>
+        <div class="hero__stat-divider"></div>
+        <div class="hero__stat">
+          <span class="hero__stat-value">100%</span>
+          <span class="hero__stat-label">Private</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- App mockup -->
+    <div class="hero__mockup-wrap">
+      <div class="container">
+        <div class="hero__mockup" id="heroMockup">
+          <div class="mockup-window">
+            <div class="mockup-window__titlebar">
+              <div class="mockup-window__controls">
+                <span class="mockup-window__dot mockup-window__dot--red"></span>
+                <span class="mockup-window__dot mockup-window__dot--yellow"></span>
+                <span class="mockup-window__dot mockup-window__dot--green"></span>
+              </div>
+              <span class="mockup-window__title">Wyre</span>
+            </div>
+            <div class="mockup-window__body">
+              <div class="mockup-sidebar">
+                <div class="mockup-sidebar__item mockup-sidebar__item--active">
+                  <i class="fa-solid fa-house"></i>
+                  <span>Home</span>
+                </div>
+                <div class="mockup-sidebar__item">
+                  <i class="fa-solid fa-arrow-right-arrow-left"></i>
+                  <span>Transfers</span>
+                </div>
+                <div class="mockup-sidebar__item">
+                  <i class="fa-solid fa-gear"></i>
+                  <span>Settings</span>
+                </div>
+              </div>
+              <div class="mockup-content">
+                <div class="mockup-section-label">NEARBY DEVICES</div>
+                <div class="mockup-devices">
+                  <div class="mockup-device mockup-device--selected">
+                    <div class="mockup-device__avatar">M</div>
+                    <div class="mockup-device__dot"></div>
+                    <div class="mockup-device__name">MacBook Pro</div>
+                    <div class="mockup-device__os"><i class="fa-brands fa-apple"></i></div>
+                  </div>
+                  <div class="mockup-device">
+                    <div class="mockup-device__avatar">P</div>
+                    <div class="mockup-device__dot"></div>
+                    <div class="mockup-device__name">Pixel 8</div>
+                    <div class="mockup-device__os"><i class="fa-brands fa-android"></i></div>
+                  </div>
+                  <div class="mockup-device">
+                    <div class="mockup-device__avatar">W</div>
+                    <div class="mockup-device__dot"></div>
+                    <div class="mockup-device__name">Win PC</div>
+                    <div class="mockup-device__os"><i class="fa-brands fa-windows"></i></div>
+                  </div>
+                </div>
+                <div class="mockup-dropzone">
+                  <i class="fa-solid fa-cloud-arrow-up"></i>
+                  <span>Drop files here or <u>browse</u></span>
+                </div>
+                <div class="mockup-transfer">
+                  <div class="mockup-transfer__stripe"></div>
+                  <div class="mockup-transfer__icon"><i class="fa-solid fa-arrow-up"></i></div>
+                  <div class="mockup-transfer__info">
+                    <div class="mockup-transfer__name">project-assets.zip</div>
+                    <div class="mockup-transfer__bar">
+                      <div class="mockup-transfer__fill" style="width:72%"></div>
+                    </div>
+                  </div>
+                  <div class="mockup-transfer__pct">72%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FEATURES ─────────────────────────────────────────── -->
+  <section class="features" id="features">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">Features</div>
+        <h2 class="section-title">Everything you need,<br />nothing you don't</h2>
+        <p class="section-subtitle">Wyre is built for speed and simplicity. Every feature is designed to get out of your way.</p>
+      </div>
+      <div class="features__grid">
+
+        <div class="feature-card feature-card--large">
+          <div class="feature-card__icon-wrap">
+            <i class="fa-solid fa-tower-broadcast feature-card__icon"></i>
+          </div>
+          <h3 class="feature-card__title">Instant Discovery</h3>
+          <p class="feature-card__desc">Devices on your network appear automatically via UDP broadcast. No pairing, no QR codes, no setup — just open the app and see who's there.</p>
+          <div class="feature-card__visual feature-card__visual--radar">
+            <div class="radar-demo">
+              <div class="radar-demo__ring radar-demo__ring--1"></div>
+              <div class="radar-demo__ring radar-demo__ring--2"></div>
+              <div class="radar-demo__ring radar-demo__ring--3"></div>
+              <div class="radar-demo__center"><i class="fa-solid fa-wifi"></i></div>
+              <div class="radar-demo__device radar-demo__device--1">
+                <i class="fa-brands fa-apple"></i>
+              </div>
+              <div class="radar-demo__device radar-demo__device--2">
+                <i class="fa-brands fa-android"></i>
+              </div>
+              <div class="radar-demo__device radar-demo__device--3">
+                <i class="fa-brands fa-windows"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon-wrap">
+            <i class="fa-solid fa-shield-halved feature-card__icon"></i>
+          </div>
+          <h3 class="feature-card__title">SHA-256 Verification</h3>
+          <p class="feature-card__desc">Every file is verified with a SHA-256 checksum after transfer. Corrupted files are caught automatically.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon-wrap">
+            <i class="fa-solid fa-bolt feature-card__icon"></i>
+          </div>
+          <h3 class="feature-card__title">LAN Speed</h3>
+          <p class="feature-card__desc">Transfers happen directly over TCP at full local network speed. No cloud bottleneck, no upload limits.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon-wrap">
+            <i class="fa-solid fa-clock feature-card__icon"></i>
+          </div>
+          <h3 class="feature-card__title">Accept / Decline</h3>
+          <p class="feature-card__desc">Incoming transfers show a 30-second countdown dialog. You're always in control of what lands on your device.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon-wrap">
+            <i class="fa-solid fa-chart-line feature-card__icon"></i>
+          </div>
+          <h3 class="feature-card__title">Live Progress</h3>
+          <p class="feature-card__desc">Real-time progress bars with transfer speed in KB/s and estimated time remaining. Always know what's happening.</p>
+        </div>
+
+        <div class="feature-card feature-card--large feature-card--right">
+          <div class="feature-card__icon-wrap">
+            <i class="fa-solid fa-moon feature-card__icon"></i>
+          </div>
+          <h3 class="feature-card__title">Dark &amp; Light Theme</h3>
+          <p class="feature-card__desc">A polished UI that respects your OS preference. Switch between dark, light, or system theme at any time.</p>
+          <div class="feature-card__visual feature-card__visual--theme">
+            <div class="theme-demo">
+              <div class="theme-demo__dark">
+                <div class="theme-demo__bar"></div>
+                <div class="theme-demo__row"></div>
+                <div class="theme-demo__row theme-demo__row--short"></div>
+              </div>
+              <div class="theme-demo__light">
+                <div class="theme-demo__bar"></div>
+                <div class="theme-demo__row"></div>
+                <div class="theme-demo__row theme-demo__row--short"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon-wrap">
+            <i class="fa-solid fa-list feature-card__icon"></i>
+          </div>
+          <h3 class="feature-card__title">Transfer History</h3>
+          <p class="feature-card__desc">Full log of completed, failed, and cancelled transfers. Review what was sent and received at any time.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon-wrap">
+            <i class="fa-solid fa-xmark feature-card__icon"></i>
+          </div>
+          <h3 class="feature-card__title">Cancel Anytime</h3>
+          <p class="feature-card__desc">Cancel transfers from either the sender or receiver side. No partial files left behind.</p>
+        </div>
+
+        <div class="feature-card">
+          <div class="feature-card__icon-wrap">
+            <i class="fa-solid fa-bell feature-card__icon"></i>
+          </div>
+          <h3 class="feature-card__title">OS Notifications</h3>
+          <p class="feature-card__desc">Native system notifications when transfers complete. Works even when the app is in the background.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── HOW IT WORKS ──────────────────────────────────────── -->
+  <section class="how-it-works" id="how-it-works">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">How it works</div>
+        <h2 class="section-title">Three steps.<br />That's it.</h2>
+        <p class="section-subtitle">Wyre is designed to be invisible. It just works.</p>
+      </div>
+      <div class="steps">
+        <div class="step">
+          <div class="step__number">01</div>
+          <div class="step__content">
+            <div class="step__icon-wrap">
+              <i class="fa-solid fa-download step__icon"></i>
+            </div>
+            <h3 class="step__title">Install Wyre</h3>
+            <p class="step__desc">Download and install Wyre on any devices you want to connect. Available for Windows, macOS, Linux, and Android.</p>
+          </div>
+          <div class="step__connector"></div>
+        </div>
+        <div class="step">
+          <div class="step__number">02</div>
+          <div class="step__content">
+            <div class="step__icon-wrap">
+              <i class="fa-solid fa-wifi step__icon"></i>
+            </div>
+            <h3 class="step__title">Connect to the same network</h3>
+            <p class="step__desc">Make sure both devices are on the same Wi-Fi or LAN. Wyre automatically discovers all nearby devices — no configuration needed.</p>
+          </div>
+          <div class="step__connector"></div>
+        </div>
+        <div class="step">
+          <div class="step__number">03</div>
+          <div class="step__content">
+            <div class="step__icon-wrap">
+              <i class="fa-solid fa-paper-plane step__icon"></i>
+            </div>
+            <h3 class="step__title">Drop and send</h3>
+            <p class="step__desc">Select a device, drop your files, and hit send. The recipient gets a notification and can accept or decline. Done.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PLATFORMS ─────────────────────────────────────────── -->
+  <section class="platforms" id="platforms">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">Platforms</div>
+        <h2 class="section-title">Works everywhere<br />you work</h2>
+        <p class="section-subtitle">Wyre runs natively on all major platforms and they all talk to each other seamlessly.</p>
+      </div>
+      <div class="platforms__grid">
+        <div class="platform-card">
+          <div class="platform-card__icon platform-card__icon--windows">
+            <i class="fa-brands fa-windows"></i>
+          </div>
+          <h3 class="platform-card__name">Windows</h3>
+          <p class="platform-card__desc">Native installer for Windows 10 and 11. Runs in the system tray.</p>
+          <div class="platform-card__badge">x64</div>
+        </div>
+        <div class="platform-card">
+          <div class="platform-card__icon platform-card__icon--macos">
+            <i class="fa-brands fa-apple"></i>
+          </div>
+          <h3 class="platform-card__name">macOS</h3>
+          <p class="platform-card__desc">Universal binary for Intel and Apple Silicon. Native title bar support.</p>
+          <div class="platform-card__badge">Intel · Apple Silicon</div>
+        </div>
+        <div class="platform-card">
+          <div class="platform-card__icon platform-card__icon--linux">
+            <i class="fa-brands fa-linux"></i>
+          </div>
+          <h3 class="platform-card__name">Linux</h3>
+          <p class="platform-card__desc">AppImage that runs on any modern Linux distribution without installation.</p>
+          <div class="platform-card__badge">AppImage · x64</div>
+        </div>
+        <div class="platform-card">
+          <div class="platform-card__icon platform-card__icon--android">
+            <i class="fa-brands fa-android"></i>
+          </div>
+          <h3 class="platform-card__name">Android</h3>
+          <p class="platform-card__desc">Native Android app with background service and system notifications.</p>
+          <div class="platform-card__badge">Android 8+</div>
+        </div>
+      </div>
+      <div class="platforms__compat">
+        <div class="platforms__compat-icon"><i class="fa-solid fa-circle-check"></i></div>
+        <p>All platforms are fully cross-compatible — send from Android to macOS, Windows to Linux, or any combination.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PRIVACY ───────────────────────────────────────────── -->
+  <section class="privacy">
+    <div class="container">
+      <div class="privacy__inner">
+        <div class="privacy__content">
+          <div class="section-badge">Privacy first</div>
+          <h2 class="section-title">Your files never<br />leave your network</h2>
+          <p class="section-subtitle">Wyre is 100% local. There are no servers, no accounts, no telemetry, and no cloud storage. Your files go directly from one device to another — and nowhere else.</p>
+          <ul class="privacy__list">
+            <li><i class="fa-solid fa-circle-check"></i> No internet connection required</li>
+            <li><i class="fa-solid fa-circle-check"></i> No account or sign-in needed</li>
+            <li><i class="fa-solid fa-circle-check"></i> No data sent to any server</li>
+            <li><i class="fa-solid fa-circle-check"></i> No telemetry or analytics</li>
+            <li><i class="fa-solid fa-circle-check"></i> Open source &amp; MIT licensed</li>
+          </ul>
+        </div>
+        <div class="privacy__visual">
+          <div class="privacy__diagram">
+            <div class="privacy__node privacy__node--device">
+              <i class="fa-solid fa-laptop"></i>
+              <span>Your Device</span>
+            </div>
+            <div class="privacy__arrow">
+              <div class="privacy__arrow-line">
+                <div class="privacy__arrow-packet"></div>
+              </div>
+              <span class="privacy__arrow-label">Direct TCP</span>
+            </div>
+            <div class="privacy__node privacy__node--device">
+              <i class="fa-brands fa-android"></i>
+              <span>Their Device</span>
+            </div>
+            <div class="privacy__no-cloud">
+              <div class="privacy__cloud-cross">
+                <i class="fa-solid fa-cloud"></i>
+                <div class="privacy__cloud-x"></div>
+              </div>
+              <span>No cloud involved</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── DOWNLOAD ──────────────────────────────────────────── -->
+  <section class="download" id="download">
+    <div class="download__glow"></div>
+    <div class="container">
+      <div class="section-header">
+        <div class="section-badge">Download</div>
+        <h2 class="section-title">Get Wyre for free</h2>
+        <p class="section-subtitle">Available on all major platforms. MIT licensed and open source.</p>
+      </div>
+      <div class="download__grid">
+        <a href="#" class="download-card">
+          <div class="download-card__icon download-card__icon--windows">
+            <i class="fa-brands fa-windows"></i>
+          </div>
+          <div class="download-card__info">
+            <span class="download-card__platform">Windows</span>
+            <span class="download-card__format">NSIS Installer · x64</span>
+          </div>
+          <i class="fa-solid fa-download download-card__arrow"></i>
+        </a>
+
+        <!-- macOS — trigger card + dropdown wrapper -->
+        <div class="macos-wrap" id="macosWrap">
+          <div class="download-card download-card--macos-trigger" id="macosTrigger" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false">
+            <div class="download-card__icon download-card__icon--macos">
+              <i class="fa-brands fa-apple"></i>
+            </div>
+            <div class="download-card__info">
+              <span class="download-card__platform">macOS</span>
+              <span class="download-card__format">DMG · Apple Silicon &amp; Intel</span>
+            </div>
+            <i class="fa-solid fa-chevron-down download-card__arrow download-card__chevron"></i>
+          </div>
+          <!-- Dropdown sits inside the wrapper, absolutely positioned below the card -->
+          <div class="macos-dropdown" id="macosDropdown" role="menu">
+            <div class="macos-dropdown__arrow"></div>
+            <a href="#" class="macos-dropdown__item" role="menuitem">
+              <div class="macos-dropdown__item-icon">
+                <i class="fa-solid fa-microchip"></i>
+              </div>
+              <div class="macos-dropdown__item-info">
+                <span class="macos-dropdown__item-name">Apple Silicon</span>
+                <span class="macos-dropdown__item-sub">arm64 · M1, M2, M3, M4</span>
+              </div>
+              <i class="fa-solid fa-download macos-dropdown__item-dl"></i>
+            </a>
+            <div class="macos-dropdown__divider"></div>
+            <a href="#" class="macos-dropdown__item" role="menuitem">
+              <div class="macos-dropdown__item-icon">
+                <i class="fa-solid fa-microchip"></i>
+              </div>
+              <div class="macos-dropdown__item-info">
+                <span class="macos-dropdown__item-name">Intel</span>
+                <span class="macos-dropdown__item-sub">x64 · Core i5, i7, i9</span>
+              </div>
+              <i class="fa-solid fa-download macos-dropdown__item-dl"></i>
+            </a>
+          </div>
+        </div>
+
+        <a href="#" class="download-card">
+          <div class="download-card__icon download-card__icon--linux">
+            <i class="fa-brands fa-linux"></i>
+          </div>
+          <div class="download-card__info">
+            <span class="download-card__platform">Linux</span>
+            <span class="download-card__format">AppImage · x64</span>
+          </div>
+          <i class="fa-solid fa-download download-card__arrow"></i>
+        </a>
+        <a href="#" class="download-card">
+          <div class="download-card__icon download-card__icon--android">
+            <i class="fa-brands fa-android"></i>
+          </div>
+          <div class="download-card__info">
+            <span class="download-card__platform">Android</span>
+            <span class="download-card__format">APK · Android 8+</span>
+          </div>
+          <i class="fa-solid fa-download download-card__arrow"></i>
+        </a>
+      </div>
+      <div class="download__footer">
+        <a href="https://github.com/MbarkT3STO/Wyre-App" target="_blank" rel="noopener" class="download__github">
+          <i class="fa-brands fa-github"></i>
+          View source on GitHub
+        </a>
+        <span class="download__version">v1.0.0 · MIT License</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── DEVELOPER ───────────────────────────────────────── -->
+  <section class="developer" id="developer">
+    <div class="developer__glow developer__glow--1"></div>
+    <div class="developer__glow developer__glow--2"></div>
+    <div class="container">
+      <div class="developer__inner">
+
+        <!-- Photo -->
+        <div class="developer__photo-wrap">
+          <div class="developer__photo-ring"></div>
+          <div class="developer__photo-ring developer__photo-ring--2"></div>
+          <img src="assets/DevPhoto.jpg" alt="Mbarek Testo — Developer" class="developer__photo" />
+          <div class="developer__photo-badge">
+            <i class="fa-solid fa-code"></i>
+          </div>
+        </div>
+
+        <!-- Content -->
+        <div class="developer__content">
+          <div class="section-badge">Built by</div>
+          <h2 class="developer__name">MBVRK</h2>
+          <p class="developer__role">Software Engineer</p>
+          <p class="developer__bio">
+            Wyre was built from scratch as a passion project — a clean, fast, and private
+            way to move files between devices without touching the cloud. Every line of code,
+            every pixel of UI, and every protocol decision was made with simplicity and
+            performance in mind.
+          </p>
+
+          <div class="developer__tags">
+            <span class="developer__tag"><i class="fa-brands fa-js"></i> TypeScript</span>
+            <span class="developer__tag"><i class="fa-brands fa-node-js"></i> Node.js</span>
+            <span class="developer__tag"><i class="fa-solid fa-bolt"></i> Electron</span>
+            <span class="developer__tag"><i class="fa-brands fa-android"></i> Android</span>
+            <span class="developer__tag"><i class="fa-solid fa-network-wired"></i> TCP/UDP</span>
+          </div>
+
+          <div class="developer__links">
+            <a href="https://github.com/MbarkT3STO" target="_blank" rel="noopener" class="developer__link developer__link--primary">
+              <i class="fa-brands fa-github"></i>
+              GitHub Profile
+            </a>
+            <a href="https://github.com/MbarkT3STO/Wyre-App" target="_blank" rel="noopener" class="developer__link developer__link--secondary">
+              <i class="fa-solid fa-code-branch"></i>
+              View Repository
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FOOTER ────────────────────────────────────────────── -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__inner">
+        <div class="footer__brand">
+          <a href="#" class="nav__logo">
+            <img src="assets/icon.png" alt="Wyre" class="nav__logo-img" />
+            <span class="nav__logo-text">Wyre</span>
+          </a>
+          <p class="footer__tagline">Seamless peer-to-peer file transfer for local networks.</p>
+        </div>
+        <div class="footer__links">
+          <div class="footer__col">
+            <span class="footer__col-title">Product</span>
+            <a href="#features">Features</a>
+            <a href="#how-it-works">How it works</a>
+            <a href="#platforms">Platforms</a>
+            <a href="#download">Download</a>
+          </div>
+          <div class="footer__col">
+            <span class="footer__col-title">Resources</span>
+            <a href="#">Documentation</a>
+            <a href="https://github.com/MbarkT3STO/Wyre-App" target="_blank" rel="noopener">GitHub</a>
+            <a href="#">Releases</a>
+            <a href="#">License</a>
+          </div>
+        </div>
+      </div>
+      <div class="footer__bottom">
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

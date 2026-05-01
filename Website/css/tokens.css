@@ -1,0 +1,153 @@
+/* ============================================================
+   tokens.css — Design System Tokens
+   Wyre Website — Keyra Design Language
+   ============================================================ */
+
+:root {
+  --h: 258;
+  --s: 85%;
+
+  --radius-xs:   4px;
+  --radius-sm:   8px;
+  --radius-md:   16px;
+  --radius-lg:   24px;
+  --radius-xl:   32px;
+  --radius-full: 999px;
+
+  --ease-out:    cubic-bezier(0.0, 0.0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-fast:   200ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition:        400ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow:   600ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono:   'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+}
+
+/* ── DARK THEME ─────────────────────────────────────────── */
+[data-theme="dark"] {
+  --bg-app:        #121214;
+  --bg-sidebar:    #0f0f11;
+  --bg-surface:    #18181b;
+  --bg-elevated:   #202023;
+  --bg-card:       #18181b;
+  --bg-card-hover: #202023;
+  --bg-overlay:    #202023;
+
+  --accent-base:   hsl(var(--h), var(--s), 55%);
+  --accent-mid:    hsl(var(--h), var(--s), 65%);
+  --accent-bright: hsl(var(--h), var(--s), 75%);
+  --accent-hover:  hsl(var(--h), var(--s), 75%);
+  --accent-active: hsl(var(--h), var(--s), 45%);
+  --accent-text:   hsl(var(--h), var(--s), 75%);
+  --accent-soft:   hsla(var(--h), var(--s), 65%, 0.15);
+  --accent-glow:   hsla(var(--h), var(--s), 65%, 0.40);
+  --accent-glow-sm:hsla(var(--h), var(--s), 65%, 0.22);
+  --accent-50:     hsla(var(--h), var(--s), 65%, 0.08);
+  --accent-100:    hsla(var(--h), var(--s), 65%, 0.15);
+  --accent-200:    hsla(var(--h), var(--s), 65%, 0.28);
+
+  --gradient-accent:  linear-gradient(135deg, hsl(var(--h), var(--s), 55%) 0%, hsl(calc(var(--h) + 40), var(--s), 65%) 100%);
+  --gradient-accent-2:linear-gradient(135deg, hsl(var(--h), var(--s), 45%) 0%, hsl(var(--h), var(--s), 65%) 100%);
+  --gradient-surface: linear-gradient(180deg, #202023 0%, #18181b 100%);
+  --gradient-glow:    radial-gradient(ellipse at 30% 0%, hsla(var(--h), var(--s), 65%, 0.18) 0%, transparent 65%);
+  --gradient-hero:    linear-gradient(135deg, hsla(var(--h), var(--s), 65%, 0.12) 0%, transparent 100%);
+
+  --success:        #34c759;
+  --success-subtle: rgba(52,199,89,0.12);
+  --success-text:   #4cd964;
+  --success-glow:   rgba(52,199,89,0.30);
+  --warning:        #ff9f0a;
+  --warning-text:   #ffb340;
+  --danger:         #ff3b30;
+  --danger-text:    #ff6b6b;
+  --info:           #0a84ff;
+  --info-text:      #5ac8fa;
+
+  --text-primary:   #f8fafc;
+  --text-secondary: #a0aec0;
+  --text-tertiary:  #718096;
+  --text-muted:     #4a5568;
+
+  --border-subtle:  rgba(255,255,255,0.04);
+  --border-default: rgba(255,255,255,0.08);
+  --border-strong:  rgba(255,255,255,0.14);
+  --border-accent:  hsla(var(--h), var(--s), 65%, 0.40);
+
+  --nm-top:    -6px -6px 14px rgba(255,255,255,0.03);
+  --nm-bottom:  6px  6px 14px rgba(0,0,0,0.60);
+  --nm-raised: var(--nm-top), var(--nm-bottom);
+  --nm-pressed: inset -3px -3px 8px rgba(255,255,255,0.03), inset 3px 3px 8px rgba(0,0,0,0.60);
+
+  --shadow-sm:  var(--nm-raised);
+  --shadow-md:  -8px -8px 18px rgba(255,255,255,0.03), 8px 8px 18px rgba(0,0,0,0.65);
+  --shadow-lg:  -10px -10px 24px rgba(255,255,255,0.03), 10px 10px 24px rgba(0,0,0,0.70);
+  --shadow-glow: 0 0 32px hsla(var(--h), var(--s), 65%, 0.35);
+  --shadow-glow-sm: 0 0 16px hsla(var(--h), var(--s), 65%, 0.22);
+
+  --scrollbar-thumb: rgba(255,255,255,0.08);
+}
+
+/* ── LIGHT THEME ────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-app:        #e0e5ec;
+  --bg-sidebar:    #d8dde8;
+  --bg-surface:    #e8ecf2;
+  --bg-elevated:   #eef1f6;
+  --bg-card:       #e0e5ec;
+  --bg-card-hover: #d8dde8;
+  --bg-overlay:    #d1d9e6;
+
+  --accent-base:   hsl(var(--h), var(--s), 40%);
+  --accent-mid:    hsl(var(--h), var(--s), 50%);
+  --accent-bright: hsl(var(--h), var(--s), 60%);
+  --accent-hover:  hsl(var(--h), var(--s), 60%);
+  --accent-active: hsl(var(--h), var(--s), 35%);
+  --accent-text:   hsl(var(--h), var(--s), 45%);
+  --accent-soft:   hsla(var(--h), var(--s), 50%, 0.15);
+  --accent-glow:   hsla(var(--h), var(--s), 50%, 0.30);
+  --accent-glow-sm:hsla(var(--h), var(--s), 50%, 0.18);
+  --accent-50:     hsla(var(--h), var(--s), 50%, 0.08);
+  --accent-100:    hsla(var(--h), var(--s), 50%, 0.15);
+  --accent-200:    hsla(var(--h), var(--s), 50%, 0.28);
+
+  --gradient-accent:  linear-gradient(135deg, hsl(var(--h), var(--s), 40%) 0%, hsl(calc(var(--h) + 40), var(--s), 55%) 100%);
+  --gradient-accent-2:linear-gradient(135deg, hsl(var(--h), var(--s), 35%) 0%, hsl(var(--h), var(--s), 55%) 100%);
+  --gradient-surface: linear-gradient(180deg, #eef1f6 0%, #e8ecf2 100%);
+  --gradient-glow:    radial-gradient(ellipse at 30% 0%, hsla(var(--h), var(--s), 50%, 0.12) 0%, transparent 65%);
+  --gradient-hero:    linear-gradient(135deg, hsla(var(--h), var(--s), 50%, 0.08) 0%, transparent 100%);
+
+  --success:        #28a745;
+  --success-subtle: rgba(40,167,69,0.10);
+  --success-text:   #28a745;
+  --success-glow:   rgba(40,167,69,0.25);
+  --warning:        #e67e00;
+  --warning-text:   #e67e00;
+  --danger:         #dc3545;
+  --danger-text:    #dc3545;
+  --info:           #0066cc;
+  --info-text:      #0066cc;
+
+  --text-primary:   #1a202c;
+  --text-secondary: #4a5568;
+  --text-tertiary:  #718096;
+  --text-muted:     #a0aec0;
+
+  --border-subtle:  rgba(0,0,0,0.04);
+  --border-default: rgba(0,0,0,0.08);
+  --border-strong:  rgba(0,0,0,0.14);
+  --border-accent:  hsla(var(--h), var(--s), 50%, 0.40);
+
+  --nm-top:    -6px -6px 14px rgba(255,255,255,0.70);
+  --nm-bottom:  6px  6px 14px rgba(163,177,198,0.60);
+  --nm-raised: var(--nm-top), var(--nm-bottom);
+  --nm-pressed: inset -3px -3px 8px rgba(255,255,255,0.70), inset 3px 3px 8px rgba(163,177,198,0.60);
+
+  --shadow-sm:  var(--nm-raised);
+  --shadow-md:  -8px -8px 18px rgba(255,255,255,0.70), 8px 8px 18px rgba(163,177,198,0.65);
+  --shadow-lg:  -10px -10px 24px rgba(255,255,255,0.70), 10px 10px 24px rgba(163,177,198,0.70);
+  --shadow-glow: 0 0 32px hsla(var(--h), var(--s), 50%, 0.25);
+  --shadow-glow-sm: 0 0 16px hsla(var(--h), var(--s), 50%, 0.18);
+
+  --scrollbar-thumb: rgba(0,0,0,0.12);
+}
