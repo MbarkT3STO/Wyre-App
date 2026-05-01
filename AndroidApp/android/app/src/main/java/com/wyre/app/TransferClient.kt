@@ -41,13 +41,17 @@ class TransferClient(
     fun send() {
         val startedAt = System.currentTimeMillis()
 
+        // Compute actual file size first — used in header and all events
+        val file = File(filePath)
+        val actualFileSize = if (fileSize > 0) fileSize else file.length()
+
         onEvent(TransferEvent.Started(
             transferId = transferId,
             direction  = "send",
             peerId     = "",
             peerName   = senderName,
             fileName   = fileName,
-            fileSize   = fileSize,
+            fileSize   = actualFileSize,
             status     = "connecting"
         ))
 
@@ -59,7 +63,7 @@ class TransferClient(
             val inp = sock.getInputStream()
 
             // ── 1. Send JSON header ───────────────────────────────────────────
-            val header = buildHeader() + "\n"
+            val header = buildHeader(actualFileSize) + "\n"
             out.write(header.toByteArray(Charsets.UTF_8))
             out.flush()
 
@@ -78,14 +82,11 @@ class TransferClient(
                 peerId     = "",
                 peerName   = senderName,
                 fileName   = fileName,
-                fileSize   = fileSize,
+                fileSize   = actualFileSize,
                 status     = "active"
             ))
 
             // ── 3. Stream file, emitting progress from sender side ────────────
-            val file = File(filePath)
-            // Use actual file size from disk — guards against fileSize=0 from JS
-            val actualFileSize = if (fileSize > 0) fileSize else file.length()
             var bytesSent = 0L
             var lastProgressTime = System.currentTimeMillis()
             var lastProgressBytes = 0L
@@ -166,12 +167,12 @@ class TransferClient(
         }
     }
 
-    private fun buildHeader(): String = org.json.JSONObject().apply {
+    private fun buildHeader(actualFileSize: Long): String = org.json.JSONObject().apply {
         put("transferId",      transferId)
         put("senderDeviceId",  senderDeviceId)
         put("senderName",      senderName)
         put("fileName",        fileName)
-        put("fileSize",        fileSize)
+        put("fileSize",        actualFileSize)   // use actual size, not the JS-supplied one
         put("checksum",        computeChecksum())
     }.toString()
 
