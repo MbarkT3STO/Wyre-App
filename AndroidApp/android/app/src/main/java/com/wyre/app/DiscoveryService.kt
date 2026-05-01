@@ -47,7 +47,8 @@ class DiscoveryService(
     @Volatile private var running = false
 
     fun start() {
-        if (running) return        running = true
+        if (running) return
+        running = true
         startBroadcasting()
         startListening()
         startEviction()
