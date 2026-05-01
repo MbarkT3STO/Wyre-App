@@ -92,8 +92,12 @@ export const AppBridge = {
     WyrePlugin.clearHistory(),
 
   // ── File picker ───────────────────────────────────────────────────────────
-  pickFile: (): Promise<{ path: string; name: string; size: number } | null> =>
-    WyrePlugin.pickFile(),
+  pickFiles: async (): Promise<Array<{ path: string; name: string; size: number }>> => {
+    const result = await WyrePlugin.pickFile();
+    if (!result || !('files' in result)) return [];
+    const files = (result as unknown as { files: Array<{ path: string; name: string; size: number }> }).files;
+    return Array.isArray(files) ? files : [];
+  },
 
   // ── Shell actions ─────────────────────────────────────────────────────────
   openFile: (path: string): Promise<void> =>

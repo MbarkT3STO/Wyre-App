@@ -1,13 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Wyre launcher icon foreground — purple "W" on transparent background -->
+<!-- Wyre launcher icon foreground — white "W" lettermark -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Letter W -->
+    <!--
+      W shape: two V strokes joined at the center.
+      Points: start top-left, go down-center-left, up-center, down-center-right, up top-right
+    -->
     <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M20,28 L32,28 L54,72 L76,28 L88,28 L62,82 L46,82 Z" />
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="7"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M18,28 L32,76 L54,44 L76,76 L90,28" />
 </vector>

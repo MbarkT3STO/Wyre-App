@@ -84,7 +84,7 @@ export interface WyrePluginInterface {
   clearHistory(): Promise<void>;
 
   // ── File picker ───────────────────────────────────────────────────────────
-  pickFile(): Promise<{ path: string; name: string; size: number } | null>;
+  pickFile(): Promise<{ files: Array<{ path: string; name: string; size: number }> }>;
 
   // ── Shell actions ─────────────────────────────────────────────────────────
   openFile(options: { path: string }): Promise<void>;

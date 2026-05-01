@@ -286,8 +286,9 @@
 
 .home-view__send-btn {
   flex: 1;
-  height: 48px;
+  height: 56px;
   font-size: var(--text-md);
+  font-weight: var(--weight-bold);
   border-radius: var(--radius-lg);
 }
 
@@ -752,4 +753,25 @@
   border-radius: var(--radius-full);
   box-shadow: var(--nm-pressed);
   flex-shrink: 0;
+}
+
+/* ── Received file save path ─────────────────────────────────────────────── */
+.transfer-item__saved-path {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  margin-top: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.transfer-item__saved-path span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

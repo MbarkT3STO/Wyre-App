@@ -152,12 +152,14 @@ export class HomeView extends Component {
   }
 
   private async handlePickFile(): Promise<void> {
-    const file = await AppBridge.pickFile();
-    if (!file) return;
+    const files = await AppBridge.pickFiles();
+    if (!files || files.length === 0) return;
 
-    // Deduplicate
-    if (!this.selectedFiles.find(f => f.path === file.path)) {
-      this.selectedFiles.push(file);
+    for (const file of files) {
+      // Deduplicate by path
+      if (!this.selectedFiles.find(f => f.path === file.path)) {
+        this.selectedFiles.push(file);
+      }
     }
 
     this.renderFileList();

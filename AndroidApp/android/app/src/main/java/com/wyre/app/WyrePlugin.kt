@@ -135,11 +135,14 @@ class WyrePlugin : Plugin() {
 
     @PluginMethod
     fun pickFile(call: PluginCall) {
-        manager.pickFile(activity) { file ->
-            if (file == null) {
-                call.resolve(JSObject())
+        manager.pickFile(activity) { result ->
+            if (result == null) {
+                // User cancelled — resolve with empty files array
+                val empty = JSObject()
+                empty.put("files", JSArray())
+                call.resolve(empty)
             } else {
-                call.resolve(file)
+                call.resolve(result)
             }
         }
     }

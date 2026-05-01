@@ -121,10 +121,14 @@ export class TransferItem extends Component {
         ${isActive ? `<button class="btn btn--danger btn--sm transfer-item__cancel" data-id="${t.id}">
           <i class="fa-solid fa-xmark btn__icon"></i> Cancel
         </button>` : ''}
-        ${t.status === TransferStatus.Completed && savedPath ? `
+      ${t.status === TransferStatus.Completed && savedPath ? `
           <button class="btn btn--ghost btn--sm transfer-item__open-file" data-path="${escapeHtml(savedPath)}">
             <i class="fa-solid fa-arrow-up-right-from-square btn__icon"></i> Open
           </button>
+          <div class="transfer-item__saved-path" title="${escapeHtml(savedPath)}">
+            <i class="fa-solid fa-folder btn__icon"></i>
+            <span>${escapeHtml(savedPath.split('/').slice(-2).join('/'))}</span>
+          </div>
         ` : ''}
       </div>
     `;

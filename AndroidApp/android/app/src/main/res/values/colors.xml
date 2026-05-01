@@ -4,6 +4,6 @@
     <color name="colorPrimary">#7C3AED</color>
     <color name="colorPrimaryDark">#5B21B6</color>
     <color name="colorAccent">#A855F7</color>
-    <!-- Launcher icon background — matches app dark background -->
-    <color name="ic_launcher_background">#121214</color>
+    <!-- Launcher icon background — Wyre purple accent -->
+    <color name="ic_launcher_background">#7C3AED</color>
 </resources>

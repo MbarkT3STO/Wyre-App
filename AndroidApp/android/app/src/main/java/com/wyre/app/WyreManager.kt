@@ -153,10 +153,10 @@ class WyreManager(
 
     fun pickFile(activity: Activity, callback: (JSObject?) -> Unit) {
         pickFileCallback = callback
-        val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             type = "*/*"
             addCategory(Intent.CATEGORY_OPENABLE)
-            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, false)
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
         }
         activity.startActivityForResult(intent, REQUEST_CODE_PICK_FILE)
     }
@@ -165,9 +165,31 @@ class WyreManager(
     fun handlePickFileResult(resultCode: Int, data: android.content.Intent?) {
         val callback = pickFileCallback ?: return
         pickFileCallback = null
-        if (resultCode != Activity.RESULT_OK) { callback(null); return }
-        val uri = data?.data ?: run { callback(null); return }
-        callback(resolveUri(uri))
+
+        if (resultCode != Activity.RESULT_OK || data == null) {
+            callback(null); return
+        }
+
+        // Collect all selected URIs (single or multiple)
+        val uris = mutableListOf<Uri>()
+        val clipData = data.clipData
+        if (clipData != null) {
+            for (i in 0 until clipData.itemCount) uris.add(clipData.getItemAt(i).uri)
+        } else {
+            data.data?.let { uris.add(it) }
+        }
+
+        if (uris.isEmpty()) { callback(null); return }
+
+        // Return first file info (JS side loops and calls again for more)
+        // We return all files as a JSON array in a wrapper object
+        val filesArray = com.getcapacitor.JSArray()
+        for (uri in uris) {
+            resolveUri(uri)?.let { filesArray.put(it) }
+        }
+        val result = JSObject()
+        result.put("files", filesArray)
+        callback(result)
     }
 
     // ── Shell ─────────────────────────────────────────────────────────────────
