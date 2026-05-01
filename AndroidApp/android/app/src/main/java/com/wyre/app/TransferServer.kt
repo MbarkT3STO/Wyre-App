@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
+import androidx.annotation.RequiresApi
 import java.io.File
 import java.io.OutputStream
 import java.net.ServerSocket
@@ -215,47 +216,100 @@ class TransferServer(
     /**
      * Opens an OutputStream for saving a received file.
      * Returns (stream, displayPath, cleanupFn) or null on failure.
-     * On API 29+ uses MediaStore (saves to public Downloads, visible in Files app).
-     * On older APIs writes directly to the saveDir path.
+     *
+     * Strategy:
+     * - If saveDir is the public Downloads folder → use MediaStore (always visible)
+     * - If saveDir is a custom path the user picked via ACTION_OPEN_DOCUMENT_TREE
+     *   → write directly to the file path (we have a persisted URI permission)
+     * - On API < 29 → always write directly
      */
     private fun openOutputStream(fileName: String, saveDir: String): Triple<OutputStream, String, () -> Unit>? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Android 10+ — use MediaStore Downloads collection
-            val values = ContentValues().apply {
-                put(MediaStore.Downloads.DISPLAY_NAME, fileName)
-                put(MediaStore.Downloads.MIME_TYPE, guessMime(fileName))
-                put(MediaStore.Downloads.IS_PENDING, 1)
+        val publicDownloads = android.os.Environment
+            .getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+            .absolutePath
+
+        val isPublicDownloads = saveDir.trimEnd('/') == publicDownloads.trimEnd('/')
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && isPublicDownloads) {
+            // Default Downloads folder on API 29+ — use MediaStore so the file
+            // is immediately visible in the Files app without a media scan
+            openViaMediaStore(fileName, "Download")
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isPublicDownloads) {
+            // Custom folder on API 29+ — derive a relative path from the absolute path
+            // e.g. /storage/emulated/0/Documents/Wyre → "Documents/Wyre"
+            val relativePath = absoluteToRelativePath(saveDir)
+            if (relativePath != null) {
+                openViaMediaStore(fileName, relativePath)
+            } else {
+                // Fallback: write directly (works if we have a persisted tree permission)
+                openDirectly(fileName, saveDir)
             }
-            val resolver = context.contentResolver
-            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-                ?: return null
-            val stream = resolver.openOutputStream(uri) ?: return null
-            val displayPath = "/storage/emulated/0/Download/$fileName"
-            val cleanup: () -> Unit = {
-                resolver.delete(uri, null, null)
-                Unit
-            }
-            // Mark as not pending when done (called after stream closes)
-            // We do this in the complete path by updating the URI
-            Triple(object : OutputStream() {
-                override fun write(b: Int) = stream.write(b)
-                override fun write(b: ByteArray, off: Int, len: Int) = stream.write(b, off, len)
-                override fun flush() = stream.flush()
-                override fun close() {
-                    stream.close()
-                    // Mark file as available
-                    val update = ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }
-                    resolver.update(uri, update, null, null)
-                }
-            }, displayPath, cleanup)
         } else {
-            // Android 9 and below — write directly
+            // API < 29 — write directly to the path
+            openDirectly(fileName, saveDir)
+        }
+    }
+
+    /** Save via MediaStore — file appears in Files app immediately, no media scan needed */
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun openViaMediaStore(fileName: String, relativePath: String): Triple<OutputStream, String, () -> Unit>? {
+        val resolver = context.contentResolver
+
+        // Use the general Files collection — works for any folder, not just Downloads
+        val collection = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+            put(MediaStore.MediaColumns.MIME_TYPE, guessMime(fileName))
+            put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath.trimEnd('/') + "/")
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+
+        val uri = resolver.insert(collection, values) ?: return null
+        val stream = resolver.openOutputStream(uri) ?: run {
+            resolver.delete(uri, null, null)
+            return null
+        }
+
+        val displayPath = "/storage/emulated/0/${relativePath.trimEnd('/')}/$fileName"
+        val cleanup: () -> Unit = { resolver.delete(uri, null, null); Unit }
+
+        return Triple(object : OutputStream() {
+            override fun write(b: Int) = stream.write(b)
+            override fun write(b: ByteArray, off: Int, len: Int) = stream.write(b, off, len)
+            override fun flush() = stream.flush()
+            override fun close() {
+                stream.close()
+                val update = ContentValues().apply {
+                    put(MediaStore.MediaColumns.IS_PENDING, 0)
+                }
+                resolver.update(uri, update, null, null)
+            }
+        }, displayPath, cleanup)
+    }
+
+    /** Write directly to a file path — used for custom folders and API < 29 */
+    private fun openDirectly(fileName: String, saveDir: String): Triple<OutputStream, String, () -> Unit>? {
+        return try {
             val dir = File(saveDir)
             dir.mkdirs()
             val file = uniquePath(File(dir, fileName))
             val stream = file.outputStream()
             Triple(stream, file.absolutePath, { file.delete(); Unit })
-        }
+        } catch (_: Exception) { null }
+    }
+
+    /**
+     * Converts an absolute path to a MediaStore relative path.
+     * /storage/emulated/0/Documents/Wyre  →  "Documents/Wyre"
+     * /storage/emulated/0/Download        →  "Download"
+     * Returns null if the path is not under primary storage.
+     */
+    private fun absoluteToRelativePath(absPath: String): String? {
+        val primaryRoot = "/storage/emulated/0/"
+        return if (absPath.startsWith(primaryRoot)) {
+            absPath.removePrefix(primaryRoot).trimEnd('/')
+        } else null
     }
 
     private fun guessMime(fileName: String): String {
