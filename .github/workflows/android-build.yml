@@ -68,6 +68,24 @@ jobs:
         working-directory: AndroidApp
         run: ./node_modules/.bin/cap sync android
 
+      # ── 9. Generate launcher PNG icons from icon.png ───────────────────────
+      - name: Generate launcher icons
+        run: |
+          SRC="AndroidApp/assets/icons/icon.png"
+          RES="AndroidApp/android/app/src/main/res"
+          for DENSITY in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            case $DENSITY in
+              mdpi)     SIZE=48  ;;
+              hdpi)     SIZE=72  ;;
+              xhdpi)    SIZE=96  ;;
+              xxhdpi)   SIZE=144 ;;
+              xxxhdpi)  SIZE=192 ;;
+            esac
+            mkdir -p "$RES/mipmap-$DENSITY"
+            convert "$SRC" -resize "${SIZE}x${SIZE}" "$RES/mipmap-$DENSITY/ic_launcher.png"
+            cp "$RES/mipmap-$DENSITY/ic_launcher.png" "$RES/mipmap-$DENSITY/ic_launcher_round.png"
+          done
+
       # ── 9. Gradle wrapper jar ──────────────────────────────────────────────
       - name: Download Gradle wrapper jar
         working-directory: AndroidApp/android

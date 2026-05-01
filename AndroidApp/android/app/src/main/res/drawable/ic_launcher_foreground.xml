@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Wyre launcher icon foreground — purple "W" on transparent background -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Letter W -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,28 L32,28 L54,72 L76,28 L88,28 L62,82 L46,82 Z" />
+</vector>
