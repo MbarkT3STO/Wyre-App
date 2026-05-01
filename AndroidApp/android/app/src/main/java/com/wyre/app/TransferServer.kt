@@ -218,34 +218,25 @@ class TransferServer(
      * Returns (stream, displayPath, cleanupFn) or null on failure.
      *
      * Strategy:
-     * - If saveDir is the public Downloads folder → use MediaStore (always visible)
-     * - If saveDir is a custom path the user picked via ACTION_OPEN_DOCUMENT_TREE
-     *   → write directly to the file path (we have a persisted URI permission)
-     * - On API < 29 → always write directly
+     * - Default Downloads folder on API 29+ → MediaStore (immediately visible in Files app)
+     * - Any custom folder → write directly to the path
+     *   (user granted permission via ACTION_OPEN_DOCUMENT_TREE, or API < 29)
      */
     private fun openOutputStream(fileName: String, saveDir: String): Triple<OutputStream, String, () -> Unit>? {
         val publicDownloads = android.os.Environment
             .getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
             .absolutePath
 
-        val isPublicDownloads = saveDir.trimEnd('/') == publicDownloads.trimEnd('/')
+        val isDefaultDownloads = saveDir.trimEnd('/') == publicDownloads.trimEnd('/')
 
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && isPublicDownloads) {
-            // Default Downloads folder on API 29+ — use MediaStore so the file
-            // is immediately visible in the Files app without a media scan
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && isDefaultDownloads) {
+            // Default Downloads on API 29+ — use MediaStore so file is visible immediately
             openViaMediaStore(fileName, "Download")
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !isPublicDownloads) {
-            // Custom folder on API 29+ — derive a relative path from the absolute path
-            // e.g. /storage/emulated/0/Documents/Wyre → "Documents/Wyre"
-            val relativePath = absoluteToRelativePath(saveDir)
-            if (relativePath != null) {
-                openViaMediaStore(fileName, relativePath)
-            } else {
-                // Fallback: write directly (works if we have a persisted tree permission)
-                openDirectly(fileName, saveDir)
-            }
+                ?: openDirectly(fileName, saveDir) // fallback if MediaStore fails
         } else {
-            // API < 29 — write directly to the path
+            // Custom folder or API < 29 — write directly
+            // The user granted write permission via ACTION_OPEN_DOCUMENT_TREE,
+            // or we're on an older API where direct writes are always allowed.
             openDirectly(fileName, saveDir)
         }
     }
@@ -297,19 +288,6 @@ class TransferServer(
             val stream = file.outputStream()
             Triple(stream, file.absolutePath, { file.delete(); Unit })
         } catch (_: Exception) { null }
-    }
-
-    /**
-     * Converts an absolute path to a MediaStore relative path.
-     * /storage/emulated/0/Documents/Wyre  →  "Documents/Wyre"
-     * /storage/emulated/0/Download        →  "Download"
-     * Returns null if the path is not under primary storage.
-     */
-    private fun absoluteToRelativePath(absPath: String): String? {
-        val primaryRoot = "/storage/emulated/0/"
-        return if (absPath.startsWith(primaryRoot)) {
-            absPath.removePrefix(primaryRoot).trimEnd('/')
-        } else null
     }
 
     private fun guessMime(fileName: String): String {
