@@ -24,7 +24,7 @@ const ICONS = {
   folder:        `<i class="fa-solid fa-folder-open"></i>`,
   port:          `<i class="fa-solid fa-plug"></i>`,
   scale:         `<i class="fa-solid fa-magnifying-glass"></i>`,
-  trusted:       `<i class="fa-solid fa-shield-check"></i>`,
+  trusted:       `<i class="fa-solid fa-shield-halved"></i>`,
   diagnostics:   `<i class="fa-solid fa-stethoscope"></i>`,
 };
 
@@ -211,7 +211,7 @@ export class SettingsView extends Component {
                 ${this.renderDeviceOptions(s.trustedDeviceIds)}
               </select>
               <button class="btn btn--primary btn--sm" id="trust-device-btn">
-                <i class="fa-solid fa-shield-check btn__icon"></i>
+                <i class="fa-solid fa-shield-halved btn__icon"></i>
                 Trust this device
               </button>
             </div>
@@ -365,7 +365,7 @@ export class SettingsView extends Component {
     }
     return trustedIds.map(id => `
       <div class="settings-view__trusted-item">
-        <i class="fa-solid fa-shield-check settings-view__trusted-icon"></i>
+        <i class="fa-solid fa-shield-halved settings-view__trusted-icon"></i>
         <span class="settings-view__trusted-id" title="${escapeHtml(id)}">…${escapeHtml(id.slice(-8))}</span>
         <button class="settings-view__trusted-remove btn btn--ghost btn--sm"
           aria-label="Remove trusted device ${escapeHtml(id.slice(-8))}"

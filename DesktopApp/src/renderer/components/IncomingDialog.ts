@@ -49,12 +49,9 @@ export class IncomingDialog extends Component {
             <circle class="incoming-dialog__ring-track" cx="50" cy="50" r="44"/>
             <circle class="incoming-dialog__ring-fill" cx="50" cy="50" r="44"/>
           </svg>
-          <div class="incoming-dialog__avatar">
-            <span class="incoming-dialog__initial">${escapeHtml(initial)}</span>
-          </div>
+          <span class="incoming-dialog__initial">${escapeHtml(initial)}</span>
           <span class="incoming-dialog__countdown" aria-live="polite">${this.remaining}</span>
         </div>
-
         <div class="incoming-dialog__body">
           <h2 class="incoming-dialog__title">
             <span>${escapeHtml(senderName)}</span> wants to send you a file

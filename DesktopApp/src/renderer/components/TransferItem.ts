@@ -139,7 +139,6 @@ export class TransferItem extends Component {
           </div>
           <div class="transfer-item__progress-stats">
             <span class="transfer-item__progress-pct">${t.status === TransferStatus.Connecting ? '—' : `${progress}%`}</span>
-            ${speed > 0 ? `<span class="transfer-item__size">${formatSpeed(speed)} · ${formatEta(eta)} left</span>` : ''}
           </div>
         </div>
       ` : ''}
