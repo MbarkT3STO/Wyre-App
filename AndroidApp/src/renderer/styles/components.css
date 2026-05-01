@@ -396,7 +396,7 @@
 
 /* Selected */
 .device-card--selected {
-  box-shadow: var(--nm-pressed), 0 0 0 2px var(--accent-mid), 0 4px 24px var(--accent-glow);
+  box-shadow: var(--nm-pressed), 0 0 0 2px var(--accent-mid), 0 3px 12px rgba(124, 58, 237, 0.2);
   transform: translateY(-3px);
 }
 .device-card--selected::before { opacity: 1; }
@@ -424,11 +424,12 @@
   font-weight: var(--weight-bold);
   color: #fff;
   letter-spacing: -0.02em;
-  box-shadow: 0 4px 18px var(--accent-glow-sm);
+  /* Reduced glow — subtle shadow only */
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.25);
   transition: box-shadow var(--transition);
 }
 .device-card--selected .device-card__initial {
-  box-shadow: 0 4px 24px var(--accent-glow);
+  box-shadow: 0 3px 12px rgba(124, 58, 237, 0.35);
 }
 
 .device-card__platform-icon {
@@ -456,7 +457,8 @@
   border-radius: 50%;
   background: var(--success);
   border: 2px solid var(--bg-card);
-  box-shadow: 0 0 7px var(--success-glow);
+  /* Reduced glow on online dot */
+  box-shadow: 0 0 4px rgba(52, 199, 89, 0.4);
   animation: pulse 2.5s ease-in-out infinite;
 }
 
@@ -1157,8 +1159,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 6px 32px var(--accent-glow), 0 0 0 3px var(--accent-200);
-  animation: glowPulse 2.5s ease-in-out infinite;
+  /* Reduced glow — subtle ring only, no pulsing animation */
+  box-shadow: 0 3px 14px var(--accent-glow-sm), 0 0 0 2px var(--accent-100);
 }
 
 .incoming-dialog__countdown-ring {

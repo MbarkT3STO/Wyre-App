@@ -1,5 +1,6 @@
 /**
- * IncomingDialog.ts — adapted for Android (uses AppBridge instead of IpcClient).
+ * IncomingDialog.ts — Android version.
+ * Accept/Decline modal with optional save-location picker.
  */
 
 import { Component } from './base/Component';
@@ -15,6 +16,8 @@ export class IncomingDialog extends Component {
   private svgCircle: SVGCircleElement | null = null;
   private countdownEl: HTMLElement | null = null;
   private readonly circumference = 2 * Math.PI * 44;
+  /** Custom save path chosen by the user — null means use default */
+  private customSavePath: string | null = null;
 
   constructor(request: IncomingRequestEvent, timeoutSeconds = 30) {
     super();
@@ -34,6 +37,7 @@ export class IncomingDialog extends Component {
 
     backdrop.innerHTML = `
       <div class="incoming-dialog">
+
         <div class="incoming-dialog__avatar-wrap">
           <svg class="incoming-dialog__countdown-ring" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -49,10 +53,12 @@ export class IncomingDialog extends Component {
           <span class="incoming-dialog__initial">${escapeHtml(initial)}</span>
           <span class="incoming-dialog__countdown" aria-live="polite">${this.remaining}</span>
         </div>
+
         <div class="incoming-dialog__body">
           <h2 class="incoming-dialog__title">
             <span>${escapeHtml(senderName)}</span> wants to send you a file
           </h2>
+
           <div class="incoming-dialog__file-row">
             <div class="incoming-dialog__file-icon">
               <i class="fa-solid fa-file-lines"></i>
@@ -62,7 +68,19 @@ export class IncomingDialog extends Component {
               <span class="incoming-dialog__file-size">${formatFileSize(fileSize)}</span>
             </div>
           </div>
+
+          <!-- Save location row -->
+          <div class="incoming-dialog__save-row">
+            <div class="incoming-dialog__save-info">
+              <i class="fa-solid fa-folder incoming-dialog__save-icon"></i>
+              <span class="incoming-dialog__save-path" id="save-path-label">Downloads</span>
+            </div>
+            <button class="incoming-dialog__save-change" id="change-save-btn" type="button">
+              Change
+            </button>
+          </div>
         </div>
+
         <div class="incoming-dialog__actions">
           <button class="incoming-dialog__decline" type="button">Decline</button>
           <button class="incoming-dialog__accept" type="button">
@@ -70,6 +88,7 @@ export class IncomingDialog extends Component {
             Accept
           </button>
         </div>
+
       </div>
     `;
 
@@ -92,6 +111,8 @@ export class IncomingDialog extends Component {
       ?.addEventListener('click', () => { void this.handleAccept(); });
     this.element.querySelector('.incoming-dialog__decline')
       ?.addEventListener('click', () => { void this.handleDecline(); });
+    this.element.querySelector('#change-save-btn')
+      ?.addEventListener('click', () => { void this.handleChangeSaveLocation(); });
 
     (this.element.querySelector('.incoming-dialog__accept') as HTMLElement)?.focus();
   }
@@ -109,8 +130,49 @@ export class IncomingDialog extends Component {
     }
   }
 
+  private async handleChangeSaveLocation(): Promise<void> {
+    // Pause the countdown while the picker is open
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+      this.countdownInterval = null;
+    }
+
+    try {
+      // Use the file picker to select a folder — pick any file in the target folder
+      // then extract the directory path from it
+      const files = await AppBridge.pickFiles();
+      if (files.length > 0 && files[0]) {
+        const filePath = files[0].path;
+        // Extract directory from the picked file path
+        const dir = filePath.substring(0, filePath.lastIndexOf('/'));
+        if (dir) {
+          this.customSavePath = dir;
+          const label = this.element?.querySelector('#save-path-label');
+          if (label) {
+            // Show last two path segments for readability
+            const parts = dir.split('/').filter(Boolean);
+            label.textContent = parts.slice(-2).join('/') || dir;
+          }
+        }
+      }
+    } catch (_) {
+      // User cancelled — keep existing path
+    }
+
+    // Resume countdown
+    this.countdownInterval = setInterval(() => {
+      this.remaining--;
+      this.updateCountdown();
+      if (this.remaining <= 0) void this.handleDecline();
+    }, 1000);
+  }
+
   private async handleAccept(): Promise<void> {
     this.cleanup();
+    // If user picked a custom save location, update settings first
+    if (this.customSavePath) {
+      await AppBridge.setSettings({ saveDirectory: this.customSavePath });
+    }
     await AppBridge.respondToIncoming({ transferId: this.request.transferId, accepted: true });
     this.unmount();
   }

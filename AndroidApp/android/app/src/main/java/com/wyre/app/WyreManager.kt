@@ -79,6 +79,7 @@ class WyreManager(
 
     fun setSettings(data: JSONObject) {
         if (data.has("deviceName"))         settings.setString("deviceName",         data.getString("deviceName"))
+        if (data.has("saveDirectory"))      settings.setString("saveDirectory",      data.getString("saveDirectory"))
         if (data.has("theme"))              settings.setString("theme",              data.getString("theme"))
         if (data.has("autoAccept"))         settings.setBoolean("autoAccept",        data.getBoolean("autoAccept"))
         if (data.has("autoDeclineTimeout")) settings.setInt("autoDeclineTimeout",    data.getInt("autoDeclineTimeout"))
