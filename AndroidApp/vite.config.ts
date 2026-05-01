@@ -12,10 +12,13 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    assetsDir: 'assets',
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
       },
     },
   },
+  // Make the icon available as a static asset
+  publicDir: 'public',
 });

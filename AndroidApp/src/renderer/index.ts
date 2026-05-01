@@ -107,7 +107,7 @@ function buildShell(deviceName: string): string {
     <header class="android-header" role="banner">
       <div class="android-header__brand">
         <div class="android-header__logo">
-          <img src="assets/icons/icon.png" alt="Wyre" draggable="false" />
+          <img src="icons/icon.png" alt="Wyre" draggable="false" />
         </div>
         <span class="android-header__title">Wyre</span>
       </div>
