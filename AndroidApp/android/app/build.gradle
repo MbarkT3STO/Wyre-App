@@ -13,34 +13,11 @@ android {
         versionName "1.0.0"
     }
 
-    // Read signing config from environment variables (set by GitHub Actions secrets)
-    def keystorePath     = System.getenv("KEYSTORE_PATH")     ?: ""
-    def keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
-    def keyAlias         = System.getenv("KEY_ALIAS")         ?: ""
-    def keyPassword      = System.getenv("KEY_PASSWORD")      ?: ""
-
-    signingConfigs {
-        release {
-            if (keystorePath) {
-                storeFile     file(keystorePath)
-                storePassword keystorePassword
-                keyAlias      keyAlias
-                keyPassword   keyPassword
-            }
-        }
-    }
-
     buildTypes {
         debug {
-            applicationIdSuffix ".debug"
-            versionNameSuffix "-debug"
-        }
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            if (keystorePath) {
-                signingConfig signingConfigs.release
-            }
+            // Debug builds are self-signed by Android toolchain automatically.
+            // No keystore needed for sideloading.
+            debuggable true
         }
     }
 
