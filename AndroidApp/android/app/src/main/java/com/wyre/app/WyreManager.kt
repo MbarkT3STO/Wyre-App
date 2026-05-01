@@ -148,11 +148,13 @@ class WyreManager(
     fun clearHistory() { synchronized(history) { history.clear() } }
 
     // ── File picker ───────────────────────────────────────────────────────────
-    // Store callback for activity result
-    private var pickFileCallback: ((JSObject?) -> Unit)? = null
+    private var pendingPickCall: PluginCall? = null
 
-    fun pickFile(activity: Activity, callback: (JSObject?) -> Unit) {
-        pickFileCallback = callback
+    fun registerPickCall(call: PluginCall) {
+        pendingPickCall = call
+    }
+
+    fun launchFilePicker(activity: Activity) {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             type = "*/*"
             addCategory(Intent.CATEGORY_OPENABLE)
@@ -163,14 +165,17 @@ class WyreManager(
 
     /** Called from WyrePlugin.handleOnActivityResult */
     fun handlePickFileResult(resultCode: Int, data: android.content.Intent?) {
-        val callback = pickFileCallback ?: return
-        pickFileCallback = null
+        val call = pendingPickCall ?: return
+        pendingPickCall = null
 
         if (resultCode != Activity.RESULT_OK || data == null) {
-            callback(null); return
+            val empty = JSObject()
+            empty.put("files", com.getcapacitor.JSArray())
+            call.resolve(empty)
+            return
         }
 
-        // Collect all selected URIs (single or multiple)
+        // Collect all selected URIs
         val uris = mutableListOf<Uri>()
         val clipData = data.clipData
         if (clipData != null) {
@@ -179,17 +184,23 @@ class WyreManager(
             data.data?.let { uris.add(it) }
         }
 
-        if (uris.isEmpty()) { callback(null); return }
-
-        // Return first file info (JS side loops and calls again for more)
-        // We return all files as a JSON array in a wrapper object
-        val filesArray = com.getcapacitor.JSArray()
-        for (uri in uris) {
-            resolveUri(uri)?.let { filesArray.put(it) }
+        if (uris.isEmpty()) {
+            val empty = JSObject()
+            empty.put("files", com.getcapacitor.JSArray())
+            call.resolve(empty)
+            return
         }
-        val result = JSObject()
-        result.put("files", filesArray)
-        callback(result)
+
+        // Do file copying on background thread to avoid blocking the UI
+        executor.submit {
+            val filesArray = com.getcapacitor.JSArray()
+            for (uri in uris) {
+                resolveUri(uri)?.let { filesArray.put(it) }
+            }
+            val result = JSObject()
+            result.put("files", filesArray)
+            call.resolve(result)
+        }
     }
 
     // ── Shell ─────────────────────────────────────────────────────────────────
@@ -312,26 +323,36 @@ class WyreManager(
     private fun resolveUri(uri: Uri): JSObject? {
         return try {
             val cursor = context.contentResolver.query(uri, null, null, null, null) ?: return null
+            var name = "file"
+            var size = 0L
             cursor.use {
-                if (!it.moveToFirst()) return null
-                val nameIdx = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                val sizeIdx = it.getColumnIndex(OpenableColumns.SIZE)
-                val name = if (nameIdx >= 0) it.getString(nameIdx) else "file"
-                val size = if (sizeIdx >= 0) it.getLong(sizeIdx) else 0L
-
-                // Copy to cache so we have a real file path
-                val cacheFile = File(context.cacheDir, name)
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    cacheFile.outputStream().use { out -> input.copyTo(out) }
+                if (it.moveToFirst()) {
+                    val nameIdx = it.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    val sizeIdx = it.getColumnIndex(OpenableColumns.SIZE)
+                    if (nameIdx >= 0) name = it.getString(nameIdx) ?: "file"
+                    if (sizeIdx >= 0) size = it.getLong(sizeIdx)
                 }
-
-                val obj = JSObject()
-                obj.put("path", cacheFile.absolutePath)
-                obj.put("name", name)
-                obj.put("size", size)
-                obj
             }
-        } catch (e: Exception) { null }
+
+            // Sanitize filename
+            name = name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim()
+            if (name.isEmpty()) name = "file"
+
+            // Copy to cache dir so we have a stable file path
+            val cacheFile = File(context.cacheDir, name)
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                cacheFile.outputStream().use { out -> input.copyTo(out) }
+            }
+
+            val obj = JSObject()
+            obj.put("path", cacheFile.absolutePath)
+            obj.put("name", name)
+            obj.put("size", if (size > 0) size else cacheFile.length())
+            obj
+        } catch (e: Exception) {
+            android.util.Log.e("WyreManager", "resolveUri failed: ${e.message}", e)
+            null
+        }
     }
 
     private fun getDownloadsDir(): String =

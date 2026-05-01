@@ -69,7 +69,7 @@ export class HomeView extends Component {
               </div>
               <div class="android-file-picker__list" id="file-picker-list" style="display:none"></div>
               <button class="android-file-picker__btn" id="pick-file-btn" aria-label="Pick files">
-                <i class="fa-solid fa-plus"></i>
+                <i class="fa-solid fa-folder-open"></i>
                 <span id="pick-btn-label">Pick Files</span>
               </button>
             </div>
@@ -129,6 +129,10 @@ export class HomeView extends Component {
     // File picker button
     const pickBtn = this.element.querySelector('#pick-file-btn') as HTMLButtonElement;
     pickBtn?.addEventListener('click', () => { void this.handlePickFile(); });
+
+    // Also make the empty state area tappable
+    const emptyArea = this.element.querySelector('#file-picker-empty') as HTMLElement;
+    emptyArea?.addEventListener('click', () => { void this.handlePickFile(); });
 
     // Queue updates
     void AppBridge.onTransferQueueUpdated((payload) => {

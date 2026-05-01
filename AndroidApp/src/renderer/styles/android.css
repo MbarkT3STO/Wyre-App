@@ -286,10 +286,12 @@
 
 .home-view__send-btn {
   flex: 1;
-  height: 56px;
+  height: 56px !important;
+  min-height: 56px !important;
   font-size: var(--text-md);
   font-weight: var(--weight-bold);
   border-radius: var(--radius-lg);
+  padding: 0 var(--sp-6) !important;
 }
 
 .home-view__queue-indicator {
@@ -418,20 +420,20 @@
   justify-content: center;
   gap: var(--sp-2);
   width: 100%;
-  height: 40px;
-  background: var(--bg-elevated);
-  border: none;
+  height: 52px;
+  background: var(--accent-soft);
+  border: 2px solid var(--accent-mid);
   border-radius: var(--radius-md);
   color: var(--accent-text);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
+  font-size: var(--text-base);
+  font-weight: var(--weight-bold);
   cursor: pointer;
   transition: all var(--transition-fast);
   -webkit-tap-highlight-color: transparent;
 }
 
 .android-file-picker__btn:active {
-  background: var(--accent-soft);
+  background: var(--accent-100);
   transform: scale(0.98);
 }
 

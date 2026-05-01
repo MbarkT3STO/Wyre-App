@@ -135,16 +135,10 @@ class WyrePlugin : Plugin() {
 
     @PluginMethod
     fun pickFile(call: PluginCall) {
-        manager.pickFile(activity) { result ->
-            if (result == null) {
-                // User cancelled — resolve with empty files array
-                val empty = JSObject()
-                empty.put("files", JSArray())
-                call.resolve(empty)
-            } else {
-                call.resolve(result)
-            }
-        }
+        // Save the call so we can resolve it from handleOnActivityResult
+        call.save()
+        manager.registerPickCall(call)
+        manager.launchFilePicker(activity)
     }
 
     // ── Shell actions ─────────────────────────────────────────────────────────
