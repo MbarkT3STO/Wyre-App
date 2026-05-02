@@ -1,6 +1,8 @@
 /**
  * Renderer entry point — Android version.
- * Bootstraps the app using AppBridge (Capacitor) instead of Electron IPC.
+ * Feature 2: clipboard received toast.
+ * Feature 3: selectedDeviceIds (multi-device).
+ * Feature 4: transferPaused event → Paused state.
  */
 
 import './styles/base.css';
@@ -26,39 +28,28 @@ const toasts = new ToastContainer();
 const router = new Router();
 
 async function bootstrap(): Promise<void> {
-  // Load initial settings
   const settings = await AppBridge.getSettings();
   StateManager.setState('settings', settings);
   themeEngine.apply(settings.theme);
 
-  // Load initial devices
   const devices = await AppBridge.getDevices();
   StateManager.setState('devices', devices);
 
-  // Load transfer history
   const history = await AppBridge.getHistory();
   StateManager.setState('transferHistory', history);
 
-  // Build the app shell
   const app = document.getElementById('app');
   if (!app) throw new Error('#app element not found');
 
   app.innerHTML = buildShell(settings.deviceName);
 
-  // Mount toast container
   const toastMount = document.getElementById('toast-mount');
   if (toastMount) toasts.mount(toastMount);
 
-  // Wire bottom nav
   wireNav();
-
-  // Wire IPC listeners
   await wireEventListeners();
-
-  // Wire custom events
   wireCustomEvents();
 
-  // Mount router
   const outlet = document.getElementById('router-outlet');
   if (!outlet) throw new Error('#router-outlet not found');
 
@@ -87,7 +78,6 @@ async function bootstrap(): Promise<void> {
 
   router.mount(outlet as HTMLElement);
 
-  // Update device name in header
   StateManager.subscribe('settings', (s) => {
     if (s) {
       const nameEl = document.getElementById('header-device-name');
@@ -100,10 +90,8 @@ function buildShell(deviceName: string): string {
   const initial = deviceName.charAt(0).toUpperCase();
 
   return `
-    <!-- Android status bar spacer (env safe area) -->
     <div class="android-status-bar"></div>
 
-    <!-- Top header bar -->
     <header class="android-header" role="banner">
       <div class="android-header__brand">
         <div class="android-header__logo">
@@ -117,10 +105,8 @@ function buildShell(deviceName: string): string {
       </div>
     </header>
 
-    <!-- Main content area -->
     <main class="android-content" id="router-outlet" role="main"></main>
 
-    <!-- Bottom navigation bar -->
     <nav class="android-bottom-nav" role="navigation" aria-label="Main navigation">
       <a href="#/home" class="android-bottom-nav__item android-bottom-nav__item--active"
          data-route="/home" role="menuitem" aria-label="Home">
@@ -146,25 +132,21 @@ function buildShell(deviceName: string): string {
 
 function wireNav(): void {
   const navItems = document.querySelectorAll('.android-bottom-nav__item');
-
   const updateActive = (route: string) => {
     navItems.forEach(item => {
       const itemRoute = (item as HTMLElement).dataset['route'];
       item.classList.toggle('android-bottom-nav__item--active', itemRoute === route);
     });
   };
-
   StateManager.subscribe('currentRoute', (route) => updateActive(route));
   updateActive(StateManager.get('currentRoute'));
 }
 
 async function wireEventListeners(): Promise<void> {
-  // Device updates
   const unsubDevices = await AppBridge.onDevicesUpdated(({ devices }) => {
     StateManager.setState('devices', devices);
   });
 
-  // Transfer started
   const unsubStarted = await AppBridge.onTransferStarted((payload) => {
     const existing = StateManager.get('activeTransfers').get(payload.transferId);
     if (!existing) {
@@ -195,7 +177,6 @@ async function wireEventListeners(): Promise<void> {
     }
   });
 
-  // Transfer progress
   const unsubProgress = await AppBridge.onTransferProgress((payload) => {
     const existing = StateManager.get('activeTransfers').get(payload.transferId);
     if (existing) {
@@ -227,7 +208,6 @@ async function wireEventListeners(): Promise<void> {
     }
   });
 
-  // Transfer complete
   const unsubComplete = await AppBridge.onTransferComplete((payload) => {
     const existing = StateManager.get('activeTransfers').get(payload.transferId);
     if (existing) {
@@ -250,7 +230,6 @@ async function wireEventListeners(): Promise<void> {
     void AppBridge.getHistory().then(h => StateManager.setState('transferHistory', h));
   });
 
-  // Transfer error
   const unsubError = await AppBridge.onTransferError((payload) => {
     const existing = StateManager.get('activeTransfers').get(payload.transferId);
     if (existing) {
@@ -268,27 +247,52 @@ async function wireEventListeners(): Promise<void> {
     void AppBridge.getHistory().then(h => StateManager.setState('transferHistory', h));
   });
 
-  // Incoming request
+  // Feature 4: transfer paused → update renderer state
+  const unsubPaused = await AppBridge.onTransferPaused((payload) => {
+    const existing = StateManager.get('activeTransfers').get(payload.transferId);
+    if (existing) {
+      StateManager.updateTransfer({
+        ...existing,
+        status: TransferStatus.Paused,
+        bytesTransferred: payload.bytesTransferred,
+        resumeOffset: payload.bytesTransferred,
+      });
+    }
+  });
+
   const unsubIncoming = await AppBridge.onIncomingRequest((payload) => {
     const queue = StateManager.get('pendingIncomingQueue');
     StateManager.setState('pendingIncomingQueue', [...queue, payload]);
     if (queue.length === 0) showIncomingDialog(payload);
   });
 
-  // Queue updates
   const unsubQueue = await AppBridge.onTransferQueueUpdated((payload) => {
     StateManager.setState('sendQueue', payload.queue);
   });
 
-  // Cleanup on unload
+  // Feature 2: clipboard received — show actionable info toast
+  const unsubClipboard = await AppBridge.onClipboardReceived(({ senderName, text, truncated }) => {
+    const preview  = text.length > 120 ? text.slice(0, 120) + '…' : text;
+    const truncNote = truncated ? ' (truncated to 5000 chars)' : '';
+    toasts.show({
+      type: 'info',
+      message: `${senderName}: "${preview}"${truncNote}`,
+      actionLabel: 'Copy',
+      onAction: () => { void navigator.clipboard.writeText(text); },
+      duration: 8000,
+    });
+  });
+
   window.addEventListener('unload', () => {
     unsubDevices();
     unsubStarted();
     unsubProgress();
     unsubComplete();
     unsubError();
+    unsubPaused();
     unsubIncoming();
     unsubQueue();
+    unsubClipboard();
   });
 }
 

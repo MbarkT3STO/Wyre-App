@@ -1,5 +1,6 @@
 /**
- * StateManager.ts — identical to desktop version, fully portable.
+ * StateManager.ts — Android version.
+ * Feature 3: selectedDeviceId → selectedDeviceIds (multi-device support).
  */
 
 import type { Device } from '../../shared/models/Device';
@@ -13,7 +14,8 @@ export interface AppState {
   transferHistory: TransferRecord[];
   settings: AppSettings | null;
   currentRoute: string;
-  selectedDeviceId: string | null;
+  /** Feature 3: multi-device selection */
+  selectedDeviceIds: string[];
   pendingIncomingQueue: IncomingRequestEvent[];
   sendQueue: TransferQueueUpdatedEvent['queue'];
   isLoading: boolean;
@@ -28,7 +30,7 @@ const initialState: AppState = {
   transferHistory: [],
   settings: null,
   currentRoute: '/home',
-  selectedDeviceId: null,
+  selectedDeviceIds: [],
   pendingIncomingQueue: [],
   sendQueue: [],
   isLoading: false,

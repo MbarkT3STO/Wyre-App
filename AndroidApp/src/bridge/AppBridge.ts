@@ -2,9 +2,6 @@
  * AppBridge.ts
  * Replaces Electron's IpcClient. All renderer code calls this instead of
  * window.api. Delegates to the native WyrePlugin via Capacitor.
- *
- * The API surface is intentionally identical to the desktop IpcClient so
- * the renderer components can be reused with minimal changes.
  */
 
 import { WyrePlugin } from './WyrePlugin';
@@ -14,8 +11,10 @@ import type {
   TransferProgressEvent,
   TransferCompleteEvent,
   TransferErrorEvent,
+  TransferPausedEvent,
   IncomingRequestEvent,
   TransferQueueUpdatedEvent,
+  ClipboardReceivedEvent,
 } from './WyrePlugin';
 import type { Device } from '../shared/models/Device';
 import type { AppSettings } from '../shared/models/AppSettings';
@@ -46,8 +45,18 @@ export const AppBridge = {
     return transferId;
   },
 
+  /** Feature 1: Zip a folder natively and send it */
+  sendFolder: async (options: { deviceId: string; folderPath: string; folderName: string }): Promise<string> => {
+    const { transferId } = await WyrePlugin.sendFolder(options);
+    return transferId;
+  },
+
   cancelTransfer: (options: { transferId: string }): Promise<void> =>
     WyrePlugin.cancelTransfer(options),
+
+  /** Feature 4: Resume a paused transfer */
+  resumeTransfer: (options: { transferId: string }): Promise<void> =>
+    WyrePlugin.resumeTransfer(options),
 
   respondToIncoming: (options: { transferId: string; accepted: boolean; savePath?: string }): Promise<void> =>
     WyrePlugin.respondToIncoming(options),
@@ -72,6 +81,12 @@ export const AppBridge = {
     return () => handle.remove();
   },
 
+  /** Feature 4: Transfer paused (resumable) */
+  onTransferPaused: async (cb: (data: TransferPausedEvent) => void): Promise<() => void> => {
+    const handle = await WyrePlugin.addListener('transferPaused', cb);
+    return () => handle.remove();
+  },
+
   onIncomingRequest: async (cb: (data: IncomingRequestEvent) => void): Promise<() => void> => {
     const handle = await WyrePlugin.addListener('incomingRequest', cb);
     return () => handle.remove();
@@ -79,6 +94,15 @@ export const AppBridge = {
 
   onTransferQueueUpdated: async (cb: (data: TransferQueueUpdatedEvent) => void): Promise<() => void> => {
     const handle = await WyrePlugin.addListener('transferQueueUpdated', cb);
+    return () => handle.remove();
+  },
+
+  // ── Clipboard (Feature 2) ─────────────────────────────────────────────────
+  sendClipboard: async (options: { deviceId: string; text: string }): Promise<void> =>
+    WyrePlugin.sendClipboard(options),
+
+  onClipboardReceived: async (cb: (data: ClipboardReceivedEvent) => void): Promise<() => void> => {
+    const handle = await WyrePlugin.addListener('clipboardReceived', cb);
     return () => handle.remove();
   },
 

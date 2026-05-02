@@ -1,14 +1,6 @@
 /**
  * WyrePlugin.ts
  * Typed Capacitor plugin interface for the native WyrePlugin (Java/Kotlin).
- *
- * The native plugin handles:
- *  - UDP broadcast / listen (device discovery)
- *  - TCP server / client (file transfer)
- *  - File I/O (read/write streams, SHA-256 checksum)
- *  - Settings persistence (SharedPreferences)
- *
- * All calls go through Capacitor.Plugins.WyrePlugin.
  */
 
 import { registerPlugin } from '@capacitor/core';
@@ -49,6 +41,11 @@ export interface TransferErrorEvent {
   code: string;
 }
 
+export interface TransferPausedEvent {
+  transferId: string;
+  bytesTransferred: number;
+}
+
 export interface IncomingRequestEvent {
   transferId: string;
   senderName: string;
@@ -60,6 +57,13 @@ export interface IncomingRequestEvent {
 
 export interface TransferQueueUpdatedEvent {
   queue: Array<{ fileName: string; fileSize: number; deviceId: string }>;
+}
+
+/** Feature 2: Clipboard text received from a peer */
+export interface ClipboardReceivedEvent {
+  senderName: string;
+  text: string;
+  truncated: boolean;
 }
 
 // ─── Plugin interface ─────────────────────────────────────────────────────────
@@ -76,8 +80,15 @@ export interface WyrePluginInterface {
 
   // ── File transfer ─────────────────────────────────────────────────────────
   sendFile(options: { deviceId: string; filePath: string; fileName: string; fileSize: number }): Promise<{ transferId: string }>;
+  /** Feature 1: Zip a folder on the native side and send it */
+  sendFolder(options: { deviceId: string; folderPath: string; folderName: string }): Promise<{ transferId: string }>;
   cancelTransfer(options: { transferId: string }): Promise<void>;
+  /** Feature 4: Resume a paused transfer from its last byte offset */
+  resumeTransfer(options: { transferId: string }): Promise<void>;
   respondToIncoming(options: { transferId: string; accepted: boolean; savePath?: string }): Promise<void>;
+
+  // ── Clipboard (Feature 2) ─────────────────────────────────────────────────
+  sendClipboard(options: { deviceId: string; text: string }): Promise<void>;
 
   // ── History ───────────────────────────────────────────────────────────────
   getHistory(): Promise<{ history: import('../shared/models/Transfer').TransferRecord[] }>;
@@ -97,8 +108,10 @@ export interface WyrePluginInterface {
   addListener(event: 'transferProgress',     handler: (data: TransferProgressEvent)     => void): Promise<{ remove: () => void }>;
   addListener(event: 'transferComplete',     handler: (data: TransferCompleteEvent)     => void): Promise<{ remove: () => void }>;
   addListener(event: 'transferError',        handler: (data: TransferErrorEvent)        => void): Promise<{ remove: () => void }>;
+  addListener(event: 'transferPaused',       handler: (data: TransferPausedEvent)       => void): Promise<{ remove: () => void }>;
   addListener(event: 'incomingRequest',      handler: (data: IncomingRequestEvent)      => void): Promise<{ remove: () => void }>;
   addListener(event: 'transferQueueUpdated', handler: (data: TransferQueueUpdatedEvent) => void): Promise<{ remove: () => void }>;
+  addListener(event: 'clipboardReceived',    handler: (data: ClipboardReceivedEvent)    => void): Promise<{ remove: () => void }>;
 }
 
 export const WyrePlugin = registerPlugin<WyrePluginInterface>('WyrePlugin');

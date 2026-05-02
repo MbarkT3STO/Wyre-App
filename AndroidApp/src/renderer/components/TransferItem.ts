@@ -1,5 +1,7 @@
 /**
- * TransferItem.ts — adapted for Android (uses AppBridge, no shell.openPath).
+ * TransferItem.ts — Android version.
+ * Feature 4: Paused status + Resume button.
+ * Uses AppBridge instead of IpcClient.
  */
 
 import { Component } from './base/Component';
@@ -34,8 +36,6 @@ export class TransferItem extends Component {
       this.patchProgress(data);
     } else {
       super.update();
-      this.attachActions();
-      this.applyProgressWidth();
     }
   }
 
@@ -77,8 +77,8 @@ export class TransferItem extends Component {
 
     const statusBadge = this.renderStatusBadge(t.status);
     const progress = isActiveTransfer(t) ? t.progress : (t.status === TransferStatus.Completed ? 100 : 0);
-    const speed = isActiveTransfer(t) ? t.speed : 0;
-    const eta = isActiveTransfer(t) ? t.eta : 0;
+    const speed    = isActiveTransfer(t) ? t.speed : 0;
+    const eta      = isActiveTransfer(t) ? t.eta : 0;
     const savedPath = 'savedPath' in t ? t.savedPath : undefined;
 
     row.innerHTML = `
@@ -96,7 +96,7 @@ export class TransferItem extends Component {
         <div class="transfer-item__stats">
           <span class="transfer-item__size">${formatFileSize(t.fileSize)}</span>
           ${isActive && speed > 0 ? `<span class="transfer-item__speed">${formatSpeed(speed)}</span>` : ''}
-          ${isActive && eta > 0 ? `<span class="transfer-item__eta">${formatEta(eta)}</span>` : ''}
+          ${isActive && eta > 0   ? `<span class="transfer-item__eta">${formatEta(eta)}</span>` : ''}
           ${t.completedAt ? `<span class="transfer-item__time">${formatTimestamp(t.completedAt)}</span>` : ''}
         </div>
         ${statusBadge}
@@ -105,8 +105,9 @@ export class TransferItem extends Component {
         <div class="transfer-item__progress-wrap">
           <div class="transfer-item__progress-bar" role="progressbar" aria-valuenow="${progress}" aria-valuemin="0" aria-valuemax="100">
             <div class="transfer-item__progress-fill${
-              t.status === TransferStatus.Active ? ' transfer-item__progress-fill--active'
-              : t.status === TransferStatus.Connecting ? ' transfer-item__progress-fill--connecting' : ''
+              t.status === TransferStatus.Active     ? ' transfer-item__progress-fill--active'
+              : t.status === TransferStatus.Connecting ? ' transfer-item__progress-fill--connecting'
+              : ''
             }" data-progress="${progress}"></div>
           </div>
           <div class="transfer-item__progress-stats">
@@ -118,10 +119,17 @@ export class TransferItem extends Component {
         <div class="transfer-item__error">${escapeHtml(t.errorMessage)}</div>
       ` : ''}
       <div class="transfer-item__actions">
-        ${isActive ? `<button class="btn btn--danger btn--sm transfer-item__cancel" data-id="${t.id}">
-          <i class="fa-solid fa-xmark btn__icon"></i> Cancel
-        </button>` : ''}
-      ${t.status === TransferStatus.Completed && savedPath ? `
+        ${isActive ? `
+          <button class="btn btn--danger btn--sm transfer-item__cancel" data-id="${t.id}">
+            <i class="fa-solid fa-xmark btn__icon"></i> Cancel
+          </button>
+        ` : ''}
+        ${t.status === TransferStatus.Paused ? `
+          <button class="btn btn--secondary btn--sm transfer-item__resume" data-id="${t.id}">
+            <i class="fa-solid fa-play btn__icon"></i> Resume
+          </button>
+        ` : ''}
+        ${t.status === TransferStatus.Completed && savedPath ? `
           <button class="btn btn--ghost btn--sm transfer-item__open-file" data-path="${escapeHtml(savedPath)}">
             <i class="fa-solid fa-arrow-up-right-from-square btn__icon"></i> Open
           </button>
@@ -150,7 +158,9 @@ export class TransferItem extends Component {
     if (isActiveTransfer(this.data) && this.data.status === TransferStatus.Connecting) return;
     const fill = this.element.querySelector<HTMLElement>('.transfer-item__progress-fill');
     if (!fill) return;
-    const progress = isActiveTransfer(this.data) ? this.data.progress : (this.data.status === TransferStatus.Completed ? 100 : 0);
+    const progress = isActiveTransfer(this.data)
+      ? this.data.progress
+      : (this.data.status === TransferStatus.Completed ? 100 : 0);
     fill.style.setProperty('--progress-width', `${progress}%`);
   }
 
@@ -162,6 +172,14 @@ export class TransferItem extends Component {
       cancelBtn.addEventListener('click', () => {
         const id = (cancelBtn as HTMLElement).dataset['id'];
         if (id) void AppBridge.cancelTransfer({ transferId: id });
+      });
+    }
+
+    const resumeBtn = this.element.querySelector('.transfer-item__resume');
+    if (resumeBtn) {
+      resumeBtn.addEventListener('click', () => {
+        const id = (resumeBtn as HTMLElement).dataset['id'];
+        if (id) void AppBridge.resumeTransfer({ transferId: id });
       });
     }
 
@@ -192,6 +210,7 @@ export class TransferItem extends Component {
       [TransferStatus.Failed]:     'Failed',
       [TransferStatus.Cancelled]:  'Cancelled',
       [TransferStatus.Declined]:   'Declined',
+      [TransferStatus.Paused]:     'Paused',
     };
     return `<span class="transfer-item__badge transfer-item__badge--${status}">${labels[status] ?? status}</span>`;
   }
