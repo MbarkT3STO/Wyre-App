@@ -96,7 +96,11 @@ class TransferClient(
             file.inputStream().use { fis ->
                 var read: Int
                 while (fis.read(buf).also { read = it } != -1) {
-                    if (cancelled) { sock.close(); return }
+                    if (cancelled) {
+                        sock.close()
+                        onEvent(TransferEvent.Error(transferId, "Cancelled", "CANCELLED"))
+                        return
+                    }
 
                     out.write(buf, 0, read)
                     bytesSent += read
@@ -163,6 +167,9 @@ class TransferClient(
         } catch (e: Exception) {
             if (!cancelled) {
                 onEvent(TransferEvent.Error(transferId, e.message ?: "Send failed", "SEND_ERROR"))
+            } else {
+                // Emit a proper cancelled event so the UI updates
+                onEvent(TransferEvent.Error(transferId, "Cancelled", "CANCELLED"))
             }
         }
     }

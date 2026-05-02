@@ -128,24 +128,33 @@ class WyreManager(
             ?: return null
         val transferId = UUID.randomUUID().toString()
 
+        val client = TransferClient(
+            transferId     = transferId,
+            filePath       = filePath,
+            fileName       = fileName,
+            fileSize       = fileSize,
+            peerIp         = device.ip,
+            peerPort       = device.port,
+            senderDeviceId = settings.getString("deviceId", ""),
+            senderName     = settings.getString("deviceName", Build.MODEL),
+            onEvent        = ::onTransferEvent
+        )
+        // Register before submitting so cancelTransfer() can find it immediately
+        activeTransfers[transferId] = client
+
         executor.submit {
-            TransferClient(
-                transferId = transferId,
-                filePath   = filePath,
-                fileName   = fileName,
-                fileSize   = fileSize,
-                peerIp     = device.ip,
-                peerPort   = device.port,
-                senderDeviceId = settings.getString("deviceId", ""),
-                senderName     = settings.getString("deviceName", Build.MODEL),
-                onEvent    = ::onTransferEvent
-            ).send()
+            try {
+                client.send()
+            } finally {
+                activeTransfers.remove(transferId)
+            }
         }
         return transferId
     }
 
     fun cancelTransfer(transferId: String) {
-        (activeTransfers[transferId] as? Cancellable)?.cancel()
+        val client = activeTransfers.remove(transferId) as? Cancellable
+        client?.cancel()
     }
 
     fun respondToIncoming(transferId: String, accepted: Boolean) {
@@ -221,23 +230,25 @@ class WyreManager(
                 }
 
                 val transferId = UUID.randomUUID().toString()
-                executor.submit {
-                    TransferClient(
-                        transferId     = transferId,
-                        filePath       = zipFile.absolutePath,
-                        fileName       = zipName,
-                        fileSize       = zipFile.length(),
-                        peerIp         = device.ip,
-                        peerPort       = device.port,
-                        senderDeviceId = settings.getString("deviceId", ""),
-                        senderName     = settings.getString("deviceName", Build.MODEL),
-                        onEvent        = { event ->
-                            onTransferEvent(event)
-                            if (event is TransferEvent.Complete || event is TransferEvent.Error) {
-                                zipFile.delete()
-                            }
+                val client = TransferClient(
+                    transferId     = transferId,
+                    filePath       = zipFile.absolutePath,
+                    fileName       = zipName,
+                    fileSize       = zipFile.length(),
+                    peerIp         = device.ip,
+                    peerPort       = device.port,
+                    senderDeviceId = settings.getString("deviceId", ""),
+                    senderName     = settings.getString("deviceName", Build.MODEL),
+                    onEvent        = { event ->
+                        onTransferEvent(event)
+                        if (event is TransferEvent.Complete || event is TransferEvent.Error) {
+                            zipFile.delete()
                         }
-                    ).send()
+                    }
+                )
+                activeTransfers[transferId] = client
+                executor.submit {
+                    try { client.send() } finally { activeTransfers.remove(transferId) }
                 }
                 callback(transferId)
             } catch (e: Exception) {
