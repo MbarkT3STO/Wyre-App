@@ -25,9 +25,13 @@ export abstract class Component {
 
   protected update(): void {
     if (!this.container || !this.element) return;
+    this.onUnmount();
+    for (const fn of this.cleanupFns) fn();
+    this.cleanupFns = [];
     const newElement = this.render();
     this.container.replaceChild(newElement, this.element);
     this.element = newElement;
+    this.onMount();
   }
 
   protected addCleanup(fn: () => void): void {

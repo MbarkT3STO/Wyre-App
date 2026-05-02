@@ -448,6 +448,10 @@
   box-shadow: var(--nm-raised);
 }
 
+[data-theme="light"] .device-card__platform-icon {
+  box-shadow: 0 1px 4px rgba(163,177,198,0.45);
+}
+
 .device-card__online-dot {
   position: absolute;
   top: -2px;
