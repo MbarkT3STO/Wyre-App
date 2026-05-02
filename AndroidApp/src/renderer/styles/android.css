@@ -1036,8 +1036,7 @@
   white-space: nowrap;
 }
 
-/* ── Feature 4: Paused transfer state ── */
-.transfer-item--paused::before {
+/* ── Feature 4: Paused transfer state ── */.transfer-item--paused::before {
   background: var(--warning);
 }
 
@@ -1047,3 +1046,24 @@
   box-shadow: var(--nm-pressed);
   border: none;
 }
+
+/* ── Pull-to-refresh indicator ──────────────────────────────── */
+.pull-refresh-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  color: var(--accent-base);
+  font-size: 18px;
+}
+
+.pull-refresh-indicator--spinning i {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ── Feature 4: Paused transfer state ── */

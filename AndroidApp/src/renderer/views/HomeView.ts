@@ -123,6 +123,10 @@ export class HomeView extends Component {
     });
     this.deviceList.mount(deviceListMount);
 
+    // Pull-to-refresh on the main scroll container
+    const scrollContainer = this.element.querySelector('.home-view__scroll') as HTMLElement;
+    if (scrollContainer) this.wirePullToRefresh(scrollContainer);
+
     // Mount TransferList (active only)
     const transferListMount = this.element.querySelector('#transfer-list-mount') as HTMLElement;
     this.transferList = new TransferList({ activeOnly: true });
@@ -376,6 +380,47 @@ export class HomeView extends Component {
       this.toasts.error(message);
       this.updateSendButton();
     }
+  }
+
+  private wirePullToRefresh(scrollEl: HTMLElement): void {
+    let startY = 0;
+    let pulling = false;
+    let indicator: HTMLElement | null = null;
+
+    scrollEl.addEventListener('touchstart', (e) => {
+      if (scrollEl.scrollTop === 0) {
+        startY = e.touches[0]!.clientY;
+        pulling = true;
+      }
+    }, { passive: true });
+
+    scrollEl.addEventListener('touchmove', (e) => {
+      if (!pulling) return;
+      const dy = e.touches[0]!.clientY - startY;
+      if (dy > 60) {
+        if (!indicator) {
+          indicator = document.createElement('div');
+          indicator.className = 'pull-refresh-indicator';
+          indicator.innerHTML = '<i class="fa-solid fa-arrow-rotate-right"></i>';
+          scrollEl.prepend(indicator);
+        }
+      }
+    }, { passive: true });
+
+    scrollEl.addEventListener('touchend', async () => {
+      if (!pulling) return;
+      pulling = false;
+      if (indicator) {
+        indicator.classList.add('pull-refresh-indicator--spinning');
+        try {
+          const devices = await AppBridge.getDevices();
+          StateManager.setState('devices', devices);
+        } finally {
+          indicator.remove();
+          indicator = null;
+        }
+      }
+    });
   }
 
   protected onUnmount(): void {

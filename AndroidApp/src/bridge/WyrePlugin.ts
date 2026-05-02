@@ -96,6 +96,7 @@ export interface WyrePluginInterface {
 
   // ── File picker ───────────────────────────────────────────────────────────
   pickFile(): Promise<{ files: Array<{ path: string; name: string; size: number }> }>;
+
   pickFolder(): Promise<{ path: string; uri: string }>;
 
   // ── Shell actions ─────────────────────────────────────────────────────────

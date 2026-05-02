@@ -27,6 +27,7 @@ class TransferClient(
     private val peerPort: Int,
     private val senderDeviceId: String,
     private val senderName: String,
+    private val resumeOffset: Long = 0,
     private val onEvent: (TransferEvent) -> Unit
 ) : Cancellable {
 
@@ -87,13 +88,22 @@ class TransferClient(
             ))
 
             // ── 3. Stream file, emitting progress from sender side ────────────
-            var bytesSent = 0L
+            var bytesSent = resumeOffset
             var lastProgressTime = System.currentTimeMillis()
-            var lastProgressBytes = 0L
+            var lastProgressBytes = resumeOffset
             val buf = ByteArray(CHUNK_SIZE)
             var chunksSinceFlush = 0
 
-            file.inputStream().use { fis ->
+            val fis = java.io.FileInputStream(file)
+            if (resumeOffset > 0) {
+                var skipped = 0L
+                while (skipped < resumeOffset) {
+                    val n = fis.skip(resumeOffset - skipped)
+                    if (n <= 0) break
+                    skipped += n
+                }
+            }
+            fis.use { fis ->
                 var read: Int
                 while (fis.read(buf).also { read = it } != -1) {
                     if (cancelled) {
@@ -181,6 +191,7 @@ class TransferClient(
         put("fileName",        fileName)
         put("fileSize",        actualFileSize)   // use actual size, not the JS-supplied one
         put("checksum",        computeChecksum())
+        if (resumeOffset > 0) put("resumeOffset", resumeOffset)
     }.toString()
 
     private fun computeChecksum(): String {

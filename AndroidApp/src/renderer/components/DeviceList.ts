@@ -72,7 +72,7 @@ export class DeviceList extends Component {
           <span>Make sure other devices are on the same network and have Wyre open.</span>
         </div>
       `;
-      for (const [id, card] of this.cards) { card.unmount(); this.cards.delete(id); }
+      this.cards.forEach(card => card.unmount()); this.cards.clear();
       return;
     }
 

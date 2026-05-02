@@ -80,11 +80,21 @@ class TransferServer(
             return
         }
 
-        out.write(("""{"accepted":true}""" + "\n").toByteArray())
+        // Validate the requested resume offset against any existing partial file
+        val headerResumeOffset = entry.request.resumeOffset
+        val validatedOffset = if (headerResumeOffset > 0) {
+            val partial = File(saveDir, entry.request.fileName)
+            if (partial.exists() && partial.length() == headerResumeOffset) headerResumeOffset else 0L
+        } else {
+            0L
+        }
+
+        val responseJson = """{"accepted":true,"resumeOffset":$validatedOffset}"""
+        out.write((responseJson + "\n").toByteArray())
         out.flush()
 
         executor.submit {
-            receiveFile(entry.socket, entry.request, saveDir, entry.remainingBytes)
+            receiveFile(entry.socket, entry.request, saveDir, entry.remainingBytes, validatedOffset)
         }
     }
 
@@ -120,6 +130,7 @@ class TransferServer(
             val rawFileName    = json.getString("fileName")
             val fileSize       = json.getLong("fileSize")
             val checksum       = json.getString("checksum")
+            val resumeOffset   = json.optLong("resumeOffset", 0L)
 
             val fileName = sanitizeFileName(rawFileName)
 
@@ -130,7 +141,7 @@ class TransferServer(
                 inp.read(remaining)
             }
 
-            val request = IncomingRequest(transferId, senderDeviceId, senderName, fileName, fileSize, checksum)
+            val request = IncomingRequest(transferId, senderDeviceId, senderName, fileName, fileSize, checksum, resumeOffset)
             pending[transferId] = PendingEntry(socket, request, remaining)
             onIncomingRequest(request)
 
@@ -139,7 +150,7 @@ class TransferServer(
         }
     }
 
-    private fun receiveFile(socket: Socket, req: IncomingRequest, saveDir: String, initial: ByteArray) {
+    private fun receiveFile(socket: Socket, req: IncomingRequest, saveDir: String, initial: ByteArray, validatedOffset: Long = 0L) {
         val startedAt = System.currentTimeMillis()
         onEvent(TransferEvent.Started(
             transferId = req.transferId,
@@ -152,13 +163,13 @@ class TransferServer(
         ))
 
         val md = MessageDigest.getInstance("SHA-256")
-        var bytesReceived = 0L
+        var bytesReceived = validatedOffset
         var lastProgressTime = System.currentTimeMillis()
-        var lastBytes = 0L
+        var lastBytes = validatedOffset
 
         // On API 29+ use MediaStore to save directly to public Downloads
         // On older versions write directly to the file path
-        val (outputStream, finalPath, cleanupOnError) = openOutputStream(req.fileName, saveDir)
+        val (outputStream, finalPath, cleanupOnError) = openOutputStream(req.fileName, saveDir, validatedOffset)
             ?: run {
                 onEvent(TransferEvent.Error(req.transferId, "Cannot open output stream", "PATH_ERROR"))
                 socket.close()
@@ -234,7 +245,7 @@ class TransferServer(
      * - Any custom folder → write directly to the path
      *   (user granted permission via ACTION_OPEN_DOCUMENT_TREE, or API < 29)
      */
-    private fun openOutputStream(fileName: String, saveDir: String): Triple<OutputStream, String, () -> Unit>? {
+    private fun openOutputStream(fileName: String, saveDir: String, resumeOffset: Long = 0L): Triple<OutputStream, String, () -> Unit>? {
         val publicDownloads = android.os.Environment
             .getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
             .absolutePath
@@ -243,13 +254,16 @@ class TransferServer(
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && isDefaultDownloads) {
             // Default Downloads on API 29+ — use MediaStore so file is visible immediately
-            openViaMediaStore(fileName, "Download")
-                ?: openDirectly(fileName, saveDir) // fallback if MediaStore fails
+            // Resume not supported via MediaStore; fall back to direct write for resumes
+            if (resumeOffset > 0) {
+                openDirectly(fileName, saveDir, resumeOffset)
+            } else {
+                openViaMediaStore(fileName, "Download")
+                    ?: openDirectly(fileName, saveDir, 0L) // fallback if MediaStore fails
+            }
         } else {
             // Custom folder or API < 29 — write directly
-            // The user granted write permission via ACTION_OPEN_DOCUMENT_TREE,
-            // or we're on an older API where direct writes are always allowed.
-            openDirectly(fileName, saveDir)
+            openDirectly(fileName, saveDir, resumeOffset)
         }
     }
 
@@ -292,12 +306,12 @@ class TransferServer(
     }
 
     /** Write directly to a file path — used for custom folders and API < 29 */
-    private fun openDirectly(fileName: String, saveDir: String): Triple<OutputStream, String, () -> Unit>? {
+    private fun openDirectly(fileName: String, saveDir: String, resumeOffset: Long = 0L): Triple<OutputStream, String, () -> Unit>? {
         return try {
             val dir = File(saveDir)
             dir.mkdirs()
-            val file = uniquePath(File(dir, fileName))
-            val stream = file.outputStream()
+            val file = if (resumeOffset > 0) File(dir, fileName) else uniquePath(File(dir, fileName))
+            val stream = java.io.FileOutputStream(file, resumeOffset > 0) // append when resuming
             Triple(stream, file.absolutePath, { file.delete(); Unit })
         } catch (_: Exception) { null }
     }

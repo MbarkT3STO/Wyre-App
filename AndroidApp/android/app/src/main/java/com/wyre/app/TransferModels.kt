@@ -10,7 +10,8 @@ data class IncomingRequest(
     val senderName: String,
     val fileName: String,
     val fileSize: Long,
-    val checksum: String
+    val checksum: String,
+    val resumeOffset: Long = 0
 )
 
 /** Sealed event hierarchy emitted by TransferClient and TransferServer */
