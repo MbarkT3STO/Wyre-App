@@ -23,7 +23,8 @@ data class DeviceInfo(
     val port: Int,
     val version: String,
     val lastSeen: Long,
-    val online: Boolean
+    val online: Boolean,
+    val encryptionSupported: Boolean = false
 )
 
 /**
@@ -141,7 +142,8 @@ class DiscoveryService(
                 port     = json.getInt("port"),
                 version  = json.getString("version"),
                 lastSeen = now,
-                online   = true
+                online   = true,
+                encryptionSupported = json.optBoolean("encryptionSupported", false)
             )
 
             val changed = existing == null || !existing.online
@@ -155,11 +157,12 @@ class DiscoveryService(
     }
 
     private fun buildAnnouncement(): String = JSONObject().apply {
-        put("id",       deviceId)
-        put("name",     deviceName)
-        put("platform", platform)
-        put("port",     port)
-        put("version",  version)
+        put("id",                 deviceId)
+        put("name",               deviceName)
+        put("platform",           platform)
+        put("port",               port)
+        put("version",            version)
+        put("encryptionSupported", true)
     }.toString()
 
     private fun getDirectedBroadcast(): InetAddress? {

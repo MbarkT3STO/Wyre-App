@@ -535,6 +535,7 @@
 .sg__icon--purple { color: var(--accent-bright); }
 .sg__icon--yellow { color: var(--warning-text); }
 .sg__icon--red    { color: var(--danger-text); }
+.sg__icon--muted  { color: var(--text-tertiary, #6B7280); }
 
 .sg__meta { flex: 1; min-width: 0; }
 .sg__title { font-size: var(--text-base); font-weight: var(--weight-bold); color: var(--text-primary); }

@@ -102,7 +102,10 @@ export class UdpBroadcaster extends EventEmitter {
   private sendBroadcast(): void {
     if (!this.socket) return;
 
-    const message = Buffer.from(JSON.stringify(this.announcement));
+    const message = Buffer.from(JSON.stringify({
+      ...this.announcement,
+      encryptionSupported: true,
+    }));
     this.socket.send(message, 0, message.length, BROADCAST_PORT, this.broadcastAddress, (err) => {
       if (err) this.emit('error', err);
     });

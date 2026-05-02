@@ -22,6 +22,8 @@ export interface Device {
   lastSeen: number;
   /** Whether the device is currently reachable */
   online: boolean;
+  /** Whether the device supports AES-256-GCM encrypted transfers */
+  encryptionSupported?: boolean;
 }
 
 /** Payload broadcast over UDP for device discovery */
@@ -31,4 +33,5 @@ export interface DeviceAnnouncement {
   platform: Platform;
   port: number;
   version: string;
+  encryptionSupported?: boolean;
 }

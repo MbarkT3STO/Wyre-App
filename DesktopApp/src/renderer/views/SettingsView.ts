@@ -68,6 +68,27 @@ export class SettingsView extends Component {
   private renderForm(s: AppSettings): string {
     return `
 
+      <!-- ── Security (read-only, reactive) ── -->
+      <div class="sg" id="security-section">
+        <div class="sg__header">
+          <div class="sg__icon sg__icon--green" id="security-icon-wrap">
+            <i class="fa-solid fa-lock" id="security-icon"></i>
+          </div>
+          <div class="sg__meta">
+            <div class="sg__title">Security</div>
+            <div class="sg__desc" id="security-desc">Encryption status for the selected peer</div>
+          </div>
+        </div>
+        <div class="sg__body">
+          <div class="sg__row">
+            <div class="sg__row-info">
+              <span class="sg__label" id="security-label">No peer selected</span>
+              <span class="sg__hint" id="security-hint">Select a device to see its encryption capability</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ── Device Identity ── -->
       <div class="sg">
         <div class="sg__header">
@@ -405,6 +426,7 @@ export class SettingsView extends Component {
     // Feature 2: Keep the trusted-device dropdown populated with live devices
     const unsubDevices = StateManager.subscribe('devices', () => {
       this.refreshTrustedDeviceDropdown();
+      this.refreshSecuritySection();
     });
     this.addCleanup(unsubDevices);
 
@@ -413,7 +435,45 @@ export class SettingsView extends Component {
       this.settings = current;
     }
 
+    // Initial security section render
+    this.refreshSecuritySection();
+
     this.attachEvents();
+  }
+
+  /** Update the Security section based on the currently selected device */
+  private refreshSecuritySection(): void {
+    const iconWrap = this.element?.querySelector('#security-icon-wrap') as HTMLElement | null;
+    const icon = this.element?.querySelector('#security-icon') as HTMLElement | null;
+    const label = this.element?.querySelector('#security-label') as HTMLElement | null;
+    const hint = this.element?.querySelector('#security-hint') as HTMLElement | null;
+    if (!iconWrap || !icon || !label || !hint) return;
+
+    const devices = StateManager.get('devices');
+    const selectedIds = StateManager.get('selectedDeviceIds');
+    const selectedDevice = selectedIds.length > 0
+      ? devices.find(d => d.id === selectedIds[0])
+      : devices.find(d => d.online); // fall back to first online device
+
+    if (!selectedDevice) {
+      iconWrap.className = 'sg__icon sg__icon--green';
+      icon.className = 'fa-solid fa-lock';
+      label.textContent = 'No peer selected';
+      hint.textContent = 'Select a device to see its encryption capability';
+      return;
+    }
+
+    if (selectedDevice.encryptionSupported === true) {
+      iconWrap.className = 'sg__icon sg__icon--green';
+      icon.className = 'fa-solid fa-lock';
+      label.textContent = 'AES-256-GCM encrypted';
+      hint.textContent = `${escapeHtml(selectedDevice.name)} supports end-to-end encrypted transfers`;
+    } else {
+      iconWrap.className = 'sg__icon sg__icon--muted';
+      icon.className = 'fa-solid fa-lock-open';
+      label.textContent = 'Unencrypted (peer does not support encryption)';
+      hint.textContent = `${escapeHtml(selectedDevice.name)} does not advertise encryption support`;
+    }
   }
 
   /** Re-populate only the device <select> without re-rendering the whole form (Feature 2) */

@@ -9,6 +9,7 @@ import { connect, Socket } from 'net';
 import { EventEmitter } from 'events';
 import { FileChunker } from './FileChunker';
 import { randomUUID } from 'crypto';
+import { TransferCrypto } from '../crypto/TransferCrypto';
 
 export interface SendFileOptions {
   filePath: string;
@@ -20,6 +21,8 @@ export interface SendFileOptions {
   senderDeviceId: string;
   senderName: string;
   resumeOffset?: number;
+  /** Whether the peer advertised AES-256-GCM encryption support */
+  peerSupportsEncryption?: boolean;
 }
 
 export interface TransferClientEvents {
@@ -38,6 +41,8 @@ export declare interface TransferClient {
 interface ActiveSend {
   socket: Socket;
   cancel: () => void;
+  /** AES-256-GCM key — set after handshake if encryption was negotiated */
+  encryptionKey?: Buffer;
 }
 
 export class TransferClient extends EventEmitter {
@@ -72,16 +77,22 @@ export class TransferClient extends EventEmitter {
   }
 
   private doSend(transferId: string, options: SendFileOptions): void {
-    const { filePath, fileName, fileSize, checksum, peerIp, peerPort, senderDeviceId, senderName, resumeOffset = 0 } = options;
+    const {
+      filePath, fileName, fileSize, checksum,
+      peerIp, peerPort, senderDeviceId, senderName,
+      resumeOffset = 0,
+      peerSupportsEncryption = false,
+    } = options;
 
     const socket = connect({ host: peerIp, port: peerPort }, () => {
       // Disable Nagle's algorithm so small writes (header, feedback ACKs) are
       // sent immediately without waiting to coalesce into a larger segment.
-      // For bulk data the kernel will still batch full-sized segments.
       socket.setNoDelay(true);
 
-      // Send JSON header
-      const header = JSON.stringify({
+      // ── Build JSON header ──────────────────────────────────────────────────
+      let senderKeyPair: ReturnType<typeof TransferCrypto.generateKeyPair> | null = null;
+
+      const headerObj: Record<string, unknown> = {
         transferId,
         senderDeviceId,
         senderName,
@@ -89,25 +100,35 @@ export class TransferClient extends EventEmitter {
         fileSize,
         checksum,
         ...(resumeOffset > 0 && { resumeOffset }),
-      }) + '\n';
+      };
 
-      socket.write(header);
+      if (peerSupportsEncryption) {
+        senderKeyPair = TransferCrypto.generateKeyPair();
+        headerObj['encryption'] = {
+          supported: true,
+          senderPublicKey: senderKeyPair.publicKeyDer.toString('base64'),
+        };
+      }
 
-      // Wait for accept/decline response from receiver.
-      // The response is a newline-terminated JSON line, but it may arrive
-      // split across multiple TCP packets, so we accumulate until we see '\n'.
+      socket.write(JSON.stringify(headerObj) + '\n');
+
+      // ── Wait for accept/decline response ───────────────────────────────────
       let responseBuffer = '';
 
       const onResponseData = (chunk: Buffer): void => {
         responseBuffer += chunk.toString('utf8');
         const newlineIdx = responseBuffer.indexOf('\n');
-        if (newlineIdx === -1) return; // incomplete — wait for more data
+        if (newlineIdx === -1) return;
 
-        // We have a full line — stop listening for response data
         socket.removeListener('data', onResponseData);
 
         try {
-          const response = JSON.parse(responseBuffer.slice(0, newlineIdx)) as { accepted: boolean; resumeOffset?: number };
+          const response = JSON.parse(responseBuffer.slice(0, newlineIdx)) as {
+            accepted: boolean;
+            resumeOffset?: number;
+            encryption?: { accepted: boolean; receiverPublicKey: string };
+          };
+
           if (!response.accepted) {
             socket.destroy();
             this.activeSends.delete(transferId);
@@ -115,11 +136,33 @@ export class TransferClient extends EventEmitter {
             return;
           }
 
-          // Server may have adjusted the resume offset (e.g. partial file mismatch)
           const serverOffset = response.resumeOffset ?? resumeOffset;
 
-          // Accepted — start streaming
-          this.streamFile(socket, transferId, filePath, fileSize, serverOffset);
+          // ── Negotiate encryption ─────────────────────────────────────────
+          let encryptionKey: Buffer | undefined;
+
+          if (
+            peerSupportsEncryption &&
+            senderKeyPair !== null &&
+            response.encryption?.accepted === true &&
+            typeof response.encryption.receiverPublicKey === 'string'
+          ) {
+            const receiverPubKeyDer = Buffer.from(response.encryption.receiverPublicKey, 'base64');
+            encryptionKey = TransferCrypto.deriveKey(
+              senderKeyPair.privateKey,
+              receiverPubKeyDer,
+              senderKeyPair.publicKeyDer,
+              receiverPubKeyDer,
+            );
+
+            // Store key on the active send entry
+            const existing = this.activeSends.get(transferId);
+            if (existing) {
+              this.activeSends.set(transferId, { ...existing, encryptionKey });
+            }
+          }
+
+          this.streamFile(socket, transferId, filePath, fileSize, serverOffset, encryptionKey);
         } catch (err) {
           socket.destroy(err instanceof Error ? err : new Error(String(err)));
           this.emit('error', transferId, err instanceof Error ? err : new Error(String(err)));
@@ -151,16 +194,37 @@ export class TransferClient extends EventEmitter {
     });
   }
 
-  private streamFile(socket: Socket, transferId: string, filePath: string, fileSize: number, resumeOffset = 0): void {
+  private streamFile(
+    socket: Socket,
+    transferId: string,
+    filePath: string,
+    fileSize: number,
+    resumeOffset = 0,
+    encryptionKey?: Buffer,
+  ): void {
+    if (encryptionKey !== undefined) {
+      this.streamFileEncrypted(socket, transferId, filePath, fileSize, resumeOffset, encryptionKey);
+    } else {
+      this.streamFilePlaintext(socket, transferId, filePath, fileSize, resumeOffset);
+    }
+  }
+
+  /** Plaintext streaming — original behaviour, unchanged. */
+  private streamFilePlaintext(
+    socket: Socket,
+    transferId: string,
+    filePath: string,
+    fileSize: number,
+    resumeOffset = 0,
+  ): void {
     const readStream = FileChunker.createReadStream(filePath, resumeOffset > 0 ? resumeOffset : undefined);
     let cancelled = false;
     let streamDone = false;
 
-    // Update cancel handler to also destroy the read stream
     const existing = this.activeSends.get(transferId);
     if (existing) {
       this.activeSends.set(transferId, {
-        socket,
+        ...existing,
         cancel: () => {
           cancelled = true;
           readStream.destroy();
@@ -169,9 +233,6 @@ export class TransferClient extends EventEmitter {
       });
     }
 
-    // The receiver writes progress-feedback JSON lines back on the same socket
-    // while it receives data. We read those here to drive the sender's progress.
-    // Format: {"p":<0-100>,"b":<bytesReceived>,"s":<speed>,"e":<eta>}\n
     let feedbackBuffer = '';
     socket.on('data', (chunk: Buffer) => {
       feedbackBuffer += chunk.toString('utf8');
@@ -190,12 +251,6 @@ export class TransferClient extends EventEmitter {
       }
     });
 
-    // Use pipe() so Node.js stream backpressure is respected automatically:
-    // when the socket's write buffer is full, the read stream pauses until the
-    // kernel drains the buffer — preventing unbounded memory growth and keeping
-    // the event loop free for other work.
-    // `end: false` because we call socket.end() manually after the stream
-    // finishes so we can emit the correct events in the right order.
     readStream.pipe(socket, { end: false });
 
     readStream.on('end', () => {
@@ -203,13 +258,8 @@ export class TransferClient extends EventEmitter {
         this.activeSends.delete(transferId);
         return;
       }
-
       streamDone = true;
-
-      // Half-close the write side — signals end of file data to the receiver.
-      // The socket read side stays open so we keep receiving progress feedback.
       socket.end();
-
       socket.once('close', (hadError: boolean) => {
         if (!cancelled && !hadError) {
           this.emit('progress', transferId, fileSize, fileSize, 0, 0, 100);
@@ -228,5 +278,87 @@ export class TransferClient extends EventEmitter {
     });
 
     void streamDone;
+  }
+
+  /** Encrypted streaming — reads file in TRANSFER_CHUNK_SIZE chunks, encrypts each. */
+  private streamFileEncrypted(
+    socket: Socket,
+    transferId: string,
+    filePath: string,
+    fileSize: number,
+    resumeOffset = 0,
+    encryptionKey: Buffer,
+  ): void {
+    const CHUNK_SIZE = 1024 * 1024; // 1 MB — matches TRANSFER_CHUNK_SIZE
+    let cancelled = false;
+
+    const existing = this.activeSends.get(transferId);
+    if (existing) {
+      this.activeSends.set(transferId, {
+        ...existing,
+        cancel: () => {
+          cancelled = true;
+          socket.destroy();
+        },
+      });
+    }
+
+    // Feedback listener (same as plaintext path)
+    let feedbackBuffer = '';
+    socket.on('data', (chunk: Buffer) => {
+      feedbackBuffer += chunk.toString('utf8');
+      let newlineIdx: number;
+      while ((newlineIdx = feedbackBuffer.indexOf('\n')) !== -1) {
+        const line = feedbackBuffer.slice(0, newlineIdx);
+        feedbackBuffer = feedbackBuffer.slice(newlineIdx + 1);
+        try {
+          const fb = JSON.parse(line) as { p: number; b: number; s: number; e: number };
+          if (typeof fb.p === 'number') {
+            this.emit('progress', transferId, fb.b, fileSize, fb.s, fb.e, fb.p);
+          }
+        } catch {
+          // ignore malformed feedback
+        }
+      }
+    });
+
+    // Read and encrypt the file asynchronously
+    const doEncryptedStream = async (): Promise<void> => {
+      const { createReadStream } = await import('fs');
+      const readStream = createReadStream(filePath, {
+        start: resumeOffset > 0 ? resumeOffset : 0,
+        highWaterMark: CHUNK_SIZE,
+      });
+
+      for await (const rawChunk of readStream) {
+        if (cancelled) return;
+        const chunk = Buffer.isBuffer(rawChunk) ? rawChunk : Buffer.from(rawChunk as Uint8Array);
+        const encrypted = TransferCrypto.encryptChunk(encryptionKey, chunk);
+        const encoded = TransferCrypto.encodeChunk(encrypted);
+
+        // Respect backpressure
+        const canContinue = socket.write(encoded);
+        if (!canContinue) {
+          await new Promise<void>((resolve) => socket.once('drain', resolve));
+        }
+      }
+
+      if (!cancelled) {
+        socket.end();
+        await new Promise<void>((resolve) => socket.once('close', resolve));
+        if (!cancelled) {
+          this.emit('progress', transferId, fileSize, fileSize, 0, 0, 100);
+          this.emit('complete', transferId);
+        }
+      }
+    };
+
+    doEncryptedStream().catch((err: Error) => {
+      if (!cancelled) {
+        socket.destroy(err);
+        this.emit('error', transferId, err);
+      }
+      this.activeSends.delete(transferId);
+    });
   }
 }

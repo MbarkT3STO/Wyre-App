@@ -10,6 +10,7 @@ import { EventEmitter } from 'events';
 import { createHash } from 'crypto';
 import { basename } from 'path';
 import { FileChunker } from './FileChunker';
+import { TransferCrypto, type KeyPair } from '../crypto/TransferCrypto';
 
 const PROGRESS_EMIT_INTERVAL_MS = 100;
 const HEADER_MAX_SIZE = 4096;
@@ -95,6 +96,10 @@ interface PendingRequest {
     resumeOffset?: number;
   };
   remainingBuffer: Buffer;
+  /** Receiver key pair — set when sender advertised encryption support */
+  receiverKeyPair?: KeyPair;
+  /** Derived AES-256-GCM key — set after key exchange */
+  encryptionKey?: Buffer;
 }
 
 interface ActiveReceive {
@@ -179,17 +184,32 @@ export class TransferServer extends EventEmitter {
     };
 
     resolveOffset().then((validatedOffset) => {
-      // Tell the sender the validated offset so it knows where to start streaming
-      pending.socket.write(JSON.stringify({ accepted: true, resumeOffset: validatedOffset }) + '\n');
+      // Build accept response — include encryption key if negotiated
+      const responseObj: Record<string, unknown> = { accepted: true, resumeOffset: validatedOffset };
+      if (pending.receiverKeyPair !== undefined && pending.encryptionKey !== undefined) {
+        responseObj['encryption'] = {
+          accepted: true,
+          receiverPublicKey: pending.receiverKeyPair.publicKeyDer.toString('base64'),
+        };
+      }
+      pending.socket.write(JSON.stringify(responseObj) + '\n');
       this.receiveFile(
         pending.socket,
         { ...pending.header, resumeOffset: validatedOffset },
         savePath,
         pending.remainingBuffer,
+        pending.encryptionKey,
       );
     }).catch(() => {
-      pending.socket.write(JSON.stringify({ accepted: true, resumeOffset: 0 }) + '\n');
-      this.receiveFile(pending.socket, { ...pending.header, resumeOffset: 0 }, savePath, pending.remainingBuffer);
+      const responseObj: Record<string, unknown> = { accepted: true, resumeOffset: 0 };
+      if (pending.receiverKeyPair !== undefined && pending.encryptionKey !== undefined) {
+        responseObj['encryption'] = {
+          accepted: true,
+          receiverPublicKey: pending.receiverKeyPair.publicKeyDer.toString('base64'),
+        };
+      }
+      pending.socket.write(JSON.stringify(responseObj) + '\n');
+      this.receiveFile(pending.socket, { ...pending.header, resumeOffset: 0 }, savePath, pending.remainingBuffer, pending.encryptionKey);
     });
   }
 
@@ -287,11 +307,38 @@ export class TransferServer extends EventEmitter {
         // Sanitise the peer-supplied file name to prevent path traversal
         const safeFileName = sanitizeFileName(header.fileName);
 
+        // ── Encryption handshake ───────────────────────────────────────────
+        let receiverKeyPair: KeyPair | undefined;
+        let encryptionKey: Buffer | undefined;
+
+        const encField = (header as Record<string, unknown>)['encryption'] as
+          | { supported?: boolean; senderPublicKey?: string }
+          | undefined;
+
+        if (encField?.supported === true && typeof encField.senderPublicKey === 'string') {
+          try {
+            receiverKeyPair = TransferCrypto.generateKeyPair();
+            const senderPubKeyDer = Buffer.from(encField.senderPublicKey, 'base64');
+            encryptionKey = TransferCrypto.deriveKey(
+              receiverKeyPair.privateKey,
+              senderPubKeyDer,
+              senderPubKeyDer,
+              receiverKeyPair.publicKeyDer,
+            );
+          } catch {
+            // If key exchange fails, fall back to plaintext
+            receiverKeyPair = undefined;
+            encryptionKey = undefined;
+          }
+        }
+
         // Store pending request — remainingBuffer is raw binary file data
         this.pendingRequests.set(header.transferId, {
           socket,
           header: { ...header, fileName: safeFileName },
           remainingBuffer,
+          receiverKeyPair,
+          encryptionKey,
         });
 
         const request: IncomingTransferRequest = {
@@ -317,6 +364,7 @@ export class TransferServer extends EventEmitter {
     header: { transferId: string; fileName: string; fileSize: number; checksum: string; resumeOffset?: number },
     savePath: string,
     remainingBuffer: Buffer,
+    encryptionKey?: Buffer,
   ): void {
     const { transferId, fileSize, checksum, resumeOffset = 0 } = header;
     let bytesReceived = resumeOffset;
@@ -338,75 +386,168 @@ export class TransferServer extends EventEmitter {
         },
       });
 
-      // Write any file data that arrived in the same packet as the header
-      if (remainingBuffer.length > 0) {
-        hash.update(remainingBuffer);
-        bytesReceived += remainingBuffer.length;
-        const canContinue = writeStream.write(remainingBuffer);
-        if (!canContinue) {
-          socket.pause();
-          writeStream.once('drain', () => socket.resume());
+      if (encryptionKey !== undefined) {
+        // ── Encrypted receive path ─────────────────────────────────────────
+        // Accumulate bytes into a framing buffer; decode length-prefixed chunks.
+        let framingBuffer = remainingBuffer.length > 0 ? Buffer.from(remainingBuffer) : Buffer.alloc(0);
+
+        const processFramingBuffer = (): void => {
+          while (framingBuffer.length >= 4) {
+            const payloadLength = framingBuffer.readUInt32BE(0);
+            const totalNeeded = 4 + payloadLength;
+            if (framingBuffer.length < totalNeeded) break;
+
+            try {
+              const decoded = TransferCrypto.decodeChunk(framingBuffer, 0);
+              const plaintext = TransferCrypto.decryptChunk(
+                encryptionKey,
+                decoded.iv,
+                decoded.ciphertext,
+                decoded.tag,
+              );
+
+              hash.update(plaintext);
+              bytesReceived += plaintext.length;
+
+              const canContinue = writeStream.write(plaintext);
+              if (!canContinue) socket.pause();
+
+              framingBuffer = framingBuffer.slice(decoded.bytesConsumed);
+            } catch {
+              // GCM authentication failed
+              cancelled = true;
+              socket.destroy();
+              writeStream.destroy();
+              void FileChunker.deleteFile(savePath);
+              this.emit('error', transferId, Object.assign(new Error('GCM authentication tag mismatch — transfer aborted'), { code: 'DECRYPT_AUTH_FAILED' }));
+              this.activeReceives.delete(transferId);
+              return;
+            }
+          }
+        };
+
+        writeStream.on('drain', () => socket.resume());
+
+        let progressInterval: ReturnType<typeof setInterval> | null = setInterval(() => {
+          const now = Date.now();
+          const elapsed = (now - lastProgressTime) / 1000;
+          speed = elapsed > 0 ? (bytesReceived - lastBytes) / elapsed : 0;
+          lastProgressTime = now;
+          lastBytes = bytesReceived;
+          const eta = speed > 0 ? (fileSize - bytesReceived) / speed : Infinity;
+          this.emit('progress', transferId, bytesReceived, fileSize, speed, eta);
+          if (!socket.destroyed && socket.writable) {
+            const progress = fileSize > 0 ? Math.min(Math.round((bytesReceived / fileSize) * 100), 99) : 0;
+            socket.write(JSON.stringify({ p: progress, b: bytesReceived, s: Math.round(speed), e: Math.round(eta) }) + '\n');
+          }
+        }, PROGRESS_EMIT_INTERVAL_MS);
+
+        // Process any bytes that arrived with the header
+        if (remainingBuffer.length > 0) {
+          processFramingBuffer();
         }
-      }
 
-      let progressInterval: ReturnType<typeof setInterval> | null = setInterval(() => {
-        const now = Date.now();
-        const elapsed = (now - lastProgressTime) / 1000;
-        speed = elapsed > 0 ? (bytesReceived - lastBytes) / elapsed : 0;
-        lastProgressTime = now;
-        lastBytes = bytesReceived;
-        const eta = speed > 0 ? (fileSize - bytesReceived) / speed : Infinity;
-        const progress = fileSize > 0 ? Math.min(Math.round((bytesReceived / fileSize) * 100), 99) : 0;
-        this.emit('progress', transferId, bytesReceived, fileSize, speed, eta);
-        // Write progress feedback back to the sender on the same socket so the
-        // sender can display accurate receive-side progress in its own UI.
-        if (!socket.destroyed && socket.writable) {
-          socket.write(JSON.stringify({ p: progress, b: bytesReceived, s: Math.round(speed), e: Math.round(eta) }) + '\n');
-        }
-      }, PROGRESS_EMIT_INTERVAL_MS);
+        socket.on('data', (chunk: Buffer | string) => {
+          if (cancelled) return;
+          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          framingBuffer = Buffer.concat([framingBuffer, buf]);
+          processFramingBuffer();
+        });
 
-      socket.on('data', (chunk: Buffer | string) => {
-        if (cancelled) return;
-        const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-        hash.update(buf);
-        bytesReceived += buf.length;
-        // Respect write-stream backpressure: if the write buffer is full,
-        // pause the socket until the stream drains to avoid unbounded memory
-        // growth and keep disk I/O from becoming the bottleneck.
-        const canContinue = writeStream.write(buf);
-        if (!canContinue) {
-          socket.pause();
-          writeStream.once('drain', () => socket.resume());
-        }
-      });
+        socket.on('end', () => {
+          if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
+          if (cancelled) return;
 
-      socket.on('end', () => {
-        if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
-        if (cancelled) return;
+          writeStream.end(() => {
+            const receivedChecksum = hash.digest('hex');
+            if (receivedChecksum !== checksum) {
+              void FileChunker.deleteFile(savePath);
+              this.emit('error', transferId, new Error('Checksum mismatch — file corrupted'));
+            } else {
+              this.emit('complete', transferId, savePath);
+            }
+            this.activeReceives.delete(transferId);
+          });
+        });
 
-        writeStream.end(() => {
-          const receivedChecksum = hash.digest('hex');
-          if (receivedChecksum !== checksum) {
+        socket.on('error', (err) => {
+          if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
+          if (!cancelled) {
+            writeStream.destroy();
             void FileChunker.deleteFile(savePath);
-            this.emit('error', transferId, new Error('Checksum mismatch — file corrupted'));
-          } else {
-            this.emit('complete', transferId, savePath);
+            this.emit('error', transferId, err);
           }
           this.activeReceives.delete(transferId);
         });
-      });
 
-      socket.on('error', (err) => {
-        if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
-        if (!cancelled) {
-          writeStream.destroy();
-          void FileChunker.deleteFile(savePath);
-          this.emit('error', transferId, err);
+        socket.resume();
+
+      } else {
+        // ── Plaintext receive path (original behaviour) ────────────────────
+        if (remainingBuffer.length > 0) {
+          hash.update(remainingBuffer);
+          bytesReceived += remainingBuffer.length;
+          const canContinue = writeStream.write(remainingBuffer);
+          if (!canContinue) {
+            socket.pause();
+            writeStream.once('drain', () => socket.resume());
+          }
         }
-        this.activeReceives.delete(transferId);
-      });
 
-      socket.resume();
+        let progressInterval: ReturnType<typeof setInterval> | null = setInterval(() => {
+          const now = Date.now();
+          const elapsed = (now - lastProgressTime) / 1000;
+          speed = elapsed > 0 ? (bytesReceived - lastBytes) / elapsed : 0;
+          lastProgressTime = now;
+          lastBytes = bytesReceived;
+          const eta = speed > 0 ? (fileSize - bytesReceived) / speed : Infinity;
+          const progress = fileSize > 0 ? Math.min(Math.round((bytesReceived / fileSize) * 100), 99) : 0;
+          this.emit('progress', transferId, bytesReceived, fileSize, speed, eta);
+          if (!socket.destroyed && socket.writable) {
+            socket.write(JSON.stringify({ p: progress, b: bytesReceived, s: Math.round(speed), e: Math.round(eta) }) + '\n');
+          }
+        }, PROGRESS_EMIT_INTERVAL_MS);
+
+        socket.on('data', (chunk: Buffer | string) => {
+          if (cancelled) return;
+          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          hash.update(buf);
+          bytesReceived += buf.length;
+          const canContinue = writeStream.write(buf);
+          if (!canContinue) {
+            socket.pause();
+            writeStream.once('drain', () => socket.resume());
+          }
+        });
+
+        socket.on('end', () => {
+          if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
+          if (cancelled) return;
+
+          writeStream.end(() => {
+            const receivedChecksum = hash.digest('hex');
+            if (receivedChecksum !== checksum) {
+              void FileChunker.deleteFile(savePath);
+              this.emit('error', transferId, new Error('Checksum mismatch — file corrupted'));
+            } else {
+              this.emit('complete', transferId, savePath);
+            }
+            this.activeReceives.delete(transferId);
+          });
+        });
+
+        socket.on('error', (err) => {
+          if (progressInterval) { clearInterval(progressInterval); progressInterval = null; }
+          if (!cancelled) {
+            writeStream.destroy();
+            void FileChunker.deleteFile(savePath);
+            this.emit('error', transferId, err);
+          }
+          this.activeReceives.delete(transferId);
+        });
+
+        socket.resume();
+      }
     }).catch((err: Error) => {
       this.emit('error', transferId, err);
     });

@@ -108,6 +108,7 @@ export class DiscoveryService extends EventEmitter {
       version: ann.version,
       lastSeen: now,
       online: true,
+      encryptionSupported: ann.encryptionSupported === true,
     };
 
     const wasOffline = existing ? !existing.online : true;

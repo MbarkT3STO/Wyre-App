@@ -41,6 +41,7 @@ export function registerTransferHandlers(
       peerName: peer.name,
       senderDeviceId: settings.deviceId,
       senderName: settings.deviceName,
+      peerSupportsEncryption: peer.encryptionSupported ?? false,
     });
   });
 

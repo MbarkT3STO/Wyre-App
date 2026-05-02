@@ -233,8 +233,9 @@ export class TransferQueue extends EventEmitter {
     peerName: string;
     senderDeviceId: string;
     senderName: string;
+    peerSupportsEncryption?: boolean;
   }): Promise<string> {
-    const { filePath, peerIp, peerPort, peerId, peerName, senderDeviceId, senderName } = options;
+    const { filePath, peerIp, peerPort, peerId, peerName, senderDeviceId, senderName, peerSupportsEncryption } = options;
 
     const fileName = filePath.split('/').pop() ?? filePath.split('\\').pop() ?? 'file';
 
@@ -263,7 +264,7 @@ export class TransferQueue extends EventEmitter {
       return randomUUID();
     }
 
-    return this.startSend({ filePath, fileName, peerIp, peerPort, peerId, peerName, senderDeviceId, senderName });
+    return this.startSend({ filePath, fileName, peerIp, peerPort, peerId, peerName, senderDeviceId, senderName, peerSupportsEncryption });
   }
 
   /** Start the next pending send if one exists (Feature 1) */
@@ -292,8 +293,9 @@ export class TransferQueue extends EventEmitter {
     peerName: string;
     senderDeviceId: string;
     senderName: string;
+    peerSupportsEncryption?: boolean;
   }): Promise<string> {
-    const { filePath, fileName, peerIp, peerPort, peerId, peerName, senderDeviceId, senderName } = options;
+    const { filePath, fileName, peerIp, peerPort, peerId, peerName, senderDeviceId, senderName, peerSupportsEncryption } = options;
 
     // Compute size and checksum BEFORE starting the TCP connection.
     const fileSize = await FileChunker.getFileSize(filePath);
@@ -338,6 +340,7 @@ export class TransferQueue extends EventEmitter {
       peerPort,
       senderDeviceId,
       senderName,
+      peerSupportsEncryption: peerSupportsEncryption ?? false,
     });
 
     return transferId;

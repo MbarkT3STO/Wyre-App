@@ -466,6 +466,28 @@
   animation: pulse 2.5s ease-in-out infinite;
 }
 
+/* Encryption badge — lock icon shown when peer supports AES-256-GCM */
+.device-card__enc-badge {
+  position: absolute;
+  bottom: -2px;
+  left: -2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--bg-card);
+  border: 1.5px solid var(--success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--success);
+  box-shadow: 0 0 4px rgba(52, 199, 89, 0.4);
+}
+.device-card__enc-badge svg {
+  width: 9px;
+  height: 9px;
+  display: block;
+}
+
 /* Info */
 .device-card__info {
   display: flex;
@@ -1886,6 +1908,7 @@
 .sg__icon--purple  { color: var(--accent-bright); }
 .sg__icon--yellow  { color: #F59E0B; }
 .sg__icon--red     { color: #EF4444; }
+.sg__icon--muted   { color: var(--text-tertiary, #6B7280); }
 
 /* Meta */
 .sg__meta {

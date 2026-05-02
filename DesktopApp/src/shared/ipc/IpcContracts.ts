@@ -82,6 +82,8 @@ export interface DevicesUpdatedPayload {
 export interface TransferSendPayload {
   deviceId: string;
   filePath: string;
+  /** Whether the target peer advertised encryption support */
+  peerSupportsEncryption?: boolean;
 }
 
 /** Main → renderer: a new transfer has been registered (seed the renderer state) */

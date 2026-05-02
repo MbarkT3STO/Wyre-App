@@ -15,6 +15,7 @@ class MockSocket extends EventEmitter {
   destroy = vi.fn();
   pause = vi.fn();
   resume = vi.fn();
+  setNoDelay = vi.fn();
 }
 
 let mockSocket: MockSocket;

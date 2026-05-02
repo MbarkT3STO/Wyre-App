@@ -138,15 +138,16 @@ class WyreManager(
         val transferId = UUID.randomUUID().toString()
 
         val client = TransferClient(
-            transferId     = transferId,
-            filePath       = filePath,
-            fileName       = fileName,
-            fileSize       = fileSize,
-            peerIp         = device.ip,
-            peerPort       = device.port,
-            senderDeviceId = settings.getString("deviceId", ""),
-            senderName     = settings.getString("deviceName", Build.MODEL),
-            onEvent        = ::onTransferEvent
+            transferId            = transferId,
+            filePath              = filePath,
+            fileName              = fileName,
+            fileSize              = fileSize,
+            peerIp                = device.ip,
+            peerPort              = device.port,
+            senderDeviceId        = settings.getString("deviceId", ""),
+            senderName            = settings.getString("deviceName", Build.MODEL),
+            peerSupportsEncryption = device.encryptionSupported,
+            onEvent               = ::onTransferEvent
         )
         // Register before submitting so cancelTransfer() can find it immediately
         activeTransfers[transferId] = client
@@ -240,15 +241,16 @@ class WyreManager(
 
                 val transferId = UUID.randomUUID().toString()
                 val client = TransferClient(
-                    transferId     = transferId,
-                    filePath       = zipFile.absolutePath,
-                    fileName       = zipName,
-                    fileSize       = zipFile.length(),
-                    peerIp         = device.ip,
-                    peerPort       = device.port,
-                    senderDeviceId = settings.getString("deviceId", ""),
-                    senderName     = settings.getString("deviceName", Build.MODEL),
-                    onEvent        = { event ->
+                    transferId            = transferId,
+                    filePath              = zipFile.absolutePath,
+                    fileName              = zipName,
+                    fileSize              = zipFile.length(),
+                    peerIp                = device.ip,
+                    peerPort              = device.port,
+                    senderDeviceId        = settings.getString("deviceId", ""),
+                    senderName            = settings.getString("deviceName", Build.MODEL),
+                    peerSupportsEncryption = device.encryptionSupported,
+                    onEvent               = { event ->
                         onTransferEvent(event)
                         if (event is TransferEvent.Complete || event is TransferEvent.Error) {
                             zipFile.delete()
@@ -500,14 +502,15 @@ class WyreManager(
         val arr = JSArray()
         list.forEach { d ->
             val obj = JSObject()
-            obj.put("id",       d.id)
-            obj.put("name",     d.name)
-            obj.put("platform", d.platform)
-            obj.put("ip",       d.ip)
-            obj.put("port",     d.port)
-            obj.put("version",  d.version)
-            obj.put("lastSeen", d.lastSeen)
-            obj.put("online",   d.online)
+            obj.put("id",                  d.id)
+            obj.put("name",                d.name)
+            obj.put("platform",            d.platform)
+            obj.put("ip",                  d.ip)
+            obj.put("port",                d.port)
+            obj.put("version",             d.version)
+            obj.put("lastSeen",            d.lastSeen)
+            obj.put("online",              d.online)
+            obj.put("encryptionSupported", d.encryptionSupported)
             arr.put(obj)
         }
         return arr

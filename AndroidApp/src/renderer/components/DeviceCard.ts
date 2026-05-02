@@ -72,6 +72,12 @@ export class DeviceCard extends Component {
           ${platformIcon}
         </span>
         <span class="device-card__online-dot" aria-label="Online"></span>
+        ${device.encryptionSupported === true ? `<span class="device-card__enc-badge" title="Encrypted transfers supported" aria-label="Encrypted transfers supported">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </span>` : ''}
       </div>
       <div class="device-card__info">
         <span class="device-card__name">${escapeHtml(device.name)}</span>

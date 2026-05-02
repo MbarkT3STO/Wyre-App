@@ -4,6 +4,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Base64
 import androidx.annotation.RequiresApi
 import java.io.File
 import java.io.OutputStream
@@ -37,7 +38,12 @@ class TransferServer(
     data class PendingEntry(
         val socket: Socket,
         val request: IncomingRequest,
-        val remainingBytes: ByteArray
+        val remainingBytes: ByteArray,
+        /** Receiver key pair — set when sender advertised encryption support */
+        val receiverPubKeyDer: ByteArray? = null,
+        val receiverPrivKey: java.security.PrivateKey? = null,
+        /** Derived AES-256-GCM key — set after key exchange */
+        val encryptionKey: ByteArray? = null
     )
 
     private val pending = ConcurrentHashMap<String, PendingEntry>()
@@ -89,12 +95,22 @@ class TransferServer(
             0L
         }
 
-        val responseJson = """{"accepted":true,"resumeOffset":$validatedOffset}"""
-        out.write((responseJson + "\n").toByteArray())
+        // Build accept response — include encryption key if negotiated
+        val responseJson = org.json.JSONObject().apply {
+            put("accepted",      true)
+            put("resumeOffset",  validatedOffset)
+            if (entry.receiverPubKeyDer != null && entry.encryptionKey != null) {
+                put("encryption", org.json.JSONObject().apply {
+                    put("accepted",          true)
+                    put("receiverPublicKey", Base64.encodeToString(entry.receiverPubKeyDer, Base64.NO_WRAP))
+                })
+            }
+        }
+        out.write((responseJson.toString() + "\n").toByteArray())
         out.flush()
 
         executor.submit {
-            receiveFile(entry.socket, entry.request, saveDir, entry.remainingBytes, validatedOffset)
+            receiveFile(entry.socket, entry.request, saveDir, entry.remainingBytes, validatedOffset, entry.encryptionKey)
         }
     }
 
@@ -134,6 +150,35 @@ class TransferServer(
 
             val fileName = sanitizeFileName(rawFileName)
 
+            // ── Encryption handshake ───────────────────────────────────────────
+            var receiverPubKeyDer: ByteArray? = null
+            var receiverPrivKey: java.security.PrivateKey? = null
+            var encryptionKey: ByteArray? = null
+
+            val encField = json.optJSONObject("encryption")
+            if (encField != null && encField.optBoolean("supported", false)) {
+                val senderPubKeyB64 = encField.optString("senderPublicKey", "")
+                if (senderPubKeyB64.isNotEmpty()) {
+                    try {
+                        val senderPubKeyDer = Base64.decode(senderPubKeyB64, Base64.NO_WRAP)
+                        val (recvPubDer, recvPriv) = TransferCrypto.generateKeyPair()
+                        receiverPubKeyDer = recvPubDer
+                        receiverPrivKey   = recvPriv
+                        encryptionKey = TransferCrypto.deriveKey(
+                            privateKey           = recvPriv,
+                            peerPublicKeyDer     = senderPubKeyDer,
+                            senderPublicKeyDer   = senderPubKeyDer,
+                            receiverPublicKeyDer = recvPubDer,
+                        )
+                    } catch (_: Exception) {
+                        // Key exchange failed — fall back to plaintext
+                        receiverPubKeyDer = null
+                        receiverPrivKey   = null
+                        encryptionKey     = null
+                    }
+                }
+            }
+
             // Read any bytes that arrived after the newline in the same packet
             val available = inp.available()
             if (available > 0) {
@@ -142,7 +187,7 @@ class TransferServer(
             }
 
             val request = IncomingRequest(transferId, senderDeviceId, senderName, fileName, fileSize, checksum, resumeOffset)
-            pending[transferId] = PendingEntry(socket, request, remaining)
+            pending[transferId] = PendingEntry(socket, request, remaining, receiverPubKeyDer, receiverPrivKey, encryptionKey)
             onIncomingRequest(request)
 
         } catch (e: Exception) {
@@ -150,7 +195,7 @@ class TransferServer(
         }
     }
 
-    private fun receiveFile(socket: Socket, req: IncomingRequest, saveDir: String, initial: ByteArray, validatedOffset: Long = 0L) {
+    private fun receiveFile(socket: Socket, req: IncomingRequest, saveDir: String, initial: ByteArray, validatedOffset: Long = 0L, encryptionKey: ByteArray? = null) {
         val startedAt = System.currentTimeMillis()
         onEvent(TransferEvent.Started(
             transferId = req.transferId,
@@ -167,8 +212,6 @@ class TransferServer(
         var lastProgressTime = System.currentTimeMillis()
         var lastBytes = validatedOffset
 
-        // On API 29+ use MediaStore to save directly to public Downloads
-        // On older versions write directly to the file path
         val (outputStream, finalPath, cleanupOnError) = openOutputStream(req.fileName, saveDir, validatedOffset)
             ?: run {
                 onEvent(TransferEvent.Error(req.transferId, "Cannot open output stream", "PATH_ERROR"))
@@ -178,36 +221,98 @@ class TransferServer(
 
         try {
             outputStream.use { fos ->
-                if (initial.isNotEmpty()) {
-                    fos.write(initial)
-                    md.update(initial)
-                    bytesReceived += initial.size
-                }
-
                 val inp = socket.getInputStream()
                 val out = socket.getOutputStream()
-                val buf = ByteArray(CHUNK_SIZE)
-                var read: Int
 
-                while (inp.read(buf).also { read = it } != -1) {
-                    fos.write(buf, 0, read)
-                    md.update(buf, 0, read)
-                    bytesReceived += read
+                if (encryptionKey != null) {
+                    // ── Encrypted receive path ─────────────────────────────────
+                    // Process any bytes that arrived with the header first
+                    // (unlikely for encrypted transfers but handle for correctness)
+                    // For encrypted mode we use the stream-based decoder.
+                    // We need to prepend `initial` to the stream — wrap it.
+                    val combinedStream = if (initial.isNotEmpty()) {
+                        java.io.SequenceInputStream(
+                            java.io.ByteArrayInputStream(initial),
+                            inp
+                        )
+                    } else {
+                        inp
+                    }
 
-                    val now = System.currentTimeMillis()
-                    if (now - lastProgressTime >= PROGRESS_INTERVAL_MS) {
-                        val elapsed = (now - lastProgressTime) / 1000.0
-                        val speed = if (elapsed > 0) ((bytesReceived - lastBytes) / elapsed).toLong() else 0L
-                        val eta = if (speed > 0) (req.fileSize - bytesReceived) / speed else 0L
-                        val progress = if (req.fileSize > 0) ((bytesReceived * 100) / req.fileSize).toInt().coerceAtMost(99) else 0
-                        onEvent(TransferEvent.Progress(req.transferId, progress, speed, eta, bytesReceived, req.fileSize))
-                        try {
-                            val fb = """{"p":$progress,"b":$bytesReceived,"s":$speed,"e":$eta}""" + "\n"
-                            out.write(fb.toByteArray())
-                            out.flush()
-                        } catch (_: Exception) {}
-                        lastProgressTime = now
-                        lastBytes = bytesReceived
+                    while (true) {
+                        val chunk = try {
+                            TransferCrypto.decodeChunkFromStream(combinedStream) ?: break
+                        } catch (_: java.io.IOException) {
+                            break // EOF or stream closed
+                        }
+
+                        val (iv, ciphertext, tag) = chunk
+                        val plaintext = try {
+                            TransferCrypto.decryptChunk(encryptionKey, iv, ciphertext, tag)
+                        } catch (_: javax.crypto.AEADBadTagException) {
+                            cleanupOnError()
+                            onEvent(TransferEvent.Error(req.transferId, "GCM authentication tag mismatch — transfer aborted", "DECRYPT_AUTH_FAILED"))
+                            socket.close()
+                            return
+                        } catch (_: Exception) {
+                            cleanupOnError()
+                            onEvent(TransferEvent.Error(req.transferId, "Decryption failed", "DECRYPT_AUTH_FAILED"))
+                            socket.close()
+                            return
+                        }
+
+                        fos.write(plaintext)
+                        md.update(plaintext)
+                        bytesReceived += plaintext.size
+
+                        val now = System.currentTimeMillis()
+                        if (now - lastProgressTime >= PROGRESS_INTERVAL_MS) {
+                            val elapsed = (now - lastProgressTime) / 1000.0
+                            val speed = if (elapsed > 0) ((bytesReceived - lastBytes) / elapsed).toLong() else 0L
+                            val eta = if (speed > 0) (req.fileSize - bytesReceived) / speed else 0L
+                            val progress = if (req.fileSize > 0) ((bytesReceived * 100) / req.fileSize).toInt().coerceAtMost(99) else 0
+                            onEvent(TransferEvent.Progress(req.transferId, progress, speed, eta, bytesReceived, req.fileSize))
+                            try {
+                                val fb = """{"p":$progress,"b":$bytesReceived,"s":$speed,"e":$eta}""" + "\n"
+                                out.write(fb.toByteArray())
+                                out.flush()
+                            } catch (_: Exception) {}
+                            lastProgressTime = now
+                            lastBytes = bytesReceived
+                        }
+                    }
+
+                } else {
+                    // ── Plaintext receive path (original behaviour) ────────────
+                    if (initial.isNotEmpty()) {
+                        fos.write(initial)
+                        md.update(initial)
+                        bytesReceived += initial.size
+                    }
+
+                    val buf = ByteArray(CHUNK_SIZE)
+                    var read: Int
+
+                    while (inp.read(buf).also { read = it } != -1) {
+                        fos.write(buf, 0, read)
+                        md.update(buf, 0, read)
+                        bytesReceived += read
+
+                        val now = System.currentTimeMillis()
+                        if (now - lastProgressTime >= PROGRESS_INTERVAL_MS) {
+                            val elapsed = (now - lastProgressTime) / 1000.0
+                            val speed = if (elapsed > 0) ((bytesReceived - lastBytes) / elapsed).toLong() else 0L
+                            val eta = if (speed > 0) (req.fileSize - bytesReceived) / speed else 0L
+                            val progress = if (req.fileSize > 0) ((bytesReceived * 100) / req.fileSize).toInt().coerceAtMost(99) else 0
+                            onEvent(TransferEvent.Progress(req.transferId, progress, speed, eta, bytesReceived, req.fileSize))
+                            try {
+                                val fb = """{"p":$progress,"b":$bytesReceived,"s":$speed,"e":$eta}""" + "\n"
+                                out.write(fb.toByteArray())
+                                out.flush()
+                            } catch (_: Exception) {}
+                            lastProgressTime = now
+                            lastBytes = bytesReceived
+                        }
                     }
                 }
             }
