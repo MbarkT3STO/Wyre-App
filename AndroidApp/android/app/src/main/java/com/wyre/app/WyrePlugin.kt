@@ -126,9 +126,35 @@ class WyrePlugin : Plugin() {
     }
 
     @PluginMethod
+    fun sendFolder(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val deviceId   = call.getString("deviceId")   ?: run { call.reject("deviceId required");   return }
+        val folderPath = call.getString("folderPath") ?: run { call.reject("folderPath required"); return }
+        val folderName = call.getString("folderName") ?: run { call.reject("folderName required"); return }
+
+        m.sendFolder(deviceId, folderPath, folderName) { transferId ->
+            if (transferId == null) {
+                call.reject("Failed to send folder — device may be offline or folder could not be zipped")
+            } else {
+                val result = JSObject()
+                result.put("transferId", transferId)
+                call.resolve(result)
+            }
+        }
+    }
+
+    @PluginMethod
     fun cancelTransfer(call: PluginCall) {
         val transferId = call.getString("transferId") ?: run { call.reject("transferId required"); return }
         manager?.cancelTransfer(transferId)
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun resumeTransfer(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val transferId = call.getString("transferId") ?: run { call.reject("transferId required"); return }
+        m.resumeTransfer(transferId)
         call.resolve()
     }
 
@@ -145,6 +171,19 @@ class WyrePlugin : Plugin() {
             m.respondToIncoming(transferId, accepted)
         }
         call.resolve()
+    }
+
+    // ── Clipboard (Feature 2) ─────────────────────────────────────────────────
+
+    @PluginMethod
+    fun sendClipboard(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val deviceId = call.getString("deviceId") ?: run { call.reject("deviceId required"); return }
+        val text     = call.getString("text")     ?: run { call.reject("text required");     return }
+
+        m.sendClipboard(deviceId, text) { error ->
+            if (error != null) call.reject(error) else call.resolve()
+        }
     }
 
     // ── History ───────────────────────────────────────────────────────────────

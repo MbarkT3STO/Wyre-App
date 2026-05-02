@@ -28,7 +28,8 @@ class TransferServer(
     private val executor: ExecutorService,
     private val settings: SettingsStore,
     private val onIncomingRequest: (IncomingRequest) -> Unit,
-    private val onEvent: (TransferEvent) -> Unit
+    private val onEvent: (TransferEvent) -> Unit,
+    private val onClipboardReceived: ((senderName: String, text: String, truncated: Boolean) -> Unit)? = null
 ) {
     private var serverSocket: ServerSocket? = null
     @Volatile private var running = false
@@ -102,6 +103,17 @@ class TransferServer(
             }
 
             val json = org.json.JSONObject(headerBuf.toString())
+
+            // ── Clipboard frame — not a file transfer ──────────────────────────
+            if (json.optString("type") == "clipboard") {
+                val senderName = json.optString("senderName", "Unknown")
+                val text       = json.optString("text", "")
+                val truncated  = json.optBoolean("truncated", false)
+                socket.close()
+                onClipboardReceived?.invoke(senderName, text, truncated)
+                return
+            }
+
             val transferId     = json.getString("transferId")
             val senderDeviceId = json.getString("senderDeviceId")
             val senderName     = json.getString("senderName")

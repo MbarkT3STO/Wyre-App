@@ -32,11 +32,28 @@ class WyreManager(
     private var transferServer: TransferServer? = null
     private val activeTransfers = ConcurrentHashMap<String, Any>()
 
+    /** Paused transfers waiting for resume (Feature 4) */
+    private data class PausedTransfer(
+        val peerId: String,
+        val filePath: String,
+        val fileName: String,
+        val fileSize: Long
+    )
+    private val pausedTransfers = ConcurrentHashMap<String, PausedTransfer>()
+
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     fun start() {
         val port = settings.getInt("transferPort", 49200)
-        transferServer = TransferServer(context, port, executor, settings, ::onIncomingRequest, ::onTransferEvent)
+        transferServer = TransferServer(
+            context             = context,
+            preferredPort       = port,
+            executor            = executor,
+            settings            = settings,
+            onIncomingRequest   = ::onIncomingRequest,
+            onEvent             = ::onTransferEvent,
+            onClipboardReceived = ::onClipboardReceived
+        )
         val actualPort = transferServer!!.start()
         if (actualPort != port) settings.setInt("transferPort", actualPort)
 
@@ -140,6 +157,133 @@ class WyreManager(
         transferServer?.respond(transferId, accepted, saveDir = savePath)
     }
 
+    // ── Clipboard (Feature 2) ─────────────────────────────────────────────────
+
+    /**
+     * Sends a clipboard text frame to a peer over TCP.
+     * Uses the same newline-terminated JSON header format as file transfers,
+     * but with type:"clipboard" so the receiver's TransferServer can distinguish it.
+     */
+    fun sendClipboard(deviceId: String, text: String, callback: (String?) -> Unit) {
+        val device = discoveryService?.getDevices()?.find { it.id == deviceId && it.online }
+        if (device == null) { callback("Device not found or offline"); return }
+
+        val senderName = settings.getString("deviceName", Build.MODEL)
+        val senderDeviceId = settings.getString("deviceId", "")
+        val truncated = text.length > 5000
+        val safeText = if (truncated) text.take(5000) else text
+
+        executor.submit {
+            try {
+                val sock = java.net.Socket(device.ip, device.port)
+                sock.use {
+                    val frame = org.json.JSONObject().apply {
+                        put("type",           "clipboard")
+                        put("senderDeviceId", senderDeviceId)
+                        put("senderName",     senderName)
+                        put("text",           safeText)
+                        put("truncated",      truncated)
+                    }.toString() + "\n"
+                    it.getOutputStream().write(frame.toByteArray(Charsets.UTF_8))
+                    it.getOutputStream().flush()
+                }
+                callback(null)
+            } catch (e: Exception) {
+                callback(e.message ?: "Failed to send clipboard")
+            }
+        }
+    }
+
+    // ── Folder send (Feature 1) ───────────────────────────────────────────────
+
+    /**
+     * Zips a folder on a background thread then sends the zip via TransferClient.
+     * The zip is written to the app cache dir and deleted after the transfer.
+     */
+    fun sendFolder(deviceId: String, folderPath: String, folderName: String, callback: (String?) -> Unit) {
+        val device = discoveryService?.getDevices()?.find { it.id == deviceId && it.online }
+        if (device == null) { callback(null); return }
+
+        executor.submit {
+            try {
+                val zipName = "$folderName.zip"
+                val zipFile = java.io.File(context.cacheDir, "wyre-${System.currentTimeMillis()}-$zipName")
+
+                zipFolder(java.io.File(folderPath), zipFile)
+
+                val transferId = UUID.randomUUID().toString()
+                executor.submit {
+                    TransferClient(
+                        transferId     = transferId,
+                        filePath       = zipFile.absolutePath,
+                        fileName       = zipName,
+                        fileSize       = zipFile.length(),
+                        peerIp         = device.ip,
+                        peerPort       = device.port,
+                        senderDeviceId = settings.getString("deviceId", ""),
+                        senderName     = settings.getString("deviceName", Build.MODEL),
+                        onEvent        = { event ->
+                            onTransferEvent(event)
+                            if (event is TransferEvent.Complete || event is TransferEvent.Error) {
+                                zipFile.delete()
+                            }
+                        }
+                    ).send()
+                }
+                callback(transferId)
+            } catch (e: Exception) {
+                android.util.Log.e("WyreManager", "sendFolder failed: ${e.message}", e)
+                callback(null)
+            }
+        }
+    }
+
+    /** Recursively zips a folder into a zip file using java.util.zip */
+    private fun zipFolder(folder: java.io.File, zipFile: java.io.File) {
+        java.util.zip.ZipOutputStream(zipFile.outputStream().buffered()).use { zos ->
+            fun addEntry(file: java.io.File, entryName: String) {
+                if (file.isDirectory) {
+                    file.listFiles()?.forEach { child ->
+                        addEntry(child, "$entryName/${child.name}")
+                    }
+                } else {
+                    zos.putNextEntry(java.util.zip.ZipEntry(entryName))
+                    file.inputStream().use { it.copyTo(zos) }
+                    zos.closeEntry()
+                }
+            }
+            folder.listFiles()?.forEach { child -> addEntry(child, child.name) }
+        }
+    }
+
+    // ── Resume (Feature 4) ────────────────────────────────────────────────────
+
+    /**
+     * Resume a paused transfer. The native side tracks paused transfers by ID.
+     * If the transfer is found and the peer is still online, re-sends from the
+     * last known byte offset.
+     */
+    fun resumeTransfer(transferId: String) {
+        val paused = pausedTransfers[transferId] ?: return
+        val device = discoveryService?.getDevices()?.find { it.id == paused.peerId && it.online } ?: return
+
+        pausedTransfers.remove(transferId)
+
+        executor.submit {
+            TransferClient(
+                transferId     = transferId,
+                filePath       = paused.filePath,
+                fileName       = paused.fileName,
+                fileSize       = paused.fileSize,
+                peerIp         = device.ip,
+                peerPort       = device.port,
+                senderDeviceId = settings.getString("deviceId", ""),
+                senderName     = settings.getString("deviceName", Build.MODEL),
+                onEvent        = ::onTransferEvent
+            ).send()
+        }
+    }
+
     // ── History ───────────────────────────────────────────────────────────────
 
     fun getHistoryJson(): JSArray {
@@ -218,6 +362,14 @@ class WyreManager(
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
+
+    private fun onClipboardReceived(senderName: String, text: String, truncated: Boolean) {
+        val obj = JSObject()
+        obj.put("senderName", senderName)
+        obj.put("text",       text)
+        obj.put("truncated",  truncated)
+        notifyFn("clipboardReceived", obj)
+    }
 
     private fun onIncomingRequest(req: IncomingRequest) {
         val obj = JSObject()
