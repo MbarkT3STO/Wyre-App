@@ -24,7 +24,8 @@ class WyreManager(
     private val context: Context,
     private val notifyFn: (event: String, data: JSObject) -> Unit
 ) {
-    private val executor = Executors.newScheduledThreadPool(2)
+    private val executor = Executors.newCachedThreadPool()
+    private val scheduler = java.util.concurrent.Executors.newSingleThreadScheduledExecutor()
     private val settings = SettingsStore(context)
     private val history: MutableList<JSObject> = java.util.Collections.synchronizedList(mutableListOf())
 
@@ -70,7 +71,7 @@ class WyreManager(
         discoveryService!!.start()
 
         // Evict stale paused transfers older than 24 hours
-        (executor as? java.util.concurrent.ScheduledExecutorService)?.scheduleAtFixedRate({
+        scheduler.scheduleAtFixedRate({
             val cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
             pausedTransfers.entries.removeIf { it.value.pausedAt < cutoff }
         }, 30, 30, java.util.concurrent.TimeUnit.MINUTES)
@@ -79,6 +80,7 @@ class WyreManager(
     fun stop() {
         discoveryService?.stop()
         transferServer?.stop()
+        scheduler.shutdownNow()
         executor.shutdownNow()
     }
 
