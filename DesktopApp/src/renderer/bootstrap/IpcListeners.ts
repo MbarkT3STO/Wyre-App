@@ -1,0 +1,214 @@
+/**
+ * IpcListeners.ts
+ * Wires all IpcClient event listeners to StateManager updates and toast notifications.
+ */
+
+import { IpcClient } from '../core/IpcClient';
+import { StateManager } from '../core/StateManager';
+import type { ToastContainer } from '../components/ToastContainer';
+import type { Router } from '../core/Router';
+import { TransferStatus } from '../../shared/models/Transfer';
+import type { Transfer } from '../../shared/models/Transfer';
+import { IncomingDialog } from '../components/IncomingDialog';
+import type { IncomingRequestPayload } from '../../shared/ipc/IpcContracts';
+
+function showIncomingDialog(payload: IncomingRequestPayload, toasts: ToastContainer): void {
+  const dialogMount = document.getElementById('dialog-mount');
+  if (!dialogMount) return;
+
+  const settings = StateManager.get('settings');
+  const timeout = settings?.autoDeclineTimeout ?? 30;
+
+  const dialog = new IncomingDialog(payload, timeout);
+
+  const originalUnmount = dialog.unmount.bind(dialog);
+  dialog.unmount = () => {
+    originalUnmount();
+    showNextIncomingDialog(toasts);
+  };
+
+  dialog.mount(dialogMount);
+}
+
+function showNextIncomingDialog(toasts: ToastContainer): void {
+  const queue = StateManager.get('pendingIncomingQueue');
+  if (queue.length === 0) return;
+
+  const [, ...remaining] = queue;
+  StateManager.setState('pendingIncomingQueue', remaining);
+
+  if (remaining.length > 0) {
+    showIncomingDialog(remaining[0], toasts);
+  }
+}
+
+/**
+ * Registers all IpcClient event listeners. Call once during bootstrap.
+ */
+export function wireIpcListeners(toasts: ToastContainer, _router: Router): void {
+  // Device updates
+  const unsubDevices = IpcClient.onDevicesUpdated(({ devices }) => {
+    StateManager.setState('devices', devices);
+  });
+
+  // Transfer started — seeds the renderer state so progress events can land.
+  const unsubStarted = IpcClient.onTransferStarted((payload) => {
+    const existing = StateManager.get('activeTransfers').get(payload.transferId);
+    if (!existing) {
+      StateManager.updateTransfer({
+        id: payload.transferId,
+        direction: payload.direction,
+        status: payload.status,
+        peerId: payload.peerId,
+        peerName: payload.peerName,
+        fileName: payload.fileName,
+        fileSize: payload.fileSize,
+        filePath: '',
+        bytesTransferred: 0,
+        progress: 0,
+        speed: 0,
+        eta: 0,
+        startedAt: Date.now(),
+        checksum: '',
+      });
+    } else {
+      StateManager.updateTransfer({
+        ...existing,
+        status: payload.status,
+        peerName: payload.peerName,
+        fileName: payload.fileName,
+        fileSize: payload.fileSize,
+      });
+    }
+  });
+
+  // Transfer progress
+  const unsubProgress = IpcClient.onTransferProgress((payload) => {
+    const existing = StateManager.get('activeTransfers').get(payload.transferId);
+    if (existing) {
+      StateManager.updateTransfer({
+        ...existing,
+        status: TransferStatus.Active,
+        bytesTransferred: payload.bytesTransferred,
+        progress: payload.progress,
+        speed: payload.speed,
+        eta: payload.eta,
+      });
+    } else {
+      StateManager.updateTransfer({
+        id: payload.transferId,
+        direction: 'send',
+        status: TransferStatus.Active,
+        peerId: '',
+        peerName: '',
+        fileName: '',
+        fileSize: payload.totalBytes,
+        filePath: '',
+        bytesTransferred: payload.bytesTransferred,
+        progress: payload.progress,
+        speed: payload.speed,
+        eta: payload.eta,
+        startedAt: Date.now(),
+        checksum: '',
+      });
+    }
+  });
+
+  // Transfer complete
+  const unsubComplete = IpcClient.onTransferComplete((payload) => {
+    const existing = StateManager.get('activeTransfers').get(payload.transferId);
+    if (existing) {
+      const completed: Transfer = {
+        ...existing,
+        status: TransferStatus.Completed,
+        progress: 100,
+        completedAt: Date.now(),
+        savedPath: payload.savedPath,
+      };
+      StateManager.updateTransfer(completed);
+      if (existing.direction === 'receive') {
+        toasts.success(
+          `${existing.fileName} transferred`,
+          'Show in folder',
+          payload.savedPath
+            ? () => window.dispatchEvent(new CustomEvent('filedrop:show-in-folder', { detail: { path: payload.savedPath } }))
+            : undefined,
+        );
+      } else {
+        toasts.success(`${existing.fileName} sent successfully`);
+      }
+    }
+    IpcClient.getHistory().then(h => StateManager.setState('transferHistory', h)).catch(() => { /* non-fatal */ });
+  });
+
+  // Transfer error
+  const unsubError = IpcClient.onTransferError((payload) => {
+    const existing = StateManager.get('activeTransfers').get(payload.transferId);
+    if (existing) {
+      StateManager.updateTransfer({
+        ...existing,
+        status: TransferStatus.Failed,
+        completedAt: Date.now(),
+        errorMessage: payload.error,
+        errorCode: payload.code,
+      });
+    }
+    if (payload.code !== 'CANCELLED' && payload.code !== 'DECLINED') {
+      toasts.error(`Transfer failed: ${payload.error}`);
+    }
+    IpcClient.getHistory().then(h => StateManager.setState('transferHistory', h)).catch(() => { /* non-fatal */ });
+  });
+
+  // Incoming request
+  const unsubIncoming = IpcClient.onIncomingRequest((payload) => {
+    const queue = StateManager.get('pendingIncomingQueue');
+    StateManager.setState('pendingIncomingQueue', [...queue, payload]);
+    if (queue.length === 0) {
+      showIncomingDialog(payload, toasts);
+    }
+  });
+
+  // Outgoing send queue
+  const unsubSendQueue = IpcClient.onTransferQueueUpdated((payload) => {
+    StateManager.setState('sendQueue', payload.queue);
+  });
+
+  // Clipboard received
+  const unsubClipboard = IpcClient.onClipboardReceived(({ senderName, text, truncated }) => {
+    const preview = text.length > 120 ? text.slice(0, 120) + '…' : text;
+    const truncNote = truncated ? ' (truncated to 5000 chars)' : '';
+    toasts.show({
+      type: 'info',
+      message: `${senderName}: "${preview}"${truncNote}`,
+      actionLabel: 'Copy',
+      onAction: () => { void navigator.clipboard.writeText(text); },
+      duration: 8000,
+    });
+  });
+
+  // Transfer paused
+  const unsubPaused = IpcClient.onTransferPaused((payload) => {
+    const existing = StateManager.get('activeTransfers').get(payload.transferId);
+    if (existing) {
+      StateManager.updateTransfer({
+        ...existing,
+        status: TransferStatus.Paused,
+        bytesTransferred: payload.bytesTransferred,
+        resumeOffset: payload.bytesTransferred,
+      });
+    }
+  });
+
+  // Cleanup on unload
+  window.addEventListener('unload', () => {
+    unsubDevices();
+    unsubStarted();
+    unsubProgress();
+    unsubComplete();
+    unsubError();
+    unsubIncoming();
+    unsubSendQueue();
+    unsubClipboard();
+    unsubPaused();
+  });
+}

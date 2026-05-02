@@ -43,14 +43,12 @@ describe('FolderZipper', () => {
       const progressValues: number[] = [];
       await FolderZipper.zip(srcDir, destPath, (pct) => progressValues.push(pct));
 
-      // File must exist
-      const stat = await fsp.stat(destPath);
-      expect(stat.size).toBeGreaterThan(0);
-
-      // First 4 bytes of an empty ZIP are the EOCD signature (0x06054b50, little-endian)
+      // An empty ZIP is exactly 22 bytes: just the End-of-Central-Directory record.
+      // EOCD starts at byte 0. Little-endian signature 0x06054b50 = bytes [0x50, 0x4B, 0x05, 0x06]
       const buf = await fsp.readFile(destPath);
-      expect(buf[0]).toBe(0x50); // P
-      expect(buf[1]).toBe(0x4b); // K
+      expect(buf.length).toBe(22);
+      expect(buf[0]).toBe(0x50);
+      expect(buf[1]).toBe(0x4b);
       expect(buf[2]).toBe(0x05);
       expect(buf[3]).toBe(0x06);
 

@@ -7,8 +7,7 @@
     "buildResources": "assets"
   },
   "files": [
-    "dist/**/*",
-    "index.html"
+    "dist/**/*"
   ],
   "extraResources": [
     {
@@ -35,6 +34,10 @@
     "target": [
       {
         "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
         "arch": ["x64"]
       }
     ],
@@ -66,5 +69,11 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true
+  },
+  "publish": {
+    "provider": "github",
+    "owner": "your-org",
+    "repo": "wyre",
+    "releaseType": "release"
   }
 }

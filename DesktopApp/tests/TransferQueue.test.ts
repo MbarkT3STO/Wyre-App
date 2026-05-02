@@ -332,6 +332,7 @@ describe('resume flow', () => {
         resumeOffset: 512,
         peerIp: '192.168.1.20',
         peerPort: 5001,
+        filePath: DEFAULT_SEND_OPTS.filePath,
       }),
     );
   });

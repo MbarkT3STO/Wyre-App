@@ -17,7 +17,13 @@ export interface Route {
 export class Router {
   private routes: Map<string, Route> = new Map();
   private outlet: HTMLElement | null = null;
-  private currentPath = '';
+  private currentPath: string | null = null;
+  private beforeEachHook: ((to: string, from: string | null) => boolean) | null = null;
+
+  beforeEach(hook: (to: string, from: string | null) => boolean): this {
+    this.beforeEachHook = hook;
+    return this;
+  }
 
   register(route: Route): this {
     this.routes.set(route.path, route);
@@ -43,6 +49,10 @@ export class Router {
   private render(path: string): void {
     if (!this.outlet) return;
     if (path === this.currentPath) return;
+
+    if (this.beforeEachHook && !this.beforeEachHook(path, this.currentPath)) {
+      return; // navigation cancelled
+    }
 
     const route = this.routes.get(path) ?? this.routes.get('/home');
     if (!route) return;
@@ -73,3 +83,6 @@ export class Router {
     document.title = `Wyre — ${route.title}`;
   }
 }
+
+/** Module-level singleton — allows views to access the router without prop-drilling. */
+export const appRouter = new Router();

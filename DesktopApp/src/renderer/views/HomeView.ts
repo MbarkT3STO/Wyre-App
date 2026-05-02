@@ -14,6 +14,7 @@ import { TransferList } from '../components/TransferList';
 import { ClipboardSendBar } from '../components/ClipboardSendBar';
 import { StateManager } from '../core/StateManager';
 import { IpcClient } from '../core/IpcClient';
+import { appRouter } from '../core/Router';
 import type { ToastContainer } from '../components/ToastContainer';
 import { TransferStatus } from '../../shared/models/Transfer';
 
@@ -27,6 +28,7 @@ export class HomeView extends Component {
   private sendBtn: HTMLButtonElement | null = null;
   private queueIndicator: HTMLElement | null = null;
   private mainQueueCount = 0;
+  private isSending = false;
 
   constructor(toasts: ToastContainer) {
     super();
@@ -154,6 +156,15 @@ export class HomeView extends Component {
 
     // Initial state
     this.updateSelectedDeviceInfo(StateManager.get('selectedDeviceIds'));
+
+    // Warn if the user tries to navigate away mid-send
+    appRouter.beforeEach((to, from) => {
+      if (this.isSending && to !== from) {
+        this.toasts.warning('A send is in progress — please wait.');
+        return false; // cancel navigation
+      }
+      return true;
+    });
   }
 
   private updateSelectedDeviceInfo(deviceIds: string[]): void {
@@ -242,6 +253,7 @@ export class HomeView extends Component {
 
     if (deviceIds.length === 0 || files.length === 0 || !this.sendBtn) return;
 
+    this.isSending = true;
     try {
       this.sendBtn.disabled = true;
       this.sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane btn__icon"></i> Sending…`;
@@ -272,6 +284,8 @@ export class HomeView extends Component {
       this.toasts.error(message);
       this.resetSendButton();
       this.updateSendButton();
+    } finally {
+      this.isSending = false;
     }
   }
 

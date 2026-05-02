@@ -6,6 +6,7 @@
 
 import { app, Tray, Menu, nativeImage } from 'electron';
 import { join } from 'path';
+import { autoUpdater } from 'electron-updater';
 import { WindowManager } from './WindowManager';
 import { SettingsStore } from '../store/SettingsStore';
 import { DiscoveryService } from '../discovery/DiscoveryService';
@@ -85,6 +86,11 @@ export class AppBootstrapper {
 
     // Create window
     this.windowManager.createMainWindow();
+
+    // Check for updates in production builds only
+    if (app.isPackaged) {
+      autoUpdater.checkForUpdatesAndNotify();
+    }
 
     // Start discovery
     this.discoveryService.start();
