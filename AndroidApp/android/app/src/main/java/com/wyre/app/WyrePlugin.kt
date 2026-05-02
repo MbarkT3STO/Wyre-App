@@ -135,12 +135,14 @@ class WyrePlugin : Plugin() {
         val treeUri = android.net.Uri.parse(folderUri)
 
         m.sendFolder(deviceId, treeUri, folderName) { transferId ->
-            if (transferId == null) {
-                call.reject("Failed to send folder — device may be offline or folder could not be zipped")
-            } else {
-                val result = JSObject()
-                result.put("transferId", transferId)
-                call.resolve(result)
+            mainHandler.post {
+                if (transferId == null) {
+                    call.reject("Failed to send folder — device may be offline or folder could not be zipped")
+                } else {
+                    val result = JSObject()
+                    result.put("transferId", transferId)
+                    call.resolve(result)
+                }
             }
         }
     }
@@ -184,7 +186,9 @@ class WyrePlugin : Plugin() {
         val text     = call.getString("text")     ?: run { call.reject("text required");     return }
 
         m.sendClipboard(deviceId, text) { error ->
-            if (error != null) call.reject(error) else call.resolve()
+            mainHandler.post {
+                if (error != null) call.reject(error) else call.resolve()
+            }
         }
     }
 
@@ -294,9 +298,11 @@ class WyrePlugin : Plugin() {
         }
 
         m.resolveUris(uris) { filesArray ->
-            val res = JSObject()
-            res.put("files", filesArray)
-            call.resolve(res)
+            mainHandler.post {
+                val res = JSObject()
+                res.put("files", filesArray)
+                call.resolve(res)
+            }
         }
     }
 
