@@ -132,17 +132,11 @@ export function registerTransferHandlers(
     }
     const { transferId } = payload as { transferId: string };
 
-    // Look up the paused transfer to get peer info
-    const history = transferQueue.getHistory();
-    void history; // history doesn't have peer IP — we need the live transfer
-
-    // Resolve peer from discovery service
     const transfer = transferQueue.getPausedTransfer(transferId);
-    if (!transfer) throw new Error(`Transfer ${transferId} not found or not paused`);
+    if (!transfer) throw new Error('Transfer not found or not paused');
 
-    const devices = discoveryService.getDevices();
-    const peer = devices.find(d => d.id === transfer.peerId);
-    if (!peer) throw new Error(`Peer device ${transfer.peerId} is no longer online`);
+    const peer = discoveryService.getDevices().find(d => d.id === transfer.peerId);
+    if (!peer) throw new Error('Peer device is offline');
 
     const settings = settingsStore.get();
     await transferQueue.resumeTransferWithPeer(

@@ -5,7 +5,7 @@
  * lightweight JSON clipboard frame instead of a file.
  */
 
-import { IpcMain, BrowserWindow } from 'electron';
+import { IpcMain } from 'electron';
 import { connect } from 'net';
 import { IpcChannels } from '../../../shared/ipc/IpcContracts';
 import type { ClipboardSendPayload, ClipboardReceivedPayload } from '../../../shared/ipc/IpcContracts';
@@ -23,7 +23,6 @@ export function registerClipboardHandlers(
   ipcMain: IpcMain,
   discoveryService: DiscoveryService,
   settingsStore: SettingsStore,
-  getMainWindow: () => BrowserWindow | null,
 ): void {
   ipcMain.handle(IpcChannels.CLIPBOARD_SEND, async (_event, payload: unknown): Promise<void> => {
     const { deviceId, text } = validateClipboardPayload(payload);
@@ -56,17 +55,17 @@ export function registerClipboardHandlers(
         resolve();
       });
 
+      socket.setTimeout(5000);
+      socket.on('timeout', () => {
+        socket.destroy(new Error('Clipboard send timed out'));
+      });
+
       socket.on('error', (err) => {
         logger()?.warn('Clipboard send failed', { deviceId, error: err.message });
         reject(err);
       });
     });
   });
-
-  // Wire clipboard-received push from TransferServer → renderer
-  // This is called by IpcBridge after wiring the server event.
-  // The actual event wiring happens in IpcBridge.wireClipboardEvents().
-  void getMainWindow; // used by IpcBridge caller
 }
 
 /** Push a received clipboard payload to the renderer */
@@ -80,7 +79,7 @@ export function pushClipboardReceived(
   }
 }
 
-function validateClipboardPayload(payload: unknown): ClipboardSendPayload {
+export function validateClipboardPayload(payload: unknown): ClipboardSendPayload {
   if (
     typeof payload !== 'object' ||
     payload === null ||

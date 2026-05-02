@@ -8,13 +8,16 @@
  *   - Local file headers + compressed data for each entry
  *   - Central directory at the end
  *   - End-of-central-directory record
+ *
+ * Streaming write: each entry is written directly to the file descriptor as it
+ * is compressed, keeping peak RAM usage at O(single largest file) rather than
+ * O(total folder size).
  */
 
-import { promises as fsp, createReadStream } from 'fs';
-import { join, relative, basename } from 'path';
+import { promises as fsp } from 'fs';
+import { join, relative } from 'path';
 import { deflateRaw } from 'zlib';
 import { promisify } from 'util';
-import { createHash } from 'crypto';
 
 const deflateRawAsync = promisify(deflateRaw);
 
@@ -112,6 +115,7 @@ export class FolderZipper {
   /**
    * Zip `folderPath` into `destPath`, calling `onProgress(pct)` as files are written.
    * Uses DEFLATE compression via Node's built-in zlib.
+   * Streams each entry directly to disk — peak RAM is O(single largest file).
    */
   static async zip(
     folderPath: string,
@@ -127,120 +131,120 @@ export class FolderZipper {
       return;
     }
 
-    const chunks: Buffer[] = [];
-    const entries: ZipEntry[] = [];
-    let offset = 0;
-    const { date: dosDate, time: dosTime } = dosDateTime();
+    const fd = await fsp.open(destPath, 'w');
+    try {
+      const entries: ZipEntry[] = [];
+      let offset = 0;
+      const { date: dosDate, time: dosTime } = dosDateTime();
 
-    for (let i = 0; i < allFiles.length; i++) {
-      const filePath = allFiles[i]!;
-      // Store relative path with forward slashes (ZIP spec)
-      const relPath = relative(folderPath, filePath).replace(/\\/g, '/');
-      const nameBytes = Buffer.from(relPath, 'utf8');
+      for (let i = 0; i < allFiles.length; i++) {
+        const filePath = allFiles[i]!;
+        // Store relative path with forward slashes (ZIP spec)
+        const relPath = relative(folderPath, filePath).replace(/\\/g, '/');
+        const nameBytes = Buffer.from(relPath, 'utf8');
 
-      // Read file
-      const fileData = await fsp.readFile(filePath);
-      const uncompressedSize = fileData.length;
-      const crc = crc32(fileData);
+        // Read file
+        const fileData = await fsp.readFile(filePath);
+        const uncompressedSize = fileData.length;
+        const crc = crc32(fileData);
 
-      // Compress
-      let compressed: Buffer;
-      let compressionMethod: number;
-      if (uncompressedSize === 0) {
-        compressed = Buffer.alloc(0);
-        compressionMethod = COMPRESSION_STORED;
-      } else {
-        compressed = await deflateRawAsync(fileData) as Buffer;
-        // Only use DEFLATE if it actually shrinks the data
-        if (compressed.length >= uncompressedSize) {
-          compressed = fileData;
+        // Compress
+        let compressed: Buffer;
+        let compressionMethod: number;
+        if (uncompressedSize === 0) {
+          compressed = Buffer.alloc(0);
           compressionMethod = COMPRESSION_STORED;
         } else {
-          compressionMethod = COMPRESSION_DEFLATE;
+          compressed = await deflateRawAsync(fileData) as Buffer;
+          // Only use DEFLATE if it actually shrinks the data
+          if (compressed.length >= uncompressedSize) {
+            compressed = fileData;
+            compressionMethod = COMPRESSION_STORED;
+          } else {
+            compressionMethod = COMPRESSION_DEFLATE;
+          }
         }
+
+        const compressedSize = compressed.length;
+
+        // Local file header (30 bytes + name)
+        const localHeader = Buffer.alloc(30 + nameBytes.length);
+        writeUInt32LE(localHeader, 0,  LOCAL_FILE_HEADER_SIG);
+        writeUInt16LE(localHeader, 4,  VERSION_NEEDED);
+        writeUInt16LE(localHeader, 6,  0);                   // general purpose bit flag
+        writeUInt16LE(localHeader, 8,  compressionMethod);
+        writeUInt16LE(localHeader, 10, dosTime);
+        writeUInt16LE(localHeader, 12, dosDate);
+        writeUInt32LE(localHeader, 14, crc);
+        writeUInt32LE(localHeader, 18, compressedSize);
+        writeUInt32LE(localHeader, 22, uncompressedSize);
+        writeUInt16LE(localHeader, 26, nameBytes.length);
+        writeUInt16LE(localHeader, 28, 0);                   // extra field length
+        nameBytes.copy(localHeader, 30);
+
+        entries.push({
+          localHeaderOffset: offset,
+          nameBytes,
+          crc,
+          compressedSize,
+          uncompressedSize,
+          compressionMethod,
+          dosDate,
+          dosTime,
+        });
+
+        // Stream directly to disk — no in-memory accumulation
+        await fd.write(localHeader);
+        await fd.write(compressed);
+        offset += localHeader.length + compressedSize;
+
+        onProgress(Math.round(((i + 1) / total) * 90)); // 0–90% for file writing
       }
 
-      const compressedSize = compressed.length;
+      // Central directory — written entry by entry
+      const centralDirOffset = offset;
+      for (const entry of entries) {
+        const cdHeader = Buffer.alloc(46 + entry.nameBytes.length);
+        writeUInt32LE(cdHeader, 0,  CENTRAL_DIR_HEADER_SIG);
+        writeUInt16LE(cdHeader, 4,  VERSION_MADE_BY);
+        writeUInt16LE(cdHeader, 6,  VERSION_NEEDED);
+        writeUInt16LE(cdHeader, 8,  0);                          // general purpose bit flag
+        writeUInt16LE(cdHeader, 10, entry.compressionMethod);
+        writeUInt16LE(cdHeader, 12, entry.dosTime);
+        writeUInt16LE(cdHeader, 14, entry.dosDate);
+        writeUInt32LE(cdHeader, 16, entry.crc);
+        writeUInt32LE(cdHeader, 20, entry.compressedSize);
+        writeUInt32LE(cdHeader, 24, entry.uncompressedSize);
+        writeUInt16LE(cdHeader, 28, entry.nameBytes.length);
+        writeUInt16LE(cdHeader, 30, 0);                          // extra field length
+        writeUInt16LE(cdHeader, 32, 0);                          // file comment length
+        writeUInt16LE(cdHeader, 34, 0);                          // disk number start
+        writeUInt16LE(cdHeader, 36, 0);                          // internal file attributes
+        writeUInt32LE(cdHeader, 38, 0);                          // external file attributes
+        writeUInt32LE(cdHeader, 42, entry.localHeaderOffset);
+        entry.nameBytes.copy(cdHeader, 46);
+        await fd.write(cdHeader);
+        offset += cdHeader.length;
+      }
 
-      // Local file header (30 bytes + name)
-      const localHeader = Buffer.alloc(30 + nameBytes.length);
-      writeUInt32LE(localHeader, 0,  LOCAL_FILE_HEADER_SIG);
-      writeUInt16LE(localHeader, 4,  VERSION_NEEDED);
-      writeUInt16LE(localHeader, 6,  0);                   // general purpose bit flag
-      writeUInt16LE(localHeader, 8,  compressionMethod);
-      writeUInt16LE(localHeader, 10, dosTime);
-      writeUInt16LE(localHeader, 12, dosDate);
-      writeUInt32LE(localHeader, 14, crc);
-      writeUInt32LE(localHeader, 18, compressedSize);
-      writeUInt32LE(localHeader, 22, uncompressedSize);
-      writeUInt16LE(localHeader, 26, nameBytes.length);
-      writeUInt16LE(localHeader, 28, 0);                   // extra field length
-      nameBytes.copy(localHeader, 30);
+      const centralDirSize = offset - centralDirOffset;
 
-      entries.push({
-        localHeaderOffset: offset,
-        nameBytes,
-        crc,
-        compressedSize,
-        uncompressedSize,
-        compressionMethod,
-        dosDate,
-        dosTime,
-      });
-
-      chunks.push(localHeader, compressed);
-      offset += localHeader.length + compressedSize;
-
-      onProgress(Math.round(((i + 1) / total) * 90)); // 0–90% for file writing
+      // End of central directory record
+      const eocd = Buffer.alloc(22);
+      writeUInt32LE(eocd, 0,  END_OF_CENTRAL_DIR_SIG);
+      writeUInt16LE(eocd, 4,  0);                    // disk number
+      writeUInt16LE(eocd, 6,  0);                    // disk with central dir
+      writeUInt16LE(eocd, 8,  entries.length);        // entries on this disk
+      writeUInt16LE(eocd, 10, entries.length);        // total entries
+      writeUInt32LE(eocd, 12, centralDirSize);
+      writeUInt32LE(eocd, 16, centralDirOffset);
+      writeUInt16LE(eocd, 20, 0);                    // comment length
+      await fd.write(eocd);
+    } finally {
+      await fd.close();
     }
 
-    // Central directory
-    const centralDirOffset = offset;
-    for (const entry of entries) {
-      const cdHeader = Buffer.alloc(46 + entry.nameBytes.length);
-      writeUInt32LE(cdHeader, 0,  CENTRAL_DIR_HEADER_SIG);
-      writeUInt16LE(cdHeader, 4,  VERSION_MADE_BY);
-      writeUInt16LE(cdHeader, 6,  VERSION_NEEDED);
-      writeUInt16LE(cdHeader, 8,  0);                          // general purpose bit flag
-      writeUInt16LE(cdHeader, 10, entry.compressionMethod);
-      writeUInt16LE(cdHeader, 12, entry.dosTime);
-      writeUInt16LE(cdHeader, 14, entry.dosDate);
-      writeUInt32LE(cdHeader, 16, entry.crc);
-      writeUInt32LE(cdHeader, 20, entry.compressedSize);
-      writeUInt32LE(cdHeader, 24, entry.uncompressedSize);
-      writeUInt16LE(cdHeader, 28, entry.nameBytes.length);
-      writeUInt16LE(cdHeader, 30, 0);                          // extra field length
-      writeUInt16LE(cdHeader, 32, 0);                          // file comment length
-      writeUInt16LE(cdHeader, 34, 0);                          // disk number start
-      writeUInt16LE(cdHeader, 36, 0);                          // internal file attributes
-      writeUInt32LE(cdHeader, 38, 0);                          // external file attributes
-      writeUInt32LE(cdHeader, 42, entry.localHeaderOffset);
-      entry.nameBytes.copy(cdHeader, 46);
-      chunks.push(cdHeader);
-      offset += cdHeader.length;
-    }
-
-    const centralDirSize = offset - centralDirOffset;
-
-    // End of central directory record
-    const eocd = Buffer.alloc(22);
-    writeUInt32LE(eocd, 0,  END_OF_CENTRAL_DIR_SIG);
-    writeUInt16LE(eocd, 4,  0);                    // disk number
-    writeUInt16LE(eocd, 6,  0);                    // disk with central dir
-    writeUInt16LE(eocd, 8,  entries.length);        // entries on this disk
-    writeUInt16LE(eocd, 10, entries.length);        // total entries
-    writeUInt32LE(eocd, 12, centralDirSize);
-    writeUInt32LE(eocd, 16, centralDirOffset);
-    writeUInt16LE(eocd, 20, 0);                    // comment length
-    chunks.push(eocd);
-
-    await fsp.writeFile(destPath, Buffer.concat(chunks));
     onProgress(100);
-
-    // Suppress unused import warning — createReadStream and createHash are
-    // available for future use (e.g. streaming large files).
-    void createReadStream;
-    void createHash;
   }
 
   private static async writeEmptyZip(destPath: string): Promise<void> {

@@ -50,7 +50,7 @@ export class IpcBridge {
     registerTransferHandlers(ipcMain, this.transferQueue, this.discoveryService, this.settingsStore);
     registerSettingsHandlers(ipcMain, this.settingsStore, this.getMainWindow);
     registerDiagnosticsHandlers(ipcMain);
-    registerClipboardHandlers(ipcMain, this.discoveryService, this.settingsStore, this.getMainWindow);
+    registerClipboardHandlers(ipcMain, this.discoveryService, this.settingsStore);
 
     // Wire service events → renderer pushes
     this.wireDiscoveryEvents();

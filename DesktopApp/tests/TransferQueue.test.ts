@@ -272,3 +272,86 @@ describe('TransferQueue', () => {
     });
   });
 });
+
+describe('resume flow', () => {
+  let client: MockTransferClient;
+  let server: MockTransferServer;
+  let queue: TransferQueue;
+
+  beforeEach(() => {
+    client = new MockTransferClient();
+    server = new MockTransferServer();
+    queue = new TransferQueue(
+      client as unknown as import('../src/main/transfer/TransferClient').TransferClient,
+      server as unknown as import('../src/main/transfer/TransferServer').TransferServer,
+    );
+  });
+
+  it('getPausedTransfer returns the transfer with Paused status and correct resumeOffset', async () => {
+    const transferId = await queue.enqueueSend(DEFAULT_SEND_OPTS);
+
+    // Simulate partial progress then an error — triggers Paused state
+    client.emit('progress', transferId, 512, 1024, 100, 5, 50);
+    client.emit('error', transferId, new Error('Connection reset'));
+
+    const paused = queue.getPausedTransfer(transferId);
+    expect(paused).toBeDefined();
+    expect(paused?.status).toBe(TransferStatus.Paused);
+    expect(paused?.resumeOffset).toBe(512);
+  });
+
+  it('getPausedTransfer returns undefined for a non-paused transfer', async () => {
+    const transferId = await queue.enqueueSend(DEFAULT_SEND_OPTS);
+    // No error emitted — still Connecting
+    expect(queue.getPausedTransfer(transferId)).toBeUndefined();
+  });
+
+  it('resumeTransferWithPeer calls sendFileWithId with the correct resumeOffset', async () => {
+    const transferId = await queue.enqueueSend(DEFAULT_SEND_OPTS);
+
+    // Simulate partial progress then error to reach Paused
+    client.emit('progress', transferId, 512, 1024, 100, 5, 50);
+    client.emit('error', transferId, new Error('Network error'));
+
+    expect(queue.getPausedTransfer(transferId)?.status).toBe(TransferStatus.Paused);
+
+    // Reset the mock so we can assert the resume call cleanly
+    client.sendFileWithId.mockClear();
+
+    await queue.resumeTransferWithPeer(
+      transferId,
+      '192.168.1.20',  // live peer IP
+      5001,            // live peer port
+      'my-device-id',
+      'MyDevice',
+    );
+
+    expect(client.sendFileWithId).toHaveBeenCalledWith(
+      transferId,
+      expect.objectContaining({
+        resumeOffset: 512,
+        peerIp: '192.168.1.20',
+        peerPort: 5001,
+      }),
+    );
+  });
+
+  it('resumeTransferWithPeer transitions status back to Connecting', async () => {
+    const transferId = await queue.enqueueSend(DEFAULT_SEND_OPTS);
+
+    client.emit('progress', transferId, 256, 1024, 100, 8, 25);
+    client.emit('error', transferId, new Error('Timeout'));
+
+    const listener = vi.fn();
+    queue.on('transferUpdated', listener);
+
+    await queue.resumeTransferWithPeer(transferId, '10.0.0.5', 5000, 'dev-id', 'Dev');
+
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: transferId,
+        status: TransferStatus.Connecting,
+      }),
+    );
+  });
+});
