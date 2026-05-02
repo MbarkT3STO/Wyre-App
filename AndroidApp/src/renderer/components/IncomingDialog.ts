@@ -138,14 +138,13 @@ export class IncomingDialog extends Component {
     }
 
     try {
-      const folderPath = await AppBridge.pickFolder();
-      if (folderPath) {
-        this.customSavePath = folderPath;
+      const result = await AppBridge.pickFolder();
+      if (result) {
+        this.customSavePath = result.path;
         const label = this.element?.querySelector('#save-path-label');
         if (label) {
-          // Show last two path segments for readability
-          const parts = folderPath.split('/').filter(Boolean);
-          label.textContent = parts.slice(-2).join('/') || folderPath;
+          const parts = result.path.split('/').filter(Boolean);
+          label.textContent = parts.slice(-2).join('/') || result.path;
         }
       }
     } catch (_) {

@@ -80,8 +80,8 @@ export interface WyrePluginInterface {
 
   // ── File transfer ─────────────────────────────────────────────────────────
   sendFile(options: { deviceId: string; filePath: string; fileName: string; fileSize: number }): Promise<{ transferId: string }>;
-  /** Feature 1: Zip a folder on the native side and send it */
-  sendFolder(options: { deviceId: string; folderPath: string; folderName: string }): Promise<{ transferId: string }>;
+  /** Feature 1: Zip a folder on the native side and send it. folderUri is the content:// tree URI. */
+  sendFolder(options: { deviceId: string; folderUri: string; folderName: string }): Promise<{ transferId: string }>;
   cancelTransfer(options: { transferId: string }): Promise<void>;
   /** Feature 4: Resume a paused transfer from its last byte offset */
   resumeTransfer(options: { transferId: string }): Promise<void>;

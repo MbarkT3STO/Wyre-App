@@ -197,10 +197,11 @@ class WyreManager(
     // ── Folder send (Feature 1) ───────────────────────────────────────────────
 
     /**
-     * Zips a folder on a background thread then sends the zip via TransferClient.
-     * The zip is written to the app cache dir and deleted after the transfer.
+     * Zips a folder using DocumentFile so it works with Android scoped storage
+     * (content:// URIs from ACTION_OPEN_DOCUMENT_TREE). Falls back to direct
+     * File access for file:// URIs (e.g. on older API levels).
      */
-    fun sendFolder(deviceId: String, folderPath: String, folderName: String, callback: (String?) -> Unit) {
+    fun sendFolder(deviceId: String, treeUri: android.net.Uri, folderName: String, callback: (String?) -> Unit) {
         val device = discoveryService?.getDevices()?.find { it.id == deviceId && it.online }
         if (device == null) { callback(null); return }
 
@@ -209,7 +210,15 @@ class WyreManager(
                 val zipName = "$folderName.zip"
                 val zipFile = java.io.File(context.cacheDir, "wyre-${System.currentTimeMillis()}-$zipName")
 
-                zipFolder(java.io.File(folderPath), zipFile)
+                // Use DocumentFile to traverse the tree — works with scoped storage
+                val docTree = androidx.documentfile.provider.DocumentFile.fromTreeUri(context, treeUri)
+                    ?: throw Exception("Cannot open folder URI: $treeUri")
+
+                zipDocumentTree(docTree, zipFile)
+
+                if (zipFile.length() == 0L) {
+                    throw Exception("Zip is empty — folder may be empty or inaccessible")
+                }
 
                 val transferId = UUID.randomUUID().toString()
                 executor.submit {
@@ -238,21 +247,35 @@ class WyreManager(
         }
     }
 
-    /** Recursively zips a folder into a zip file using java.util.zip */
-    private fun zipFolder(folder: java.io.File, zipFile: java.io.File) {
+    /**
+     * Recursively zips a DocumentFile tree into a zip file.
+     * Uses ContentResolver.openInputStream() for each file — the only way to
+     * read content:// URIs on Android 10+ with scoped storage.
+     */
+    private fun zipDocumentTree(root: androidx.documentfile.provider.DocumentFile, zipFile: java.io.File) {
         java.util.zip.ZipOutputStream(zipFile.outputStream().buffered()).use { zos ->
-            fun addEntry(file: java.io.File, entryName: String) {
-                if (file.isDirectory) {
-                    file.listFiles()?.forEach { child ->
-                        addEntry(child, "$entryName/${child.name}")
+            fun addDoc(doc: androidx.documentfile.provider.DocumentFile, entryPath: String) {
+                if (doc.isDirectory) {
+                    doc.listFiles().forEach { child ->
+                        addDoc(child, "$entryPath/${child.name ?: "file"}")
                     }
                 } else {
-                    zos.putNextEntry(java.util.zip.ZipEntry(entryName))
-                    file.inputStream().use { it.copyTo(zos) }
-                    zos.closeEntry()
+                    val uri = doc.uri
+                    try {
+                        context.contentResolver.openInputStream(uri)?.use { input ->
+                            zos.putNextEntry(java.util.zip.ZipEntry(entryPath))
+                            input.copyTo(zos)
+                            zos.closeEntry()
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("WyreManager", "Skipping ${doc.name}: ${e.message}")
+                    }
                 }
             }
-            folder.listFiles()?.forEach { child -> addEntry(child, child.name) }
+            // Add each child of the root — don't include the root folder itself as a prefix
+            root.listFiles().forEach { child ->
+                addDoc(child, child.name ?: "file")
+            }
         }
     }
 

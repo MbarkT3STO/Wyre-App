@@ -245,12 +245,14 @@ export class HomeView extends Component {
   }
 
   private async handlePickFolder(): Promise<void> {
-    const folderPath = await AppBridge.pickFolder();
-    if (!folderPath) return;
-    const parts = folderPath.replace(/\\/g, '/').split('/').filter(Boolean);
-    const folderName = parts[parts.length - 1] ?? folderPath;
-    if (!this.selectedFiles.find(f => f.path === folderPath)) {
-      this.selectedFiles.push({ path: folderPath, name: folderName, size: 0, type: 'folder' });
+    const result = await AppBridge.pickFolder();
+    if (!result) return;
+    const { path, uri } = result;
+    const parts = path.replace(/\\/g, '/').split('/').filter(Boolean);
+    const folderName = parts[parts.length - 1] ?? path;
+    // Store the URI for sending — path is only used for display
+    if (!this.selectedFiles.find(f => f.path === uri)) {
+      this.selectedFiles.push({ path: uri, name: folderName, size: 0, type: 'folder' });
     }
     this.renderFileList();
     this.updateSendButton();
@@ -355,7 +357,7 @@ export class HomeView extends Component {
       for (const deviceId of deviceIds) {
         for (const file of files) {
           if (file.type === 'folder') {
-            await AppBridge.sendFolder({ deviceId, folderPath: file.path, folderName: file.name });
+            await AppBridge.sendFolder({ deviceId, folderUri: file.path, folderName: file.name });
           } else {
             await AppBridge.sendFile({ deviceId, filePath: file.path, fileName: file.name, fileSize: file.size });
           }

@@ -129,10 +129,12 @@ class WyrePlugin : Plugin() {
     fun sendFolder(call: PluginCall) {
         val m = manager ?: run { call.reject("Service not ready"); return }
         val deviceId   = call.getString("deviceId")   ?: run { call.reject("deviceId required");   return }
-        val folderPath = call.getString("folderPath") ?: run { call.reject("folderPath required"); return }
+        val folderUri  = call.getString("folderUri")  ?: run { call.reject("folderUri required");  return }
         val folderName = call.getString("folderName") ?: run { call.reject("folderName required"); return }
 
-        m.sendFolder(deviceId, folderPath, folderName) { transferId ->
+        val treeUri = android.net.Uri.parse(folderUri)
+
+        m.sendFolder(deviceId, treeUri, folderName) { transferId ->
             if (transferId == null) {
                 call.reject("Failed to send folder — device may be offline or folder could not be zipped")
             } else {

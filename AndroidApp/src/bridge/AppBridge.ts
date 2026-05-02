@@ -45,8 +45,8 @@ export const AppBridge = {
     return transferId;
   },
 
-  /** Feature 1: Zip a folder natively and send it */
-  sendFolder: async (options: { deviceId: string; folderPath: string; folderName: string }): Promise<string> => {
+  /** Feature 1: Zip a folder natively and send it. folderUri is the content:// URI from pickFolder. */
+  sendFolder: async (options: { deviceId: string; folderUri: string; folderName: string }): Promise<string> => {
     const { transferId } = await WyrePlugin.sendFolder(options);
     return transferId;
   },
@@ -123,9 +123,10 @@ export const AppBridge = {
     return Array.isArray(files) ? files : [];
   },
 
-  pickFolder: async (): Promise<string | null> => {
+  pickFolder: async (): Promise<{ path: string; uri: string } | null> => {
     const result = await WyrePlugin.pickFolder();
-    return result?.path || null;
+    if (!result?.path && !result?.uri) return null;
+    return { path: result.path ?? '', uri: result.uri ?? '' };
   },
 
   // ── Shell actions ─────────────────────────────────────────────────────────
