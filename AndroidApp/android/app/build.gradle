@@ -13,11 +13,24 @@ android {
         versionName "1.0.0"
     }
 
+    signingConfigs {
+        release {
+            storeFile     file(System.getenv("KEYSTORE_PATH") ?: "keystore.jks")
+            storePassword System.getenv("KEYSTORE_PASS") ?: ""
+            keyAlias      System.getenv("KEY_ALIAS")     ?: "wyre"
+            keyPassword   System.getenv("KEY_PASS")      ?: ""
+        }
+    }
+
     buildTypes {
         debug {
-            // Debug builds are self-signed by Android toolchain automatically.
-            // No keystore needed for sideloading.
             debuggable true
+        }
+        release {
+            minifyEnabled   true
+            shrinkResources true
+            signingConfig   signingConfigs.release
+            proguardFiles   getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 

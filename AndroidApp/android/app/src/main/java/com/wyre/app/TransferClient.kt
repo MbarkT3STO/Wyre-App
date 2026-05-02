@@ -4,7 +4,7 @@ import java.io.File
 import java.net.Socket
 import java.security.MessageDigest
 
-private const val CHUNK_SIZE = 64 * 1024
+private const val CHUNK_SIZE = 1 * 1024 * 1024
 private const val PROGRESS_INTERVAL_MS = 150L
 
 /**

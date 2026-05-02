@@ -13,7 +13,7 @@ import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 
-private const val CHUNK_SIZE = 64 * 1024
+private const val CHUNK_SIZE = 1 * 1024 * 1024
 private const val PROGRESS_INTERVAL_MS = 100L
 private const val HEADER_MAX_BYTES = 4096
 

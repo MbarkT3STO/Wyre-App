@@ -3,6 +3,14 @@
    Replaces the desktop sidebar with a bottom navigation bar
    ============================================================ */
 
+/* ── Root app container — safe-area insets ─────────────────── */
+#app {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
 /* ── Safe area / status bar spacer ────────────────────────── */
 /* Not needed — header is position:fixed and handles safe-area-inset-top */
 .android-status-bar {
@@ -129,7 +137,7 @@
   left: 0;
   right: 0;
   z-index: 100;
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
 }
 
 .android-bottom-nav__item {

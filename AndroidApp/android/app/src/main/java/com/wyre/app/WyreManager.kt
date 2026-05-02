@@ -24,9 +24,9 @@ class WyreManager(
     private val context: Context,
     private val notifyFn: (event: String, data: JSObject) -> Unit
 ) {
-    private val executor = Executors.newCachedThreadPool()
+    private val executor = Executors.newScheduledThreadPool(2)
     private val settings = SettingsStore(context)
-    private val history  = mutableListOf<JSObject>()
+    private val history: MutableList<JSObject> = java.util.Collections.synchronizedList(mutableListOf())
 
     private var discoveryService: DiscoveryService? = null
     private var transferServer: TransferServer? = null
@@ -37,7 +37,8 @@ class WyreManager(
         val peerId: String,
         val filePath: String,
         val fileName: String,
-        val fileSize: Long
+        val fileSize: Long,
+        val pausedAt: Long = System.currentTimeMillis()
     )
     private val pausedTransfers = ConcurrentHashMap<String, PausedTransfer>()
 
@@ -67,6 +68,12 @@ class WyreManager(
             onDevicesChanged = { list -> notifyFn("devicesUpdated", buildDevicesPayload(list)) }
         )
         discoveryService!!.start()
+
+        // Evict stale paused transfers older than 24 hours
+        (executor as? java.util.concurrent.ScheduledExecutorService)?.scheduleAtFixedRate({
+            val cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+            pausedTransfers.entries.removeIf { it.value.pausedAt < cutoff }
+        }, 30, 30, java.util.concurrent.TimeUnit.MINUTES)
     }
 
     fun stop() {
@@ -326,6 +333,7 @@ class WyreManager(
         return arr
     }
 
+    @Synchronized
     fun clearHistory() { synchronized(history) { history.clear() } }
 
     // ── File picker ───────────────────────────────────────────────────────────

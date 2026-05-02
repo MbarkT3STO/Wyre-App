@@ -44,11 +44,13 @@ class DiscoveryService(
     private var broadcastFuture: ScheduledFuture<*>? = null
     private var evictionFuture: ScheduledFuture<*>? = null
     private var listenSocket: DatagramSocket? = null
+    private var broadcastSocket: DatagramSocket? = null
     @Volatile private var running = false
 
     fun start() {
         if (running) return
         running = true
+        broadcastSocket = DatagramSocket().apply { broadcast = true }
         startBroadcasting()
         startListening()
         startEviction()
@@ -58,6 +60,7 @@ class DiscoveryService(
         running = false
         broadcastFuture?.cancel(false)
         evictionFuture?.cancel(false)
+        broadcastSocket?.close(); broadcastSocket = null
         listenSocket?.close()
         scheduler.shutdownNow()
     }
@@ -73,11 +76,10 @@ class DiscoveryService(
                 val payload = buildAnnouncement()
                 val bytes = payload.toByteArray(Charsets.UTF_8)
                 val broadcastAddr = getDirectedBroadcast() ?: InetAddress.getByName("255.255.255.255")
-                DatagramSocket().use { sock ->
-                    sock.broadcast = true
-                    val packet = DatagramPacket(bytes, bytes.size, broadcastAddr, BROADCAST_PORT)
-                    sock.send(packet)
-                }
+                val packet = DatagramPacket(bytes, bytes.size, broadcastAddr, BROADCAST_PORT)
+                try {
+                    broadcastSocket!!.send(packet)
+                } catch (_: Exception) {}
             } catch (_: Exception) {}
         }, 0, BROADCAST_INTERVAL_SEC, TimeUnit.SECONDS)
     }
