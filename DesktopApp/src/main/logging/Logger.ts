@@ -6,7 +6,6 @@
  */
 
 import * as fs from 'fs';
-import * as path from 'path';
 
 const MAX_LOG_SIZE_BYTES = 2 * 1024 * 1024; // 2 MB
 
@@ -91,11 +90,4 @@ export class Logger {
     }
   }
 
-  /** Derive the default log path from Electron's userData directory. */
-  static defaultLogPath(): string {
-    // Lazy import so this module can be loaded before app is ready if needed.
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { app } = require('electron') as typeof import('electron');
-    return path.join(app.getPath('userData'), 'wyre.log');
-  }
 }

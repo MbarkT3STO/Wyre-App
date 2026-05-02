@@ -149,7 +149,7 @@ describe('TransferQueue', () => {
       const listener = vi.fn();
       queue.on('transferUpdated', listener);
 
-      client.emit('progress', id, 512, 1024, 100, 5);
+      client.emit('progress', id, 512, 1024, 100, 5, 50);
 
       expect(listener).toHaveBeenCalledWith(expect.objectContaining({
         id,

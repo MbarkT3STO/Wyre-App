@@ -447,6 +447,10 @@
   box-shadow: var(--nm-raised);
 }
 
+[data-theme="light"] .device-card__platform-icon {
+  box-shadow: 0 1px 4px rgba(163,177,198,0.45);
+}
+
 .device-card__online-dot {
   position: absolute;
   top: -2px;
@@ -2996,4 +3000,165 @@
   color: var(--accent-text);
   box-shadow: var(--nm-pressed);
   white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════
+   NEW FEATURE STYLES
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Device list multi-select badge ── */
+.device-list__heading-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: 0 2px;
+}
+
+.device-list__selection-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  box-shadow: var(--nm-pressed);
+  white-space: nowrap;
+}
+
+/* ── Folder icon in file drop zone ── */
+.file-drop-zone__file-icon--folder {
+  color: var(--warning-text);
+}
+
+/* ── Clipboard send bar ── */
+.home-view__clipboard-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--bg-app);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--nm-raised);
+  margin-top: var(--sp-3);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.home-view__clipboard-bar--hidden {
+  display: none;
+}
+
+.home-view__clipboard-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.home-view__clipboard-icon {
+  font-size: 14px;
+  color: var(--accent-mid);
+  flex-shrink: 0;
+}
+
+.home-view__clipboard-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.home-view__clipboard-counter {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  flex-shrink: 0;
+}
+
+.home-view__clipboard-counter--warn {
+  color: var(--warning-text);
+}
+
+.home-view__clipboard-textarea {
+  width: 100%;
+  min-height: 72px;
+  max-height: 110px;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--bg-app);
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  resize: none;
+  outline: none;
+  box-shadow: var(--nm-pressed);
+  transition: box-shadow var(--transition-fast);
+  -webkit-app-region: no-drag;
+}
+
+.home-view__clipboard-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.home-view__clipboard-textarea:focus {
+  box-shadow: var(--nm-pressed), 0 0 0 2px var(--accent-soft);
+}
+
+.home-view__clipboard-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ── Multi-device chip row ── */
+.home-view__device-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.home-view__device-chip--compact {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 4px var(--sp-3);
+  background: var(--bg-app);
+  border-radius: var(--radius-full);
+  box-shadow: var(--nm-raised);
+}
+
+.home-view__device-chip--compact .home-view__device-chip-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--gradient-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: var(--weight-bold);
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.home-view__device-chip--compact .home-view__device-chip-name {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* ── Paused transfer state ── */
+.transfer-item--paused::before {
+  background: var(--warning);
+}
+
+.transfer-item__badge--paused {
+  background: var(--bg-app);
+  color: var(--warning-text);
+  box-shadow: var(--nm-pressed);
+  border: none;
 }

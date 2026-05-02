@@ -19,6 +19,11 @@ import type {
   IncomingRequestPayload,
   TransferQueueUpdatedPayload,
   LogsGetResponse,
+  FolderZipAndSendPayload,
+  ClipboardSendPayload,
+  ClipboardReceivedPayload,
+  TransferResumePayload,
+  TransferPausedPayload,
 } from '../shared/ipc/IpcContracts';
 import type { Device } from '../shared/models/Device';
 import type { AppSettings } from '../shared/models/AppSettings';
@@ -75,6 +80,17 @@ export interface FileDropApi {
 
   // Native directory picker
   openDirectory: () => Promise<string | null>;
+
+  // Folder zip-and-send
+  folderZipAndSend: (payload: FolderZipAndSendPayload) => Promise<string>;
+
+  // Clipboard sharing
+  sendClipboard: (payload: ClipboardSendPayload) => Promise<void>;
+  onClipboardReceived: (cb: (payload: ClipboardReceivedPayload) => void) => () => void;
+
+  // Transfer resume
+  resumeTransfer: (payload: TransferResumePayload) => Promise<void>;
+  onTransferPaused: (cb: (payload: TransferPausedPayload) => void) => () => void;
 }
 
 // ─── Helper: create a listener that returns an unsubscribe function ───────────
@@ -139,6 +155,17 @@ const api: FileDropApi = {
 
   // Native directory picker
   openDirectory: () => ipcRenderer.invoke(IpcChannels.DIALOG_OPEN_DIRECTORY),
+
+  // Folder zip-and-send
+  folderZipAndSend: (payload) => ipcRenderer.invoke(IpcChannels.FOLDER_ZIP_AND_SEND, payload),
+
+  // Clipboard sharing
+  sendClipboard: (payload) => ipcRenderer.invoke(IpcChannels.CLIPBOARD_SEND, payload),
+  onClipboardReceived: (cb) => createListener(IpcChannels.CLIPBOARD_RECEIVED, cb),
+
+  // Transfer resume
+  resumeTransfer: (payload) => ipcRenderer.invoke(IpcChannels.TRANSFER_RESUME, payload),
+  onTransferPaused: (cb) => createListener(IpcChannels.TRANSFER_PAUSED, cb),
 };
 
 contextBridge.exposeInMainWorld('api', api);

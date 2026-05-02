@@ -21,6 +21,11 @@ import type {
   IncomingRequestPayload,
   TransferQueueUpdatedPayload,
   LogsGetResponse,
+  FolderZipAndSendPayload,
+  ClipboardSendPayload,
+  ClipboardReceivedPayload,
+  TransferResumePayload,
+  TransferPausedPayload,
 } from '../../shared/ipc/IpcContracts';
 
 function getApi(): FileDropApi {
@@ -85,4 +90,17 @@ export const IpcClient = {
 
   // Native directory picker
   openDirectory: (): Promise<string | null> => getApi().openDirectory(),
+
+  // Folder zip-and-send
+  folderZipAndSend: (payload: FolderZipAndSendPayload): Promise<string> => getApi().folderZipAndSend(payload),
+
+  // Clipboard sharing
+  sendClipboard: (payload: ClipboardSendPayload): Promise<void> => getApi().sendClipboard(payload),
+  onClipboardReceived: (cb: (payload: ClipboardReceivedPayload) => void): (() => void) =>
+    getApi().onClipboardReceived(cb),
+
+  // Transfer resume
+  resumeTransfer: (payload: TransferResumePayload): Promise<void> => getApi().resumeTransfer(payload),
+  onTransferPaused: (cb: (payload: TransferPausedPayload) => void): (() => void) =>
+    getApi().onTransferPaused(cb),
 } as const;

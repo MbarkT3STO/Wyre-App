@@ -11,6 +11,7 @@ export enum TransferStatus {
   Failed = 'failed',
   Cancelled = 'cancelled',
   Declined = 'declined',
+  Paused = 'paused',
 }
 
 export type TransferDirection = 'send' | 'receive';
@@ -41,6 +42,8 @@ export interface Transfer {
   savedPath?: string;
   /** SHA-256 checksum */
   checksum: string;
+  /** Byte offset to resume from (Feature: Resume) */
+  resumeOffset?: number;
 }
 
 /** Persisted record in transfer history */

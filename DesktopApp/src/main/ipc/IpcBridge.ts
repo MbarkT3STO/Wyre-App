@@ -5,7 +5,6 @@
  */
 
 import { ipcMain, BrowserWindow } from 'electron';
-import { networkInterfaces } from 'os';
 import { IpcChannels } from '../../shared/ipc/IpcContracts';
 import type { DiscoveryService } from '../discovery/DiscoveryService';
 import type { TransferQueue } from '../transfer/TransferQueue';
@@ -15,6 +14,8 @@ import type { SettingsStore } from '../store/SettingsStore';
 import { registerDeviceHandlers } from './handlers/DeviceHandlers';
 import { registerTransferHandlers } from './handlers/TransferHandlers';
 import { registerSettingsHandlers } from './handlers/SettingsHandlers';
+import { registerDiagnosticsHandlers } from './handlers/DiagnosticsHandlers';
+import { registerClipboardHandlers, pushClipboardReceived } from './handlers/ClipboardHandlers';
 import { Logger } from '../logging/Logger';
 import type { Transfer } from '../../shared/models/Transfer';
 import { TransferStatus } from '../../shared/models/Transfer';
@@ -48,36 +49,15 @@ export class IpcBridge {
     registerDeviceHandlers(ipcMain, this.discoveryService);
     registerTransferHandlers(ipcMain, this.transferQueue, this.discoveryService, this.settingsStore);
     registerSettingsHandlers(ipcMain, this.settingsStore, this.getMainWindow);
-
-    // LOGS_GET handler (Feature 3)
-    ipcMain.handle(IpcChannels.LOGS_GET, () => {
-      try {
-        const lines = Logger.getInstance().readLastLines(200);
-        return { lines };
-      } catch {
-        return { lines: [] };
-      }
-    });
-
-    // LOCAL_IP_GET — returns the first non-internal IPv4 address
-    ipcMain.handle(IpcChannels.LOCAL_IP_GET, () => {
-      const nets = networkInterfaces();
-      for (const ifaces of Object.values(nets)) {
-        if (!ifaces) continue;
-        for (const iface of ifaces) {
-          if (iface.family === 'IPv4' && !iface.internal) {
-            return iface.address;
-          }
-        }
-      }
-      return '—';
-    });
+    registerDiagnosticsHandlers(ipcMain);
+    registerClipboardHandlers(ipcMain, this.discoveryService, this.settingsStore, this.getMainWindow);
 
     // Wire service events → renderer pushes
     this.wireDiscoveryEvents();
     this.wireTransferEvents();
     this.wireIncomingEvents();
     this.wireQueueEvents();
+    this.wireClipboardEvents();
   }
 
   private send(channel: string, payload: unknown): void {
@@ -182,7 +162,20 @@ export class IpcBridge {
             code: transfer.status.toUpperCase(),
           });
           break;
+
+        case TransferStatus.Paused:
+          this.send(IpcChannels.TRANSFER_PAUSED, {
+            transferId: transfer.id,
+            bytesTransferred: transfer.bytesTransferred,
+          });
+          break;
       }
+    });
+  }
+
+  private wireClipboardEvents(): void {
+    this.transferServer.on('clipboardReceived', (senderName, text, truncated) => {
+      pushClipboardReceived(this.getMainWindow, { senderName, text, truncated });
     });
   }
 

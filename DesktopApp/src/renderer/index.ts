@@ -421,6 +421,32 @@ function wireIpcListeners(): void {
     StateManager.setState('sendQueue', payload.queue);
   });
 
+  // Clipboard received — show an actionable info toast
+  const unsubClipboard = IpcClient.onClipboardReceived(({ senderName, text, truncated }) => {
+    const preview = text.length > 120 ? text.slice(0, 120) + '…' : text;
+    const truncNote = truncated ? ' (truncated to 5000 chars)' : '';
+    toasts.show({
+      type: 'info',
+      message: `${senderName}: "${preview}"${truncNote}`,
+      actionLabel: 'Copy',
+      onAction: () => { void navigator.clipboard.writeText(text); },
+      duration: 8000,
+    });
+  });
+
+  // Transfer paused — update renderer state
+  const unsubPaused = IpcClient.onTransferPaused((payload) => {
+    const existing = StateManager.get('activeTransfers').get(payload.transferId);
+    if (existing) {
+      StateManager.updateTransfer({
+        ...existing,
+        status: TransferStatus.Paused,
+        bytesTransferred: payload.bytesTransferred,
+        resumeOffset: payload.bytesTransferred,
+      });
+    }
+  });
+
   // Cleanup on unload
   window.addEventListener('unload', () => {
     unsubDevices();
@@ -430,6 +456,8 @@ function wireIpcListeners(): void {
     unsubError();
     unsubIncoming();
     unsubSendQueue();
+    unsubClipboard();
+    unsubPaused();
   });
 }
 
@@ -508,6 +536,16 @@ function wireCustomEvents(): void {
   window.addEventListener('filedrop:scale-change', (e) => {
     const scale = (e as CustomEvent<{ scale: import('../shared/models/AppSettings').UiScale }>).detail.scale;
     scaleEngine.apply(scale);
+  });
+
+  // Resume a paused transfer — dispatched by TransferItem's Resume button
+  window.addEventListener('filedrop:resume-transfer', (e) => {
+    const { transferId } = (e as CustomEvent<{ transferId: string }>).detail;
+    IpcClient.resumeTransfer({ transferId })
+      .then(() => toasts.info('Resuming transfer…'))
+      .catch((err: unknown) => {
+        toasts.error(`Resume failed: ${err instanceof Error ? err.message : String(err)}`);
+      });
   });
 }
 

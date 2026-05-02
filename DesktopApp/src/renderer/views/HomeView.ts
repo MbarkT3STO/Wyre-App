@@ -1,7 +1,9 @@
 /**
  * HomeView.ts
  * Main screen: device list + file send UI.
- * Feature 1: multi-file send queue support.
+ * Feature 1 (Folder Send): sends folders as zips via FOLDER_ZIP_AND_SEND.
+ * Feature 2 (Clipboard): mounts ClipboardSendBar below the drop zone.
+ * Feature 3 (Multi-device): loops over all selectedDeviceIds on send.
  */
 
 import { Component } from '../components/base/Component';
@@ -9,9 +11,9 @@ import { DeviceList } from '../components/DeviceList';
 import { FileDropZone } from '../components/FileDropZone';
 import type { SelectedFile } from '../components/FileDropZone';
 import { TransferList } from '../components/TransferList';
+import { ClipboardSendBar } from '../components/ClipboardSendBar';
 import { StateManager } from '../core/StateManager';
 import { IpcClient } from '../core/IpcClient';
-import type { Device } from '../../shared/models/Device';
 import type { ToastContainer } from '../components/ToastContainer';
 import { TransferStatus } from '../../shared/models/Transfer';
 
@@ -19,11 +21,11 @@ export class HomeView extends Component {
   private deviceList: DeviceList | null = null;
   private fileDropZone: FileDropZone | null = null;
   private transferList: TransferList | null = null;
+  private clipboardBar: ClipboardSendBar | null = null;
   private toasts: ToastContainer;
   private selectedFiles: SelectedFile[] = [];
   private sendBtn: HTMLButtonElement | null = null;
   private queueIndicator: HTMLElement | null = null;
-  /** Number of files queued on the main-process side (from queueUpdated events) */
   private mainQueueCount = 0;
 
   constructor(toasts: ToastContainer) {
@@ -40,7 +42,7 @@ export class HomeView extends Component {
         <div class="home-view__devices-section">
           <div class="home-view__section-header">
             <span class="home-view__section-title">Nearby Devices</span>
-            <span class="home-view__section-hint">Click a device to select it as the transfer target</span>
+            <span class="home-view__section-hint">Click to select — hold Ctrl/⌘ to pick multiple</span>
           </div>
           <div id="device-list-mount" class="home-view__devices-mount"></div>
         </div>
@@ -48,16 +50,17 @@ export class HomeView extends Component {
         <div class="home-view__send-section">
           <div class="home-view__section-header">
             <span class="home-view__section-title">Send Files</span>
-            <span class="home-view__section-hint">Drop files or click to browse, then hit Send</span>
+            <span class="home-view__section-hint">Drop files or folders, then hit Send</span>
           </div>
           <div class="home-view__send-body">
             <div class="home-view__target-row">
               <span class="home-view__target-label">To</span>
               <div id="selected-device-info" class="home-view__target-info">
-                <div class="home-view__no-device">No device selected — pick one above</div>
+                <div class="home-view__no-device">Select one or more devices above</div>
               </div>
             </div>
             <div id="file-drop-zone-mount"></div>
+            <div id="clipboard-bar-mount"></div>
             <div class="home-view__send-footer">
               <button class="btn btn--primary home-view__send-btn" id="send-btn" disabled>
                 <i class="fa-solid fa-paper-plane btn__icon"></i>
@@ -84,14 +87,17 @@ export class HomeView extends Component {
   protected onMount(): void {
     if (!this.element) return;
 
-    // Mount DeviceList
+    // Mount DeviceList (multi-select)
     const deviceListMount = this.element.querySelector('#device-list-mount') as HTMLElement;
     this.deviceList = new DeviceList({
-      onDeviceSelect: (device) => this.handleDeviceSelect(device),
+      onSelectionChanged: (ids) => {
+        this.updateSelectedDeviceInfo(ids);
+        this.updateSendButton();
+      },
     });
     this.deviceList.mount(deviceListMount);
 
-    // Mount FileDropZone (multi-file)
+    // Mount FileDropZone (multi-file + folder)
     const dropZoneMount = this.element.querySelector('#file-drop-zone-mount') as HTMLElement;
     this.fileDropZone = new FileDropZone({
       onFilesSelected: (files) => {
@@ -101,12 +107,17 @@ export class HomeView extends Component {
     });
     this.fileDropZone.mount(dropZoneMount);
 
+    // Mount ClipboardSendBar
+    const clipboardMount = this.element.querySelector('#clipboard-bar-mount') as HTMLElement;
+    this.clipboardBar = new ClipboardSendBar(this.toasts);
+    this.clipboardBar.mount(clipboardMount);
+
     // Mount TransferList (active transfers only)
     const transferListMount = this.element.querySelector('#transfer-list-mount') as HTMLElement;
     this.transferList = new TransferList({ activeOnly: true });
     this.transferList.mount(transferListMount);
 
-    // Show/hide the transfers section based on whether there are active transfers
+    // Show/hide the transfers section based on active transfers
     const transfersSection = this.element.querySelector('#transfers-section') as HTMLElement;
     const updateTransfersVisibility = (transfers: Map<string, import('../../shared/models/Transfer').Transfer>) => {
       const activeStatuses = new Set([TransferStatus.Active, TransferStatus.Connecting, TransferStatus.Pending]);
@@ -122,67 +133,91 @@ export class HomeView extends Component {
     this.queueIndicator = this.element.querySelector('#queue-indicator') as HTMLElement;
     this.sendBtn?.addEventListener('click', () => { void this.handleSend(); });
 
-    // Subscribe to main-process queue updates (Feature 1)
+    // Subscribe to main-process queue updates
     const unsubQueue = IpcClient.onTransferQueueUpdated((payload) => {
       this.mainQueueCount = payload.queue.length;
       this.updateQueueIndicator();
     });
     this.addCleanup(unsubQueue);
 
+    // Initialise queue indicator from current state
+    const initialQueue = StateManager.get('sendQueue');
+    this.mainQueueCount = initialQueue.length;
+    this.updateQueueIndicator();
+
     // Subscribe to selected device changes
-    const unsub = StateManager.subscribe('selectedDeviceId', (id) => {
-      this.updateSelectedDeviceInfo(id);
+    const unsub = StateManager.subscribe('selectedDeviceIds', (ids) => {
+      this.updateSelectedDeviceInfo(ids);
       this.updateSendButton();
     });
     this.addCleanup(unsub);
 
     // Initial state
-    this.updateSelectedDeviceInfo(StateManager.get('selectedDeviceId'));
+    this.updateSelectedDeviceInfo(StateManager.get('selectedDeviceIds'));
   }
 
-  private handleDeviceSelect(device: Device): void {
-    const current = StateManager.get('selectedDeviceId');
-    StateManager.setState('selectedDeviceId', current === device.id ? null : device.id);
-  }
-
-  private updateSelectedDeviceInfo(deviceId: string | null): void {
+  private updateSelectedDeviceInfo(deviceIds: string[]): void {
     const infoEl = this.element?.querySelector('#selected-device-info');
     if (!infoEl) return;
 
-    if (!deviceId) {
-      infoEl.innerHTML = `<div class="home-view__no-device">No device selected — pick one above</div>`;
+    if (deviceIds.length === 0) {
+      infoEl.innerHTML = `<div class="home-view__no-device">Select one or more devices above</div>`;
       return;
     }
 
-    const device = StateManager.get('devices').find(d => d.id === deviceId);
-    if (!device) {
+    const devices = StateManager.get('devices');
+    const selected = deviceIds
+      .map(id => devices.find(d => d.id === id))
+      .filter((d): d is NonNullable<typeof d> => d !== undefined);
+
+    if (selected.length === 0) {
       infoEl.innerHTML = `<div class="home-view__no-device">Device not found</div>`;
       return;
     }
 
-    const initial = device.name.charAt(0).toUpperCase();
-    infoEl.innerHTML = `
-      <div class="home-view__device-chip">
-        <div class="home-view__device-chip-avatar">${escapeHtml(initial)}</div>
-        <div class="home-view__device-chip-info">
-          <div class="home-view__device-chip-name">${escapeHtml(device.name)}</div>
-          <div class="home-view__device-chip-ip">${escapeHtml(device.ip)}</div>
+    if (selected.length === 1) {
+      const device = selected[0]!;
+      const initial = device.name.charAt(0).toUpperCase();
+      infoEl.innerHTML = `
+        <div class="home-view__device-chip">
+          <div class="home-view__device-chip-avatar">${escapeHtml(initial)}</div>
+          <div class="home-view__device-chip-info">
+            <div class="home-view__device-chip-name">${escapeHtml(device.name)}</div>
+            <div class="home-view__device-chip-ip">${escapeHtml(device.ip)}</div>
+          </div>
+          <span class="home-view__device-chip-dot"></span>
         </div>
-        <span class="home-view__device-chip-dot"></span>
-      </div>
-    `;
+      `;
+    } else {
+      // Multiple devices — show chips for each
+      const chips = selected.map(device => {
+        const initial = device.name.charAt(0).toUpperCase();
+        return `
+          <div class="home-view__device-chip home-view__device-chip--compact">
+            <div class="home-view__device-chip-avatar">${escapeHtml(initial)}</div>
+            <div class="home-view__device-chip-name">${escapeHtml(device.name)}</div>
+          </div>
+        `;
+      }).join('');
+      infoEl.innerHTML = `<div class="home-view__device-chips">${chips}</div>`;
+    }
   }
 
   private updateSendButton(): void {
     if (!this.sendBtn) return;
-    const hasDevice = StateManager.get('selectedDeviceId') !== null;
+    const deviceIds = StateManager.get('selectedDeviceIds');
+    const hasDevice = deviceIds.length > 0;
     const hasFiles = this.selectedFiles.length > 0;
     this.sendBtn.disabled = !(hasDevice && hasFiles);
 
-    // Update button label to reflect file count
-    const count = this.selectedFiles.length;
-    if (count > 1) {
-      this.sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane btn__icon"></i> Send ${count} Files`;
+    const fileCount = this.selectedFiles.length;
+    const deviceCount = deviceIds.length;
+    const totalTransfers = fileCount * deviceCount;
+
+    if (deviceCount > 1 && fileCount > 0) {
+      this.sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane btn__icon"></i> Send to ${deviceCount} devices (${fileCount} file${fileCount > 1 ? 's' : ''} = ${totalTransfers} transfers)`;
+    } else if (fileCount > 1) {
+      this.sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane btn__icon"></i> Send ${fileCount} Files`;
     } else {
       this.sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane btn__icon"></i> Send`;
     }
@@ -202,40 +237,38 @@ export class HomeView extends Component {
   }
 
   private async handleSend(): Promise<void> {
-    const deviceId = StateManager.get('selectedDeviceId');
+    const deviceIds = StateManager.get('selectedDeviceIds');
     const files = [...this.selectedFiles];
 
-    if (!deviceId || files.length === 0 || !this.sendBtn) return;
+    if (deviceIds.length === 0 || files.length === 0 || !this.sendBtn) return;
 
     try {
       this.sendBtn.disabled = true;
       this.sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane btn__icon"></i> Sending…`;
 
-      // Send files sequentially — each awaited before the next starts.
-      // We do NOT seed StateManager here — the main process emits TRANSFER_STARTED
-      // for every transfer (immediate or drained from queue) and index.ts handles
-      // that push. Seeding here with a placeholder ID for queued files was the
-      // cause of duplicate entries in the transfer list.
-      for (const file of files) {
-        await IpcClient.sendFile({
-          deviceId,
-          filePath: file.path,
-        });
+      // Fan out: for each device × each file
+      for (const deviceId of deviceIds) {
+        for (const file of files) {
+          if (file.type === 'folder') {
+            // Folder: zip on the fly then send
+            await IpcClient.folderZipAndSend({ folderPath: file.path, deviceId });
+          } else {
+            await IpcClient.sendFile({ deviceId, filePath: file.path });
+          }
+        }
       }
 
-      const firstFile = files[0];
-      const label = files.length === 1 && firstFile ? firstFile.name : `${files.length} files`;
-      this.toasts.success(`Sending ${label}…`);
+      const fileLabel = files.length === 1 && files[0] ? files[0].name : `${files.length} items`;
+      const deviceLabel = deviceIds.length === 1 ? '1 device' : `${deviceIds.length} devices`;
+      this.toasts.success(`Sending ${fileLabel} to ${deviceLabel}…`);
       this.fileDropZone?.clearSelection();
       this.selectedFiles = [];
 
       this.resetSendButton();
-
-      // Navigate to transfers view
       window.location.hash = '/transfers';
 
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to send file';
+      const message = err instanceof Error ? err.message : 'Failed to send';
       this.toasts.error(message);
       this.resetSendButton();
       this.updateSendButton();
@@ -250,6 +283,7 @@ export class HomeView extends Component {
   protected onUnmount(): void {
     this.deviceList?.unmount();
     this.fileDropZone?.unmount();
+    this.clipboardBar?.unmount();
     this.transferList?.unmount();
   }
 }

@@ -8,12 +8,7 @@ import { createReadStream, createWriteStream, promises as fsp } from 'fs';
 import { EventEmitter } from 'events';
 import { dirname, join } from 'path';
 import { Worker } from 'worker_threads';
-
-// 1 MB read/write chunks — large enough to amortise syscall overhead on fast
-// local networks (gigabit+) while staying well within typical L2/L3 cache.
-// Benchmarks show ~10–15× throughput improvement over 64 KB on loopback and
-// LAN transfers where disk I/O is the bottleneck, not the network.
-const CHUNK_SIZE = 1 * 1024 * 1024; // 1 MB
+import { TRANSFER_CHUNK_SIZE } from '../../shared/utils/constants';
 
 export interface ChunkReadEvents {
   progress: (bytesRead: number, totalBytes: number) => void;
@@ -71,10 +66,13 @@ export class FileChunker extends EventEmitter {
 
   /**
    * Create a readable stream for sending a file in chunks.
-   * Returns the stream and total file size.
+   * Optionally starts from `startOffset` bytes for resume support.
    */
-  static createReadStream(filePath: string): ReturnType<typeof createReadStream> {
-    return createReadStream(filePath, { highWaterMark: CHUNK_SIZE });
+  static createReadStream(filePath: string, startOffset?: number): ReturnType<typeof createReadStream> {
+    return createReadStream(filePath, {
+      highWaterMark: TRANSFER_CHUNK_SIZE,
+      ...(startOffset !== undefined && startOffset > 0 && { start: startOffset }),
+    });
   }
 
   /**
@@ -82,10 +80,14 @@ export class FileChunker extends EventEmitter {
    * Ensures the destination directory exists.
    * highWaterMark matches the read-side chunk size so the stream's internal
    * buffer can absorb a full chunk without stalling the socket.
+   * Pass `appendMode: true` to open with flags:'a' for resume support.
    */
-  static async createWriteStream(destPath: string): Promise<ReturnType<typeof createWriteStream>> {
+  static async createWriteStream(destPath: string, appendMode = false): Promise<ReturnType<typeof createWriteStream>> {
     await fsp.mkdir(dirname(destPath), { recursive: true });
-    return createWriteStream(destPath, { highWaterMark: CHUNK_SIZE });
+    return createWriteStream(destPath, {
+      highWaterMark: TRANSFER_CHUNK_SIZE,
+      ...(appendMode && { flags: 'a' }),
+    });
   }
 
   /**

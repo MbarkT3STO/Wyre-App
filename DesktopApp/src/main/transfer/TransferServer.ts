@@ -75,6 +75,7 @@ export interface TransferServerEvents {
   complete: (transferId: string, savedPath: string) => void;
   error: (transferId: string | null, err: Error) => void;
   cancelled: (transferId: string) => void;
+  clipboardReceived: (senderName: string, text: string, truncated: boolean) => void;
 }
 
 export declare interface TransferServer {
@@ -91,6 +92,7 @@ interface PendingRequest {
     fileName: string;
     fileSize: number;
     checksum: string;
+    resumeOffset?: number;
   };
   remainingBuffer: Buffer;
 }
@@ -155,16 +157,40 @@ export class TransferServer extends EventEmitter {
   /**
    * Called by TransferQueue after user accepts.
    * Writes the accept response to the sender, then starts receiving.
+   * If the header contains a resumeOffset and a partial file exists at savePath
+   * with the matching size, we append to it; otherwise we overwrite from byte 0.
    */
   triggerAccept(transferId: string, savePath: string): void {
     const pending = this.pendingRequests.get(transferId);
     if (!pending) return;
     this.pendingRequests.delete(transferId);
 
-    // Tell the sender we accepted — this unblocks their streaming
-    pending.socket.write(JSON.stringify({ accepted: true }) + '\n');
+    const resumeOffset = pending.header.resumeOffset ?? 0;
 
-    this.receiveFile(pending.socket, pending.header, savePath, pending.remainingBuffer);
+    // Validate resume offset against actual file size on disk
+    const resolveOffset = async (): Promise<number> => {
+      if (resumeOffset <= 0) return 0;
+      try {
+        const stat = await import('fs').then(m => m.promises.stat(savePath));
+        return stat.size === resumeOffset ? resumeOffset : 0;
+      } catch {
+        return 0;
+      }
+    };
+
+    resolveOffset().then((validatedOffset) => {
+      // Tell the sender the validated offset so it knows where to start streaming
+      pending.socket.write(JSON.stringify({ accepted: true, resumeOffset: validatedOffset }) + '\n');
+      this.receiveFile(
+        pending.socket,
+        { ...pending.header, resumeOffset: validatedOffset },
+        savePath,
+        pending.remainingBuffer,
+      );
+    }).catch(() => {
+      pending.socket.write(JSON.stringify({ accepted: true, resumeOffset: 0 }) + '\n');
+      this.receiveFile(pending.socket, { ...pending.header, resumeOffset: 0 }, savePath, pending.remainingBuffer);
+    });
   }
 
   /**
@@ -232,13 +258,29 @@ export class TransferServer extends EventEmitter {
 
       try {
         const header = JSON.parse(headerLine) as {
+          type?: string;
           transferId: string;
           senderDeviceId: string;
           senderName: string;
           fileName: string;
           fileSize: number;
           checksum: string;
+          // clipboard frame fields
+          text?: string;
+          truncated?: boolean;
         };
+
+        // ── Clipboard frame — not a file transfer ──────────────────────────
+        if (header.type === 'clipboard') {
+          socket.destroy();
+          this.emit(
+            'clipboardReceived',
+            header.senderName ?? 'Unknown',
+            header.text ?? '',
+            header.truncated === true,
+          );
+          return;
+        }
 
         transferId = header.transferId;
 
@@ -272,20 +314,20 @@ export class TransferServer extends EventEmitter {
 
   private receiveFile(
     socket: Socket,
-    header: { transferId: string; fileName: string; fileSize: number; checksum: string },
+    header: { transferId: string; fileName: string; fileSize: number; checksum: string; resumeOffset?: number },
     savePath: string,
     remainingBuffer: Buffer,
   ): void {
-    const { transferId, fileSize, checksum } = header;
-    let bytesReceived = 0;
+    const { transferId, fileSize, checksum, resumeOffset = 0 } = header;
+    let bytesReceived = resumeOffset;
     let lastProgressTime = Date.now();
-    let lastBytes = 0;
+    let lastBytes = resumeOffset;
     let speed = 0;
     let cancelled = false;
 
     const hash = createHash('sha256');
 
-    FileChunker.createWriteStream(savePath).then((writeStream) => {
+    FileChunker.createWriteStream(savePath, resumeOffset > 0).then((writeStream) => {
       this.activeReceives.set(transferId, {
         socket,
         cancel: () => {

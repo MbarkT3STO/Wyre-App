@@ -13,13 +13,12 @@
 import { workerData, parentPort } from 'worker_threads';
 import { createReadStream } from 'fs';
 import { createHash } from 'crypto';
-
-const CHUNK_SIZE = 1 * 1024 * 1024; // 1 MB — matches FileChunker.CHUNK_SIZE
+import { TRANSFER_CHUNK_SIZE } from '../../shared/utils/constants';
 
 function computeChecksum(filePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const hash = createHash('sha256');
-    const stream = createReadStream(filePath, { highWaterMark: CHUNK_SIZE });
+    const stream = createReadStream(filePath, { highWaterMark: TRANSFER_CHUNK_SIZE });
     stream.on('data', (chunk: Buffer | string) => {
       hash.update(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
     });

@@ -7,6 +7,7 @@
 
 import { EventEmitter } from 'events';
 import { join } from 'path';
+import { randomUUID } from 'crypto';
 import { TransferClient } from './TransferClient';
 import { TransferServer } from './TransferServer';
 import { FileChunker } from './FileChunker';
@@ -42,6 +43,7 @@ export declare interface TransferQueue {
 export class TransferQueue extends EventEmitter {
   private transfers: Map<string, Transfer> = new Map();
   private history: TransferRecord[] = [];
+  private historyIdSet: Set<string> = new Set();
   private client: TransferClient;
   private server: TransferServer;
   /** Pending outgoing sends waiting for the active transfer to finish (Feature 1) */
@@ -102,7 +104,22 @@ export class TransferQueue extends EventEmitter {
         peerName: transfer?.peerName ?? '',
         error: err.message,
       });
-      this.failTransfer(transferId, err.message, 'SEND_ERROR');
+
+      // If bytes were transferred and the peer is still online, pause for resume
+      // instead of immediately failing.
+      if (transfer && transfer.bytesTransferred > 0 && transfer.direction === 'send') {
+        this.updateTransfer(transferId, {
+          status: TransferStatus.Paused,
+          resumeOffset: transfer.bytesTransferred,
+          errorMessage: err.message,
+        });
+        this.logger()?.info('Transfer paused (resumable)', {
+          transferId,
+          bytesTransferred: transfer.bytesTransferred,
+        });
+      } else {
+        this.failTransfer(transferId, err.message, 'SEND_ERROR');
+      }
       this.drainQueue();
     });
 
@@ -243,7 +260,6 @@ export class TransferQueue extends EventEmitter {
         queueDepth: this.pendingSends.length,
       });
       // Return a placeholder id so the caller has something to track
-      const { randomUUID } = await import('crypto');
       return randomUUID();
     }
 
@@ -283,7 +299,6 @@ export class TransferQueue extends EventEmitter {
     const fileSize = await FileChunker.getFileSize(filePath);
     const checksum = await FileChunker.computeChecksum(filePath);
 
-    const { randomUUID } = await import('crypto');
     const transferId = randomUUID();
 
     const transfer: Transfer = {
@@ -395,6 +410,66 @@ export class TransferQueue extends EventEmitter {
     }
   }
 
+  /** Resume a paused outgoing transfer from where it left off */
+  async resumeTransfer(transferId: string): Promise<void> {
+    const transfer = this.transfers.get(transferId);
+    if (!transfer || transfer.status !== TransferStatus.Paused) return;
+    if (transfer.direction !== 'send') return;
+
+    const resumeOffset = transfer.resumeOffset ?? transfer.bytesTransferred;
+
+    this.updateTransfer(transferId, {
+      status: TransferStatus.Connecting,
+      errorMessage: undefined,
+    });
+
+    this.logger()?.info('Resuming transfer', { transferId, resumeOffset });
+
+    // Re-use the existing transferId so the renderer entry updates in place
+    this.client.sendFileWithId(transferId, {
+      filePath: transfer.filePath,
+      fileName: transfer.fileName,
+      fileSize: transfer.fileSize,
+      checksum: transfer.checksum,
+      peerIp: '', // resolved below
+      peerPort: 0,
+      senderDeviceId: transfer.peerId, // will be overridden
+      senderName: transfer.peerName,
+      resumeOffset,
+    });
+
+    // Note: peerIp/peerPort must be resolved by the caller (TransferHandlers)
+    // which has access to DiscoveryService. This method is intentionally thin.
+  }
+
+  /** Resume a paused transfer with full peer connection details */
+  async resumeTransferWithPeer(transferId: string, peerIp: string, peerPort: number, senderDeviceId: string, senderName: string): Promise<void> {
+    const transfer = this.transfers.get(transferId);
+    if (!transfer || transfer.status !== TransferStatus.Paused) return;
+    if (transfer.direction !== 'send') return;
+
+    const resumeOffset = transfer.resumeOffset ?? transfer.bytesTransferred;
+
+    this.updateTransfer(transferId, {
+      status: TransferStatus.Connecting,
+      errorMessage: undefined,
+    });
+
+    this.logger()?.info('Resuming transfer', { transferId, resumeOffset, peerIp });
+
+    this.client.sendFileWithId(transferId, {
+      filePath: transfer.filePath,
+      fileName: transfer.fileName,
+      fileSize: transfer.fileSize,
+      checksum: transfer.checksum,
+      peerIp,
+      peerPort,
+      senderDeviceId,
+      senderName,
+      resumeOffset,
+    });
+  }
+
   cancelTransfer(transferId: string): void {
     const transfer = this.transfers.get(transferId);
     if (!transfer) return;
@@ -427,7 +502,14 @@ export class TransferQueue extends EventEmitter {
     return [...this.history];
   }
 
+  /** Return a paused transfer by ID (for resume) */
+  getPausedTransfer(transferId: string): Transfer | undefined {
+    const t = this.transfers.get(transferId);
+    return t?.status === TransferStatus.Paused ? t : undefined;
+  }
+
   clearHistory(): void {
+    this.historyIdSet.clear();
     this.history = [];
     this.emit('historyUpdated', this.history);
   }
@@ -467,10 +549,11 @@ export class TransferQueue extends EventEmitter {
     };
 
     // Avoid duplicates
-    const idx = this.history.findIndex(h => h.id === transfer.id);
-    if (idx >= 0) {
-      this.history[idx] = record;
+    if (this.historyIdSet.has(transfer.id)) {
+      const idx = this.history.findIndex(h => h.id === transfer.id);
+      if (idx >= 0) this.history[idx] = record;
     } else {
+      this.historyIdSet.add(transfer.id);
       this.history.unshift(record);
     }
 

@@ -31,9 +31,13 @@ export abstract class Component {
   /** Replace the current element with a fresh render */
   protected update(): void {
     if (!this.container || !this.element) return;
+    this.onUnmount();
+    for (const fn of this.cleanupFns) fn();
+    this.cleanupFns = [];
     const newElement = this.render();
     this.container.replaceChild(newElement, this.element);
     this.element = newElement;
+    this.onMount();
   }
 
   /** Register a cleanup function to run on unmount */

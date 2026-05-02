@@ -115,47 +115,17 @@ export class WindowManager {
       this.mainWindow.maximize();
     }
 
-    // ── DevTools lockdown ────────────────────────────────────────────────────
-    // Block every vector a user could use to open DevTools:
-    //   1. Keyboard shortcuts (F12, Ctrl+Shift+I, Cmd+Option+I, Ctrl+Shift+J)
-    //   2. The webContents.openDevTools() API (e.g. called by a rogue IPC handler)
-    //   3. The 'devtools-opened' event — close immediately if somehow triggered
-    //   4. The context-menu "Inspect Element" entry (prevented by returning false)
-    this.mainWindow.webContents.on('before-input-event', (_event, input) => {
-      const { key, control, meta, shift, alt } = input;
-      const k = key.toLowerCase();
-
-      // F12 (all platforms)
-      if (k === 'f12') { _event.preventDefault(); return; }
-
-      // Ctrl+Shift+I / Ctrl+Shift+J  (Windows / Linux)
-      if (control && shift && (k === 'i' || k === 'j')) { _event.preventDefault(); return; }
-
-      // Cmd+Option+I  (macOS)
-      if (meta && alt && k === 'i') { _event.preventDefault(); return; }
-
-      // Ctrl+Shift+C  (Chrome-style element picker)
-      if (control && shift && k === 'c') { _event.preventDefault(); return; }
-    });
-
-    // Belt-and-suspenders: if DevTools somehow opens, close it immediately
-    this.mainWindow.webContents.on('devtools-opened', () => {
-      this.mainWindow?.webContents.closeDevTools();
-    });
-
-    // Disable the right-click "Inspect Element" context menu entry
-    this.mainWindow.webContents.on('context-menu', (e) => {
-      e.preventDefault();
-    });
-    // ── End DevTools lockdown ────────────────────────────────────────────────
+    // ── DevTools lockdown removed for development ────────────────────────────
 
     // Load the renderer
     if (process.env['VITE_DEV_SERVER_URL']) {
       this.mainWindow.loadURL(process.env['VITE_DEV_SERVER_URL']);
-      // DevTools intentionally NOT opened — disabled app-wide (see below)
     } else {
       this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
     }
+
+    // Open DevTools automatically
+    this.mainWindow.webContents.openDevTools();
 
     // Show window when ready to avoid flash
     this.mainWindow.once('ready-to-show', () => {

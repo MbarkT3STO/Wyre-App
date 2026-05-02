@@ -30,8 +30,32 @@ export class DeviceCard extends Component {
   }
 
   updateOptions(options: Partial<DeviceCardOptions>): void {
+    const prevSelected = this.options.selected;
     this.options = { ...this.options, ...options };
-    super.update();
+
+    // Always patch in-place — never do a full re-render from an external call.
+    // A full replaceChild re-attaches click listeners which causes re-entrant
+    // setState calls and freezes the UI.
+    if (!this.element) return;
+
+    const selectedChanged = options.selected !== undefined && options.selected !== prevSelected;
+    if (selectedChanged) {
+      this.element.classList.toggle('device-card--selected', this.options.selected);
+      this.element.setAttribute('aria-pressed', String(this.options.selected));
+
+      const existingCheck = this.element.querySelector('.device-card__check');
+      if (this.options.selected && !existingCheck) {
+        const check = document.createElement('span');
+        check.className = 'device-card__check';
+        check.setAttribute('aria-hidden', 'true');
+        check.innerHTML = `<svg viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>`;
+        this.element.appendChild(check);
+      } else if (!this.options.selected && existingCheck) {
+        existingCheck.remove();
+      }
+    }
+    // If only device metadata changed (name, ip, etc.) we could patch those too,
+    // but device objects are stable during a session so no action needed.
   }
 
   render(): HTMLElement {

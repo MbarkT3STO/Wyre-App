@@ -19,6 +19,7 @@ export interface SendFileOptions {
   peerPort: number;
   senderDeviceId: string;
   senderName: string;
+  resumeOffset?: number;
 }
 
 export interface TransferClientEvents {
@@ -71,7 +72,7 @@ export class TransferClient extends EventEmitter {
   }
 
   private doSend(transferId: string, options: SendFileOptions): void {
-    const { filePath, fileName, fileSize, checksum, peerIp, peerPort, senderDeviceId, senderName } = options;
+    const { filePath, fileName, fileSize, checksum, peerIp, peerPort, senderDeviceId, senderName, resumeOffset = 0 } = options;
 
     const socket = connect({ host: peerIp, port: peerPort }, () => {
       // Disable Nagle's algorithm so small writes (header, feedback ACKs) are
@@ -87,6 +88,7 @@ export class TransferClient extends EventEmitter {
         fileName,
         fileSize,
         checksum,
+        ...(resumeOffset > 0 && { resumeOffset }),
       }) + '\n';
 
       socket.write(header);
@@ -105,7 +107,7 @@ export class TransferClient extends EventEmitter {
         socket.removeListener('data', onResponseData);
 
         try {
-          const response = JSON.parse(responseBuffer.slice(0, newlineIdx)) as { accepted: boolean };
+          const response = JSON.parse(responseBuffer.slice(0, newlineIdx)) as { accepted: boolean; resumeOffset?: number };
           if (!response.accepted) {
             socket.destroy();
             this.activeSends.delete(transferId);
@@ -113,8 +115,11 @@ export class TransferClient extends EventEmitter {
             return;
           }
 
+          // Server may have adjusted the resume offset (e.g. partial file mismatch)
+          const serverOffset = response.resumeOffset ?? resumeOffset;
+
           // Accepted — start streaming
-          this.streamFile(socket, transferId, filePath, fileSize);
+          this.streamFile(socket, transferId, filePath, fileSize, serverOffset);
         } catch (err) {
           socket.destroy(err instanceof Error ? err : new Error(String(err)));
           this.emit('error', transferId, err instanceof Error ? err : new Error(String(err)));
@@ -146,8 +151,8 @@ export class TransferClient extends EventEmitter {
     });
   }
 
-  private streamFile(socket: Socket, transferId: string, filePath: string, fileSize: number): void {
-    const readStream = FileChunker.createReadStream(filePath);
+  private streamFile(socket: Socket, transferId: string, filePath: string, fileSize: number, resumeOffset = 0): void {
+    const readStream = FileChunker.createReadStream(filePath, resumeOffset > 0 ? resumeOffset : undefined);
     let cancelled = false;
     let streamDone = false;
 

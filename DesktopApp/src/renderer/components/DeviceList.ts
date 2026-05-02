@@ -1,6 +1,7 @@
 /**
  * DeviceList.ts
- * Grid of DeviceCard components. Manages card lifecycle.
+ * Grid of DeviceCard components. Manages multi-device selection.
+ * Feature 3: supports selecting multiple devices simultaneously.
  */
 
 import { Component } from './base/Component';
@@ -9,13 +10,14 @@ import { StateManager } from '../core/StateManager';
 import type { Device } from '../../shared/models/Device';
 
 export interface DeviceListOptions {
-  onDeviceSelect: (device: Device) => void;
+  onSelectionChanged: (selectedIds: string[]) => void;
 }
 
 export class DeviceList extends Component {
   private options: DeviceListOptions;
   private cards: Map<string, DeviceCard> = new Map();
   private gridEl: HTMLElement | null = null;
+  private badgeEl: HTMLElement | null = null;
 
   constructor(options: DeviceListOptions) {
     super();
@@ -25,8 +27,11 @@ export class DeviceList extends Component {
   render(): HTMLElement {
     const wrapper = this.el('div', 'device-list');
 
-    const heading = this.el('div', 'device-list__heading');
-    heading.textContent = 'Nearby Devices';
+    const heading = this.el('div', 'device-list__heading-row');
+    heading.innerHTML = `
+      <span class="device-list__heading">Nearby Devices</span>
+      <span class="device-list__selection-badge" id="device-selection-badge" style="display:none"></span>
+    `;
 
     this.gridEl = this.el('div', 'device-list__grid');
     wrapper.appendChild(heading);
@@ -36,13 +41,16 @@ export class DeviceList extends Component {
   }
 
   protected onMount(): void {
+    this.badgeEl = this.element?.querySelector('#device-selection-badge') ?? null;
+
     const unsub = StateManager.subscribe('devices', (devices) => {
       this.syncDevices(devices);
     });
     this.addCleanup(unsub);
 
-    const unsub2 = StateManager.subscribe('selectedDeviceId', () => {
+    const unsub2 = StateManager.subscribe('selectedDeviceIds', () => {
       this.refreshSelectedState();
+      this.updateBadge();
     });
     this.addCleanup(unsub2);
 
@@ -53,7 +61,7 @@ export class DeviceList extends Component {
   private syncDevices(devices: Device[]): void {
     if (!this.gridEl) return;
 
-    const selectedId = StateManager.get('selectedDeviceId');
+    const selectedIds = StateManager.get('selectedDeviceIds');
 
     if (devices.length === 0) {
       this.gridEl.innerHTML = `
@@ -68,7 +76,6 @@ export class DeviceList extends Component {
           <span>Make sure other devices are on the same network and have Wyre open.</span>
         </div>
       `;
-      // Unmount removed cards
       for (const [id, card] of this.cards) {
         card.unmount();
         this.cards.delete(id);
@@ -91,14 +98,15 @@ export class DeviceList extends Component {
 
     // Add or update cards
     for (const device of devices) {
+      const isSelected = selectedIds.includes(device.id);
       const existing = this.cards.get(device.id);
       if (existing) {
-        existing.updateOptions({ device, selected: device.id === selectedId });
+        existing.updateOptions({ device, selected: isSelected });
       } else {
         const card = new DeviceCard({
           device,
-          selected: device.id === selectedId,
-          onClick: (d) => this.options.onDeviceSelect(d),
+          selected: isSelected,
+          onClick: (d) => this.handleCardClick(d),
         });
         card.mount(this.gridEl);
         this.cards.set(device.id, card);
@@ -106,14 +114,37 @@ export class DeviceList extends Component {
     }
   }
 
+  private handleCardClick(device: Device): void {
+    const current = StateManager.get('selectedDeviceIds');
+    let next: string[];
+    if (current.includes(device.id)) {
+      next = current.filter(id => id !== device.id);
+    } else {
+      next = [...current, device.id];
+    }
+    StateManager.setState('selectedDeviceIds', next);
+    this.options.onSelectionChanged(next);
+  }
+
   private refreshSelectedState(): void {
-    const selectedId = StateManager.get('selectedDeviceId');
+    const selectedIds = StateManager.get('selectedDeviceIds');
     const devices = StateManager.get('devices');
     for (const device of devices) {
       const card = this.cards.get(device.id);
       if (card) {
-        card.updateOptions({ selected: device.id === selectedId });
+        card.updateOptions({ selected: selectedIds.includes(device.id) });
       }
+    }
+  }
+
+  private updateBadge(): void {
+    if (!this.badgeEl) return;
+    const count = StateManager.get('selectedDeviceIds').length;
+    if (count > 1) {
+      this.badgeEl.textContent = `${count} selected`;
+      this.badgeEl.style.display = 'inline-flex';
+    } else {
+      this.badgeEl.style.display = 'none';
     }
   }
 

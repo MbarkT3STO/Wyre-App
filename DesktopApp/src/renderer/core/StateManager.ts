@@ -1,6 +1,6 @@
 /**
  * StateManager.ts
- * Observable typed state store — ~80 lines.
+ * Observable typed state store.
  * Components subscribe to slices of state and receive updates.
  * No third-party library — implemented from scratch.
  */
@@ -16,7 +16,8 @@ export interface AppState {
   transferHistory: TransferRecord[];
   settings: AppSettings | null;
   currentRoute: string;
-  selectedDeviceId: string | null;
+  /** Multi-device selection (Feature 3: Send to multiple devices) */
+  selectedDeviceIds: string[];
   /** Queue of pending incoming requests */
   pendingIncomingQueue: IncomingRequestPayload[];
   /** Pending outgoing sends waiting for the active transfer to finish */
@@ -33,7 +34,7 @@ const initialState: AppState = {
   transferHistory: [],
   settings: null,
   currentRoute: '/home',
-  selectedDeviceId: null,
+  selectedDeviceIds: [],
   pendingIncomingQueue: [],
   sendQueue: [],
   isLoading: false,

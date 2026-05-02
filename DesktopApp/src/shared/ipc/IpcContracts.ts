@@ -53,6 +53,17 @@ export const IpcChannels = {
 
   // Native directory picker
   DIALOG_OPEN_DIRECTORY: 'dialog:openDirectory',
+
+  // Folder zip-and-send (Feature: Folder Send)
+  FOLDER_ZIP_AND_SEND: 'folder:zipAndSend',
+
+  // Clipboard sharing (Feature: Clipboard)
+  CLIPBOARD_SEND: 'clipboard:send',
+  CLIPBOARD_RECEIVED: 'clipboard:received',
+
+  // Transfer resume (Feature: Resume)
+  TRANSFER_RESUME: 'transfer:resume',
+  TRANSFER_PAUSED: 'transfer:paused',
 } as const;
 
 export type IpcChannel = (typeof IpcChannels)[keyof typeof IpcChannels];
@@ -151,6 +162,36 @@ export type SettingsSetPayload = Partial<import('../models/AppSettings').AppSett
 /** Main → renderer: transfer history list */
 export type HistoryGetResponse = import('../models/Transfer').TransferRecord[];
 
+/** Renderer → main: zip a folder and send it to a device */
+export interface FolderZipAndSendPayload {
+  folderPath: string;
+  deviceId: string;
+}
+
+/** Renderer → main: send clipboard text to a device */
+export interface ClipboardSendPayload {
+  deviceId: string;
+  text: string;
+}
+
+/** Main → renderer: clipboard text received from a peer */
+export interface ClipboardReceivedPayload {
+  senderName: string;
+  text: string;
+  truncated: boolean;
+}
+
+/** Renderer → main: resume a paused transfer */
+export interface TransferResumePayload {
+  transferId: string;
+}
+
+/** Main → renderer: transfer is paused (resumable) */
+export interface TransferPausedPayload {
+  transferId: string;
+  bytesTransferred: number;
+}
+
 // ─── Typed IPC Map (for type-safe invoke/handle) ─────────────────────────────
 
 export interface IpcInvokeMap {
@@ -171,4 +212,7 @@ export interface IpcInvokeMap {
   [IpcChannels.LOGS_GET]: [void, LogsGetResponse];
   [IpcChannels.LOCAL_IP_GET]: [void, string];
   [IpcChannels.DIALOG_OPEN_DIRECTORY]: [void, string | null];
+  [IpcChannels.FOLDER_ZIP_AND_SEND]: [FolderZipAndSendPayload, string];
+  [IpcChannels.CLIPBOARD_SEND]: [ClipboardSendPayload, void];
+  [IpcChannels.TRANSFER_RESUME]: [TransferResumePayload, void];
 }

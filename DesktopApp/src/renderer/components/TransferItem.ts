@@ -37,8 +37,6 @@ export class TransferItem extends Component {
       this.patchProgress(data);
     } else {
       super.update();
-      this.attachActions();
-      this.applyProgressWidth();
     }
   }
 
@@ -150,6 +148,12 @@ export class TransferItem extends Component {
           <i class="fa-solid fa-xmark btn__icon transfer-item__btn-icon"></i>
           Cancel
         </button>` : ''}
+        ${t.status === TransferStatus.Paused ? `
+          <button class="btn btn--secondary btn--sm transfer-item__resume" data-id="${t.id}">
+            <i class="fa-solid fa-play btn__icon transfer-item__btn-icon"></i>
+            Resume
+          </button>
+        ` : ''}
         ${t.status === TransferStatus.Failed && t.direction === 'send' ? `
           <button class="btn btn--secondary btn--sm transfer-item__retry"
             data-file-path="${escapeHtml('filePath' in t ? (t.filePath ?? '') : '')}"
@@ -219,6 +223,18 @@ export class TransferItem extends Component {
       });
     }
 
+    const resumeBtn = this.element.querySelector('.transfer-item__resume');
+    if (resumeBtn) {
+      resumeBtn.addEventListener('click', () => {
+        const id = (resumeBtn as HTMLElement).dataset['id'];
+        if (id) {
+          window.dispatchEvent(new CustomEvent('filedrop:resume-transfer', {
+            detail: { transferId: id },
+          }));
+        }
+      });
+    }
+
     const openFileBtn = this.element.querySelector('.transfer-item__open-file');
     if (openFileBtn) {
       openFileBtn.addEventListener('click', () => {
@@ -247,6 +263,7 @@ export class TransferItem extends Component {
       [TransferStatus.Failed]: 'Failed',
       [TransferStatus.Cancelled]: 'Cancelled',
       [TransferStatus.Declined]: 'Declined',
+      [TransferStatus.Paused]: 'Paused',
     };
     return `<span class="transfer-item__badge transfer-item__badge--${status}">${labels[status] ?? status}</span>`;
   }
