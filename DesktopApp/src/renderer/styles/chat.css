@@ -1321,6 +1321,13 @@
 
 .chat-message { position: relative; }
 
+/* Extend the hover zone to cover the absolutely-positioned ⋮ button,
+   which sits outside the bubble. Without this, moving the mouse from the
+   bubble toward the button crosses a gap where nothing is hovered and the
+   button disappears before it can be clicked. */
+.chat-message--own  { padding-left:  40px; }
+.chat-message--peer { padding-right: 40px; }
+
 /* ⋮ button container — shown on hover */
 .chat-message__actions {
   position: absolute;
@@ -1331,8 +1338,8 @@
   z-index: 10;
 }
 
-.chat-message--own  .chat-message__actions { left:  -36px; }
-.chat-message--peer .chat-message__actions { right: -36px; }
+.chat-message--own  .chat-message__actions { left:  4px; }
+.chat-message--peer .chat-message__actions { right: 4px; }
 
 .chat-message:hover .chat-message__actions,
 .chat-message:focus-within .chat-message__actions {
