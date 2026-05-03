@@ -16,6 +16,7 @@ import com.getcapacitor.annotation.CapacitorPlugin
 class WyrePlugin : Plugin() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val executor = java.util.concurrent.Executors.newCachedThreadPool()
 
     /** The manager is owned by WyreService; we just hold a reference */
     private val manager: WyreManager?
@@ -306,11 +307,87 @@ class WyrePlugin : Plugin() {
         }
     }
 
+    // ── Chat ──────────────────────────────────────────────────────────────────
+
+    @PluginMethod
+    fun chatOpenSession(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val deviceId = call.getString("deviceId") ?: run { call.reject("deviceId required"); return }
+        executor.submit {
+            try {
+                val result = m.chatOpenSession(deviceId)
+                mainHandler.post { call.resolve(result) }
+            } catch (e: Exception) {
+                mainHandler.post { call.reject(e.message ?: "Failed to open chat session") }
+            }
+        }
+    }
+
+    @PluginMethod
+    fun chatCloseSession(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val sessionId = call.getString("sessionId") ?: run { call.reject("sessionId required"); return }
+        m.chatCloseSession(sessionId)
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun chatSendText(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val sessionId = call.getString("sessionId") ?: run { call.reject("sessionId required"); return }
+        val text      = call.getString("text")      ?: run { call.reject("text required");      return }
+        executor.submit {
+            val result = m.chatSendText(sessionId, text)
+            mainHandler.post {
+                if (result != null) call.resolve(result) else call.reject("Failed to send message")
+            }
+        }
+    }
+
+    @PluginMethod
+    fun chatSendFile(call: PluginCall) {
+        // File sending via chat not yet implemented on Android
+        call.reject("chatSendFile not yet implemented on Android")
+    }
+
+    @PluginMethod
+    fun chatAcceptInvite(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val sessionId = call.getString("sessionId") ?: run { call.reject("sessionId required"); return }
+        executor.submit {
+            m.chatAcceptInvite(sessionId)
+            mainHandler.post { call.resolve() }
+        }
+    }
+
+    @PluginMethod
+    fun chatDeclineInvite(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val sessionId = call.getString("sessionId") ?: run { call.reject("sessionId required"); return }
+        m.chatDeclineInvite(sessionId)
+        call.resolve()
+    }
+
+    @PluginMethod
+    fun chatGetSessions(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val result = com.getcapacitor.JSObject()
+        result.put("sessions", m.chatGetSessions())
+        call.resolve(result)
+    }
+
+    @PluginMethod
+    fun chatMarkRead(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val sessionId = call.getString("sessionId") ?: run { call.reject("sessionId required"); return }
+        m.chatMarkRead(sessionId)
+        call.resolve()
+    }
+
     // ── Shell actions ─────────────────────────────────────────────────────────
 
     @PluginMethod
-    fun openFile(call: PluginCall) {
-        val m = manager ?: run { call.reject("Service not ready"); return }
+    fun openFile(call: PluginCall) {        val m = manager ?: run { call.reject("Service not ready"); return }
         val path = call.getString("path") ?: run { call.reject("path required"); return }
         m.openFile(activity, path)
         call.resolve()

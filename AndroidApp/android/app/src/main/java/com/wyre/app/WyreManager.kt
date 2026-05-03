@@ -31,6 +31,7 @@ class WyreManager(
 
     private var discoveryService: DiscoveryService? = null
     private var transferServer: TransferServer? = null
+    private var chatManager: ChatManager? = null
     private val activeTransfers = ConcurrentHashMap<String, Any>()
 
     /** Paused transfers waiting for resume (Feature 4) */
@@ -59,6 +60,17 @@ class WyreManager(
         val actualPort = transferServer!!.start()
         if (actualPort != port) settings.setInt("transferPort", actualPort)
 
+        // Chat server listens on transferPort + 1
+        val chatPort = actualPort + 1
+        chatManager = ChatManager(
+            executor        = executor,
+            localDeviceId   = settings.getString("deviceId", java.util.UUID.randomUUID().toString()),
+            localDeviceName = settings.getString("deviceName", android.os.Build.MODEL),
+            chatPort        = chatPort,
+            notifyFn        = notifyFn
+        )
+        chatManager!!.start()
+
         discoveryService = DiscoveryService(
             deviceId   = settings.getString("deviceId", UUID.randomUUID().toString()),
             deviceName = settings.getString("deviceName", Build.MODEL),
@@ -80,6 +92,7 @@ class WyreManager(
     fun stop() {
         discoveryService?.stop()
         transferServer?.stop()
+        chatManager?.stop()
         scheduler.shutdownNow()
         executor.shutdownNow()
     }
@@ -301,7 +314,7 @@ class WyreManager(
         }
     }
 
-    // ── Resume (Feature 4) ────────────────────────────────────────────────────
+    // ── History ───────────────────────────────────────────────────────────────
 
     /**
      * Resume a paused transfer. The native side tracks paused transfers by ID.
@@ -327,6 +340,38 @@ class WyreManager(
                 onEvent        = ::onTransferEvent
             ).send()
         }
+    }
+
+    // ── Chat ──────────────────────────────────────────────────────────────────
+
+    fun chatOpenSession(deviceId: String): JSObject {
+        val device = discoveryService?.getDevices()?.find { it.id == deviceId }
+            ?: throw Exception("Device not found or offline")
+        val chatPort = device.port + 1
+        return chatManager?.openSession(device.id, device.name, device.ip, chatPort)
+            ?: throw Exception("Chat service not ready")
+    }
+
+    fun chatCloseSession(sessionId: String) {
+        chatManager?.closeSession(sessionId)
+    }
+
+    fun chatSendText(sessionId: String, text: String): JSObject? =
+        chatManager?.sendText(sessionId, text)
+
+    fun chatAcceptInvite(sessionId: String) {
+        chatManager?.acceptInvite(sessionId)
+    }
+
+    fun chatDeclineInvite(sessionId: String) {
+        chatManager?.declineInvite(sessionId)
+    }
+
+    fun chatGetSessions(): JSArray =
+        chatManager?.getSessionsJson() ?: JSArray()
+
+    fun chatMarkRead(sessionId: String) {
+        chatManager?.markRead(sessionId)
     }
 
     // ── History ───────────────────────────────────────────────────────────────
