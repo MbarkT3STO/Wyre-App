@@ -256,6 +256,26 @@ export function wireIpcListeners(toasts: ToastContainer, _router: Router): void 
     showChatPendingDialog(payload.sessionId, payload.peerName, _router);
   });
 
+  // Message edited by peer
+  const unsubChatEdited = IpcClient.onChatMessageEdited(({ sessionId, messageId, newText, editedAt }) => {
+    const session = StateManager.get('chatSessions').get(sessionId);
+    if (session) {
+      const msg = session.messages.find(m => m.id === messageId);
+      if (msg) { msg.text = newText; msg.editedAt = editedAt; }
+      StateManager.updateChatSession({ ...session });
+    }
+  });
+
+  // Message deleted by peer
+  const unsubChatDeleted = IpcClient.onChatMessageDeleted(({ sessionId, messageId }) => {
+    const session = StateManager.get('chatSessions').get(sessionId);
+    if (session) {
+      const msg = session.messages.find(m => m.id === messageId);
+      if (msg) msg.deleted = true;
+      StateManager.updateChatSession({ ...session });
+    }
+  });
+
   // Cleanup on unload
   window.addEventListener('unload', () => {
     unsubDevices();
@@ -272,6 +292,8 @@ export function wireIpcListeners(toasts: ToastContainer, _router: Router): void 
     unsubChatSession();
     unsubChatInvite();
     unsubChatPending();
+    unsubChatEdited();
+    unsubChatDeleted();
   });
 }
 

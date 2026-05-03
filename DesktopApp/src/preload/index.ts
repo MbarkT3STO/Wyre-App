@@ -42,6 +42,10 @@ import type {
   ChatRequestPendingPayload,
   ChatRequestResolvedPayload,
   ChatRequestCancelPayload,
+  ChatEditMessagePayload,
+  ChatDeleteMessagePayload,
+  ChatMessageEditedPayload,
+  ChatMessageDeletedPayload,
 } from '../shared/ipc/ChatIpcContracts';
 import type { Device } from '../shared/models/Device';
 import type { AppSettings } from '../shared/models/AppSettings';
@@ -127,6 +131,10 @@ export interface FileDropApi {
   onChatRequestPending: (cb: (payload: ChatRequestPendingPayload) => void) => () => void;
   onChatRequestResolved: (cb: (payload: ChatRequestResolvedPayload) => void) => () => void;
   chatCancelRequest: (payload: ChatRequestCancelPayload) => Promise<void>;
+  chatEditMessage: (payload: ChatEditMessagePayload) => Promise<boolean>;
+  chatDeleteMessage: (payload: ChatDeleteMessagePayload) => Promise<boolean>;
+  onChatMessageEdited: (cb: (payload: ChatMessageEditedPayload) => void) => () => void;
+  onChatMessageDeleted: (cb: (payload: ChatMessageDeletedPayload) => void) => () => void;
 }
 
 // ─── Helper: create a listener that returns an unsubscribe function ───────────
@@ -219,6 +227,10 @@ const api: FileDropApi = {
   onChatRequestPending: (cb) => createListener(ChatIpcChannels.CHAT_REQUEST_PENDING, cb),
   onChatRequestResolved: (cb) => createListener(ChatIpcChannels.CHAT_REQUEST_RESOLVED, cb),
   chatCancelRequest: (payload) => ipcRenderer.invoke(ChatIpcChannels.CHAT_REQUEST_CANCEL, payload),
+  chatEditMessage: (payload) => ipcRenderer.invoke(ChatIpcChannels.CHAT_EDIT_MESSAGE, payload),
+  chatDeleteMessage: (payload) => ipcRenderer.invoke(ChatIpcChannels.CHAT_DELETE_MESSAGE, payload),
+  onChatMessageEdited: (cb) => createListener(ChatIpcChannels.CHAT_MESSAGE_EDITED, cb),
+  onChatMessageDeleted: (cb) => createListener(ChatIpcChannels.CHAT_MESSAGE_DELETED, cb),
 };
 
 contextBridge.exposeInMainWorld('api', api);

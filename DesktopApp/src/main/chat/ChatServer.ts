@@ -27,6 +27,8 @@ import { readFile } from 'fs/promises';
 import type {
   ChatWireMessage,
   ChatAckWireMessage,
+  ChatEditWireMessage,
+  ChatDeleteWireMessage,
   ChatHandshakeWireMessage,
   ChatCloseWireMessage,
 } from '../../shared/models/ChatMessage';
@@ -53,6 +55,10 @@ export interface ChatServerEvents {
   incomingSession: (session: IncomingChatSession) => void;
   /** A message was received on an active session */
   message: (sessionId: string, msg: ChatWireMessage) => void;
+  /** A message was edited by the peer */
+  messageEdited: (sessionId: string, messageId: string, newText: string, editedAt: number) => void;
+  /** A message was deleted by the peer */
+  messageDeleted: (sessionId: string, messageId: string) => void;
   /** A session was closed by the peer */
   sessionClosed: (sessionId: string) => void;
   /** A socket error occurred on a session */
@@ -229,6 +235,37 @@ export class ChatServer extends EventEmitter {
   }
 
   /**
+   * Send an edit for a previously sent text message.
+   */
+  sendEdit(sessionId: string, messageId: string, senderDeviceId: string, newText: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.socket.destroyed) return false;
+    const editedAt = Date.now();
+    const wire: ChatEditWireMessage = {
+      type: 'chat_edit',
+      id: messageId,
+      senderDeviceId,
+      newText: newText.slice(0, MAX_TEXT_LENGTH),
+      editedAt,
+    };
+    return this.writeMessage(session, wire);
+  }
+
+  /**
+   * Send a delete notification for a message.
+   */
+  sendDelete(sessionId: string, messageId: string, senderDeviceId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || session.socket.destroyed) return false;
+    const wire: ChatDeleteWireMessage = {
+      type: 'chat_delete',
+      id: messageId,
+      senderDeviceId,
+    };
+    return this.writeMessage(session, wire);
+  }
+
+  /**
    * Close a session gracefully.
    */
   closeSession(sessionId: string, senderDeviceId: string): void {
@@ -339,20 +376,28 @@ export class ChatServer extends EventEmitter {
 
     if (type === 'chat') {
       const wire = msg as unknown as ChatWireMessage;
-      // Validate required fields
       if (!wire.id || !wire.senderDeviceId) return;
-      // Sanitise text
       if (wire.text) wire.text = wire.text.slice(0, MAX_TEXT_LENGTH);
-      // Sanitise file name
       if (wire.fileName) wire.fileName = basename(wire.fileName).replace(/[\x00-\x1F\x7F]/g, '');
-      // Send ack
       this.sendAck(sessionId, wire.id);
       this.emit('message', sessionId, wire);
+
+    } else if (type === 'chat_edit') {
+      const edit = msg as unknown as ChatEditWireMessage;
+      if (!edit.id || !edit.senderDeviceId) return;
+      const safeText = (edit.newText ?? '').slice(0, MAX_TEXT_LENGTH);
+      this.emit('messageEdited', sessionId, edit.id, safeText, edit.editedAt ?? Date.now());
+
+    } else if (type === 'chat_delete') {
+      const del = msg as unknown as ChatDeleteWireMessage;
+      if (!del.id || !del.senderDeviceId) return;
+      this.emit('messageDeleted', sessionId, del.id);
+
     } else if (type === 'chat_close') {
       this.sessions.delete(sessionId);
       this.emit('sessionClosed', sessionId);
+
     } else if (type === 'chat_ack') {
-      // Acks are handled by ChatManager
       const ack = msg as unknown as ChatAckWireMessage;
       this.emit('message', sessionId, { type: 'chat_ack', id: ack.id } as unknown as ChatWireMessage);
     }

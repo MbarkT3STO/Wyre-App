@@ -30,6 +30,10 @@ export interface ChatManagerEvents {
   requestPending: (sessionId: string, peerId: string, peerName: string) => void;
   /** Sender's outgoing request was resolved */
   requestResolved: (sessionId: string, outcome: 'accepted' | 'declined' | 'cancelled' | 'timeout') => void;
+  /** A message was edited (own or peer) */
+  messageEdited: (sessionId: string, messageId: string, newText: string, editedAt: number) => void;
+  /** A message was deleted (own or peer) */
+  messageDeleted: (sessionId: string, messageId: string) => void;
 }
 
 export declare interface ChatManager {
@@ -288,6 +292,48 @@ export class ChatManager extends EventEmitter {
     this.emit('sessionUpdated', { ...session });
   }
 
+  /**
+   * Edit a sent text message. Only own messages can be edited.
+   * Propagates the edit to the peer over the wire.
+   */
+  editMessage(sessionId: string, messageId: string, newText: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+
+    const msg = session.messages.find(m => m.id === messageId);
+    if (!msg || !msg.isOwn || msg.type !== 'text' || msg.deleted) return false;
+
+    const editedAt = Date.now();
+    msg.text = newText;
+    msg.editedAt = editedAt;
+
+    const settings = this.settingsStore.get();
+    this.chatServer.sendEdit(sessionId, messageId, settings.deviceId, newText);
+
+    this.emit('messageEdited', sessionId, messageId, newText, editedAt);
+    return true;
+  }
+
+  /**
+   * Delete a message. Only own messages can be deleted.
+   * Sends a delete wire message to the peer so their copy is also removed.
+   */
+  deleteMessage(sessionId: string, messageId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) return false;
+
+    const msg = session.messages.find(m => m.id === messageId);
+    if (!msg || !msg.isOwn || msg.deleted) return false;
+
+    msg.deleted = true;
+
+    const settings = this.settingsStore.get();
+    this.chatServer.sendDelete(sessionId, messageId, settings.deviceId);
+
+    this.emit('messageDeleted', sessionId, messageId);
+    return true;
+  }
+
   // ─── Private ──────────────────────────────────────────────────────────────
 
   private wireChatServer(): void {
@@ -342,6 +388,29 @@ export class ChatManager extends EventEmitter {
       if (session) {
         session.connected = false;
         this.emit('sessionUpdated', { ...session });
+      }
+    });
+
+    // Peer edited a message
+    this.chatServer.on('messageEdited', (sessionId, messageId, newText, editedAt) => {
+      const session = this.sessions.get(sessionId);
+      if (!session) return;
+      const msg = session.messages.find(m => m.id === messageId);
+      if (msg && !msg.deleted) {
+        msg.text = newText;
+        msg.editedAt = editedAt;
+        this.emit('messageEdited', sessionId, messageId, newText, editedAt);
+      }
+    });
+
+    // Peer deleted a message
+    this.chatServer.on('messageDeleted', (sessionId, messageId) => {
+      const session = this.sessions.get(sessionId);
+      if (!session) return;
+      const msg = session.messages.find(m => m.id === messageId);
+      if (msg) {
+        msg.deleted = true;
+        this.emit('messageDeleted', sessionId, messageId);
       }
     });
   }

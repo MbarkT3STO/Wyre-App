@@ -417,17 +417,63 @@ export class ChatView extends Component {
   private patchMessageStatuses(session: ChatSession): void {
     if (!this.messageListEl) return;
     for (const msg of session.messages) {
-      if (!msg.isOwn) continue;
-      const bubble = this.messageListEl.querySelector(`[data-message-id="${msg.id}"]`);
-      if (!bubble) continue;
-      const statusEl = bubble.querySelector('.chat-message__status-icon');
-      if (!statusEl) continue;
-      const newIcon = this.getStatusIcon(msg.status);
-      if (newIcon && statusEl.outerHTML !== newIcon) {
-        const tmp = document.createElement('span');
-        tmp.innerHTML = newIcon;
-        const newEl = tmp.firstElementChild;
-        if (newEl) statusEl.replaceWith(newEl);
+      const bubbleEl = this.messageListEl.querySelector(`[data-message-id="${msg.id}"]`) as HTMLElement | null;
+      if (!bubbleEl) continue;
+
+      // If message was deleted, replace with tombstone
+      if (msg.deleted && !bubbleEl.querySelector('.chat-message__bubble--deleted')) {
+        const tombstone = this.createMessageBubble(msg);
+        bubbleEl.replaceWith(tombstone);
+        continue;
+      }
+
+      // Patch status icon for own messages
+      if (msg.isOwn && !msg.deleted) {
+        const statusEl = bubbleEl.querySelector('.chat-message__status-icon');
+        if (statusEl) {
+          const newIcon = this.getStatusIcon(msg.status);
+          if (newIcon && statusEl.outerHTML !== newIcon) {
+            const tmp = document.createElement('span');
+            tmp.innerHTML = newIcon;
+            const newEl = tmp.firstElementChild;
+            if (newEl) statusEl.replaceWith(newEl);
+          }
+        }
+
+        // Patch edited text in-place
+        if (msg.editedAt) {
+          const textEl = bubbleEl.querySelector('.chat-message__text');
+          if (textEl && msg.text) {
+            const newHtml = escapeHtml(msg.text).replace(/\n/g, '<br>');
+            if (textEl.innerHTML !== newHtml) textEl.innerHTML = newHtml;
+          }
+          // Add edited badge if missing
+          const meta = bubbleEl.querySelector('.chat-message__meta');
+          if (meta && !meta.querySelector('.chat-message__edited')) {
+            const badge = document.createElement('span');
+            badge.className = 'chat-message__edited';
+            badge.title = 'Edited';
+            badge.textContent = 'edited';
+            meta.prepend(badge);
+          }
+        }
+      }
+
+      // Patch peer edited text
+      if (!msg.isOwn && msg.editedAt && !msg.deleted) {
+        const textEl = bubbleEl.querySelector('.chat-message__text');
+        if (textEl && msg.text) {
+          const newHtml = escapeHtml(msg.text).replace(/\n/g, '<br>');
+          if (textEl.innerHTML !== newHtml) textEl.innerHTML = newHtml;
+        }
+        const meta = bubbleEl.querySelector('.chat-message__meta');
+        if (meta && !meta.querySelector('.chat-message__edited')) {
+          const badge = document.createElement('span');
+          badge.className = 'chat-message__edited';
+          badge.title = 'Edited';
+          badge.textContent = 'edited';
+          meta.prepend(badge);
+        }
       }
     }
   }
@@ -484,8 +530,24 @@ export class ChatView extends Component {
     wrapper.className = `chat-message ${msg.isOwn ? 'chat-message--own' : 'chat-message--peer'}`;
     wrapper.dataset['messageId'] = msg.id;
 
+    // Deleted message — show tombstone
+    if (msg.deleted) {
+      wrapper.innerHTML = `
+        <div class="chat-message__bubble chat-message__bubble--deleted">
+          <p class="chat-message__deleted-text">
+            <i class="fa-solid fa-ban" aria-hidden="true"></i>
+            Message deleted
+          </p>
+        </div>
+      `;
+      return wrapper;
+    }
+
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const statusIcon = msg.isOwn ? this.getStatusIcon(msg.status) : '';
+    const editedBadge = msg.editedAt
+      ? `<span class="chat-message__edited" title="Edited">edited</span>`
+      : '';
 
     let contentHtml = '';
 
@@ -523,10 +585,37 @@ export class ChatView extends Component {
       `;
     }
 
+    // Build action bar — copy always available for text; edit/delete only for own
+    const canCopy = msg.type === 'text' && !!(msg.text);
+    const canEdit = msg.isOwn && msg.type === 'text';
+    const canDelete = msg.isOwn;
+
+    const actionBar = `
+      <div class="chat-message__actions" role="toolbar" aria-label="Message actions">
+        ${canCopy ? `
+          <button class="chat-message__action-btn" data-action="copy" title="Copy text" aria-label="Copy message text">
+            <i class="fa-regular fa-copy" aria-hidden="true"></i>
+          </button>
+        ` : ''}
+        ${canEdit ? `
+          <button class="chat-message__action-btn" data-action="edit" title="Edit message" aria-label="Edit message">
+            <i class="fa-solid fa-pen" aria-hidden="true"></i>
+          </button>
+        ` : ''}
+        ${canDelete ? `
+          <button class="chat-message__action-btn chat-message__action-btn--danger" data-action="delete" title="Delete message" aria-label="Delete message">
+            <i class="fa-solid fa-trash" aria-hidden="true"></i>
+          </button>
+        ` : ''}
+      </div>
+    `;
+
     wrapper.innerHTML = `
+      ${actionBar}
       <div class="chat-message__bubble">
         ${contentHtml}
         <div class="chat-message__meta">
+          ${editedBadge}
           <span class="chat-message__time">${time}</span>
           ${statusIcon}
         </div>
@@ -551,7 +640,121 @@ export class ChatView extends Component {
       });
     }
 
+    // Wire action buttons
+    wrapper.querySelectorAll('.chat-message__action-btn').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const action = (btn as HTMLElement).dataset['action'];
+        if (action === 'copy') this.handleCopyMessage(msg);
+        else if (action === 'edit') this.handleEditMessage(msg, wrapper);
+        else if (action === 'delete') void this.handleDeleteMessage(msg, wrapper);
+      });
+    });
+
     return wrapper;
+  }
+
+  // ── Message actions ────────────────────────────────────────────────────────
+
+  private handleCopyMessage(msg: ChatMessage): void {
+    if (!msg.text) return;
+    navigator.clipboard.writeText(msg.text).then(() => {
+      this.toasts.success('Copied to clipboard');
+    }).catch(() => {
+      this.toasts.error('Failed to copy');
+    });
+  }
+
+  private handleEditMessage(msg: ChatMessage, wrapper: HTMLElement): void {
+    if (!this.activeSessionId || !msg.isOwn || msg.type !== 'text') return;
+
+    const bubble = wrapper.querySelector('.chat-message__bubble') as HTMLElement | null;
+    if (!bubble) return;
+
+    const originalText = msg.text ?? '';
+
+    // Replace bubble content with inline editor
+    bubble.innerHTML = `
+      <div class="chat-message__edit-wrap">
+        <textarea class="chat-message__edit-input" aria-label="Edit message" maxlength="10000">${escapeHtml(originalText)}</textarea>
+        <div class="chat-message__edit-actions">
+          <button class="btn btn--ghost btn--sm" id="edit-cancel-${msg.id}">Cancel</button>
+          <button class="btn btn--primary btn--sm" id="edit-save-${msg.id}">Save</button>
+        </div>
+      </div>
+    `;
+
+    const textarea = bubble.querySelector('textarea') as HTMLTextAreaElement;
+    // Set cursor to end
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    // Auto-resize
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    textarea.addEventListener('input', () => {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    });
+
+    const cancelEdit = (): void => {
+      // Restore original bubble
+      const restored = this.createMessageBubble(msg);
+      wrapper.replaceWith(restored);
+    };
+
+    const saveEdit = (): void => {
+      const newText = textarea.value.trim();
+      if (!newText || newText === originalText) { cancelEdit(); return; }
+      if (!this.activeSessionId) return;
+
+      void IpcClient.chatEditMessage({
+        sessionId: this.activeSessionId,
+        messageId: msg.id,
+        newText,
+      }).then((ok) => {
+        if (ok) {
+          // Update local state — the IpcListener will also fire but we patch immediately
+          msg.text = newText;
+          msg.editedAt = Date.now();
+          const restored = this.createMessageBubble(msg);
+          wrapper.replaceWith(restored);
+        } else {
+          this.toasts.error('Could not edit message');
+          cancelEdit();
+        }
+      });
+    };
+
+    bubble.querySelector(`#edit-cancel-${msg.id}`)?.addEventListener('click', cancelEdit);
+    bubble.querySelector(`#edit-save-${msg.id}`)?.addEventListener('click', saveEdit);
+
+    // Keyboard shortcuts inside the edit textarea
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); }
+      if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+    });
+  }
+
+  private async handleDeleteMessage(msg: ChatMessage, wrapper: HTMLElement): Promise<void> {
+    if (!this.activeSessionId || !msg.isOwn) return;
+
+    // Instant optimistic delete — replace with tombstone immediately
+    msg.deleted = true;
+    const tombstone = this.createMessageBubble(msg);
+    wrapper.replaceWith(tombstone);
+
+    try {
+      await IpcClient.chatDeleteMessage({
+        sessionId: this.activeSessionId,
+        messageId: msg.id,
+      });
+    } catch {
+      // Revert on failure
+      msg.deleted = false;
+      const restored = this.createMessageBubble(msg);
+      tombstone.replaceWith(restored);
+      this.toasts.error('Could not delete message');
+    }
   }
 
   private getStatusIcon(status: ChatMessage['status']): string {

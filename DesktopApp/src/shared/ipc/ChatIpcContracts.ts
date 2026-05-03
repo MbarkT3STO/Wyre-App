@@ -39,6 +39,14 @@ export const ChatIpcChannels = {
   CHAT_REQUEST_RESOLVED: 'chat:request:resolved',
   /** Renderer → main: sender cancels their outgoing request */
   CHAT_REQUEST_CANCEL: 'chat:request:cancel',
+  /** Renderer → main: edit a sent text message */
+  CHAT_EDIT_MESSAGE: 'chat:edit:message',
+  /** Renderer → main: delete a message */
+  CHAT_DELETE_MESSAGE: 'chat:delete:message',
+  /** Main → renderer: a message was edited by either side */
+  CHAT_MESSAGE_EDITED: 'chat:message:edited',
+  /** Main → renderer: a message was deleted by either side */
+  CHAT_MESSAGE_DELETED: 'chat:message:deleted',
 } as const;
 
 export type ChatIpcChannel = (typeof ChatIpcChannels)[keyof typeof ChatIpcChannels];
@@ -129,4 +137,31 @@ export interface ChatRequestResolvedPayload {
 /** Renderer → main: sender cancels their outgoing request */
 export interface ChatRequestCancelPayload {
   sessionId: string;
+}
+
+/** Renderer → main: edit a sent text message */
+export interface ChatEditMessagePayload {
+  sessionId: string;
+  messageId: string;
+  newText: string;
+}
+
+/** Renderer → main: delete a message */
+export interface ChatDeleteMessagePayload {
+  sessionId: string;
+  messageId: string;
+}
+
+/** Main → renderer: a message was edited */
+export interface ChatMessageEditedPayload {
+  sessionId: string;
+  messageId: string;
+  newText: string;
+  editedAt: number;
+}
+
+/** Main → renderer: a message was deleted */
+export interface ChatMessageDeletedPayload {
+  sessionId: string;
+  messageId: string;
 }

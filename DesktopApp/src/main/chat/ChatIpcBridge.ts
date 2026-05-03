@@ -15,6 +15,8 @@ import type {
   ChatInviteDeclinePayload,
   ChatMarkReadPayload,
   ChatRequestCancelPayload,
+  ChatEditMessagePayload,
+  ChatDeleteMessagePayload,
 } from '../../shared/ipc/ChatIpcContracts';
 import type { ChatManager } from './ChatManager';
 
@@ -95,6 +97,16 @@ export class ChatIpcBridge {
     ipcMain.handle(ChatIpcChannels.CHAT_REQUEST_CANCEL, (_event, payload: ChatRequestCancelPayload) => {
       this.chatManager.cancelRequest(payload.sessionId);
     });
+
+    // Edit a message
+    ipcMain.handle(ChatIpcChannels.CHAT_EDIT_MESSAGE, (_event, payload: ChatEditMessagePayload) => {
+      return this.chatManager.editMessage(payload.sessionId, payload.messageId, payload.newText);
+    });
+
+    // Delete a message
+    ipcMain.handle(ChatIpcChannels.CHAT_DELETE_MESSAGE, (_event, payload: ChatDeleteMessagePayload) => {
+      return this.chatManager.deleteMessage(payload.sessionId, payload.messageId);
+    });
   }
 
   private wireManagerEvents(): void {
@@ -120,6 +132,14 @@ export class ChatIpcBridge {
 
     this.chatManager.on('requestResolved', (sessionId, outcome) => {
       this.send(ChatIpcChannels.CHAT_REQUEST_RESOLVED, { sessionId, outcome });
+    });
+
+    this.chatManager.on('messageEdited', (sessionId, messageId, newText, editedAt) => {
+      this.send(ChatIpcChannels.CHAT_MESSAGE_EDITED, { sessionId, messageId, newText, editedAt });
+    });
+
+    this.chatManager.on('messageDeleted', (sessionId, messageId) => {
+      this.send(ChatIpcChannels.CHAT_MESSAGE_DELETED, { sessionId, messageId });
     });
   }
 }

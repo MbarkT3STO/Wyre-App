@@ -33,6 +33,10 @@ export interface ChatMessage {
   timestamp: number;
   /** Delivery status */
   status: ChatMessageStatus;
+  /** Set when the message has been edited — unix timestamp (ms) */
+  editedAt?: number;
+  /** Set to true when the message has been deleted locally */
+  deleted?: boolean;
 }
 
 export interface ChatSession {
@@ -80,6 +84,22 @@ export interface ChatWireMessage {
 export interface ChatAckWireMessage {
   type: 'chat_ack';
   id: string;
+}
+
+/** Sent over the wire to edit a message */
+export interface ChatEditWireMessage {
+  type: 'chat_edit';
+  id: string;
+  senderDeviceId: string;
+  newText: string;
+  editedAt: number;
+}
+
+/** Sent over the wire to delete a message */
+export interface ChatDeleteWireMessage {
+  type: 'chat_delete';
+  id: string;
+  senderDeviceId: string;
 }
 
 /** Sent over the wire to initiate a chat session */

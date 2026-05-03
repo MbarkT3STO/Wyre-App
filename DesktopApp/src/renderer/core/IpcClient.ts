@@ -43,6 +43,10 @@ import type {
   ChatRequestPendingPayload,
   ChatRequestResolvedPayload,
   ChatRequestCancelPayload,
+  ChatEditMessagePayload,
+  ChatDeleteMessagePayload,
+  ChatMessageEditedPayload,
+  ChatMessageDeletedPayload,
 } from '../../shared/ipc/ChatIpcContracts';
 import type { ChatMessage, ChatSession } from '../../shared/models/ChatMessage';
 
@@ -153,4 +157,12 @@ export const IpcClient = {
     getApi().onChatRequestResolved(cb),
   chatCancelRequest: (payload: ChatRequestCancelPayload): Promise<void> =>
     getApi().chatCancelRequest(payload),
+  chatEditMessage: (payload: ChatEditMessagePayload): Promise<boolean> =>
+    getApi().chatEditMessage(payload),
+  chatDeleteMessage: (payload: ChatDeleteMessagePayload): Promise<boolean> =>
+    getApi().chatDeleteMessage(payload),
+  onChatMessageEdited: (cb: (payload: ChatMessageEditedPayload) => void): (() => void) =>
+    getApi().onChatMessageEdited(cb),
+  onChatMessageDeleted: (cb: (payload: ChatMessageDeletedPayload) => void): (() => void) =>
+    getApi().onChatMessageDeleted(cb),
 } as const;
