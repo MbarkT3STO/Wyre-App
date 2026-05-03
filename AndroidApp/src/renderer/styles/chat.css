@@ -728,3 +728,49 @@
   80%  { transform: scale(1.55); opacity: 0; }
   100% { transform: scale(1.55); opacity: 0; }
 }
+
+/* ══════════════════════════════════════════════════════════
+   DEVICE CARD CHAT BUTTON
+   ══════════════════════════════════════════════════════════ */
+
+.device-card__chat-btn {
+  /* Sits in the bottom-centre of the card, always visible on mobile
+     (no hover state on touch devices) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  box-shadow: var(--nm-raised);
+  font-size: 15px;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-spring);
+  /* Always visible on touch — no opacity:0 hide like desktop */
+  opacity: 1;
+  pointer-events: auto;
+  flex-shrink: 0;
+  /* Prevent card click from firing when tapping the button */
+  position: relative;
+  z-index: 2;
+}
+
+.device-card__chat-btn:active {
+  box-shadow: var(--nm-pressed);
+  transform: scale(0.92);
+  color: var(--accent-mid);
+}
+
+/* Highlight when the parent card is selected */
+.device-card--selected .device-card__chat-btn {
+  background: var(--bg-app);
+  color: var(--accent-mid);
+  box-shadow: 0 2px 10px var(--accent-glow-sm), var(--nm-raised);
+}

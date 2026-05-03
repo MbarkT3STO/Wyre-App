@@ -391,7 +391,13 @@ export class HomeView extends Component {
       StateManager.setState('activeChatSessionId', session.id);
       window.location.hash = '/chat';
     } catch (err) {
-      this.toasts.error(err instanceof Error ? err.message : 'Could not start chat');
+      const msg = err instanceof Error ? err.message : '';
+      // Native chat plugin not yet implemented on Android — show a friendly notice
+      if (msg.toLowerCase().includes('not implemented')) {
+        this.toasts.info('Chat is coming soon for Android');
+      } else {
+        this.toasts.error(msg || 'Could not start chat');
+      }
     }
   }
 
