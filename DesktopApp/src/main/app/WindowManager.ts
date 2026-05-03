@@ -41,6 +41,11 @@ interface WindowState {
  * Applied via session.webRequest.onHeadersReceived so it covers file:// loads
  * (Electron ignores <meta http-equiv="CSP"> for file:// protocol).
  *
+ * 'unsafe-inline' is included in style-src because the renderer sets inline
+ * styles at runtime (ScaleEngine zoom compensation, dynamic display toggles).
+ * This is safe in Electron — the renderer only loads local file:// content
+ * and there is no XSS attack surface from external origins.
+ *
  * In dev mode we do NOT inject this header — the Vite dev server's own
  * /@vite/client script sets inline styles for its HMR overlay, and
  * overriding headers on localhost requests would break hot-reload.
@@ -49,8 +54,8 @@ interface WindowState {
 const PRODUCTION_CSP =
   "default-src 'self'; " +
   "script-src 'self'; " +
-  "style-src 'self' https://fonts.googleapis.com; " +
-  "font-src 'self' data: https://fonts.gstatic.com; " +
+  "style-src 'self' 'unsafe-inline'; " +
+  "font-src 'self' data:; " +
   "img-src 'self' data:; " +
   "connect-src 'self'; " +
   "object-src 'none'; " +

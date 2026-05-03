@@ -13,10 +13,6 @@
     {
       "from": "assets/icons",
       "to": "assets/icons"
-    },
-    {
-      "from": "assets/fonts",
-      "to": "assets/fonts"
     }
   ],
   "mac": {

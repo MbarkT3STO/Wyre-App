@@ -100,5 +100,10 @@ export default defineConfig(({ command }) => {
         },
       },
     },
+
+    // Serve the top-level assets/ folder as static files so fonts, icons, etc.
+    // are copied into dist/renderer/ and reachable via absolute paths (e.g.
+    // /assets/fonts/InterVariable.woff2) in both dev and production builds.
+    publicDir: resolve(__dirname, 'assets'),
   };
 });
