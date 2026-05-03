@@ -9,6 +9,7 @@ export interface DeviceCardOptions {
   device: Device;
   selected: boolean;
   onClick: (device: Device) => void;
+  onChat?: (device: Device) => void;
 }
 
 const PLATFORM_ICONS: Record<string, string> = {
@@ -89,12 +90,25 @@ export class DeviceCard extends Component {
       ${selected ? `<span class="device-card__check" aria-hidden="true">
         <svg viewBox="0 0 16 16" fill="currentColor"><path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z"/></svg>
       </span>` : ''}
+      <button class="device-card__chat-btn" title="Chat with ${escapeHtml(device.name)}" aria-label="Chat with ${escapeHtml(device.name)}">
+        <i class="fa-solid fa-comment" aria-hidden="true"></i>
+      </button>
     `;
 
     card.addEventListener('click', () => onClick(device));
     card.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(device); }
     });
+
+    const chatBtn = card.querySelector('.device-card__chat-btn') as HTMLButtonElement | null;
+    if (chatBtn && this.options.onChat) {
+      chatBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.options.onChat?.(device);
+      });
+    } else if (chatBtn) {
+      chatBtn.style.display = 'none';
+    }
 
     return card;
   }

@@ -6,6 +6,7 @@
 
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 import { IpcChannels } from '../shared/ipc/IpcContracts';
+import { ChatIpcChannels } from '../shared/ipc/ChatIpcContracts';
 import type {
   TransferSendPayload,
   TransferCancelPayload,
@@ -25,9 +26,27 @@ import type {
   TransferResumePayload,
   TransferPausedPayload,
 } from '../shared/ipc/IpcContracts';
+import type {
+  ChatSessionOpenPayload,
+  ChatSessionClosePayload,
+  ChatSendTextPayload,
+  ChatSendFilePayload,
+  ChatInviteAcceptPayload,
+  ChatInviteDeclinePayload,
+  ChatMarkReadPayload,
+  ChatMessagePayload,
+  ChatMessageStatusPayload,
+  ChatSessionUpdatedPayload,
+  ChatInvitePayload,
+  ChatSessionsGetResponse,
+  ChatRequestPendingPayload,
+  ChatRequestResolvedPayload,
+  ChatRequestCancelPayload,
+} from '../shared/ipc/ChatIpcContracts';
 import type { Device } from '../shared/models/Device';
 import type { AppSettings } from '../shared/models/AppSettings';
 import type { TransferRecord } from '../shared/models/Transfer';
+import type { ChatMessage, ChatSession } from '../shared/models/ChatMessage';
 
 // ─── Typed API exposed to renderer ───────────────────────────────────────────
 
@@ -91,6 +110,23 @@ export interface FileDropApi {
   // Transfer resume
   resumeTransfer: (payload: TransferResumePayload) => Promise<void>;
   onTransferPaused: (cb: (payload: TransferPausedPayload) => void) => () => void;
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  chatOpenSession: (payload: ChatSessionOpenPayload) => Promise<ChatSession>;
+  chatCloseSession: (payload: ChatSessionClosePayload) => Promise<void>;
+  chatSendText: (payload: ChatSendTextPayload) => Promise<ChatMessage | null>;
+  chatSendFile: (payload: ChatSendFilePayload) => Promise<ChatMessage | null>;
+  chatAcceptInvite: (payload: ChatInviteAcceptPayload) => Promise<void>;
+  chatDeclineInvite: (payload: ChatInviteDeclinePayload) => Promise<void>;
+  chatGetSessions: () => Promise<ChatSessionsGetResponse>;
+  chatMarkRead: (payload: ChatMarkReadPayload) => Promise<void>;
+  onChatMessage: (cb: (payload: ChatMessagePayload) => void) => () => void;
+  onChatMessageStatus: (cb: (payload: ChatMessageStatusPayload) => void) => () => void;
+  onChatSessionUpdated: (cb: (payload: ChatSessionUpdatedPayload) => void) => () => void;
+  onChatInvite: (cb: (payload: ChatInvitePayload) => void) => () => void;
+  onChatRequestPending: (cb: (payload: ChatRequestPendingPayload) => void) => () => void;
+  onChatRequestResolved: (cb: (payload: ChatRequestResolvedPayload) => void) => () => void;
+  chatCancelRequest: (payload: ChatRequestCancelPayload) => Promise<void>;
 }
 
 // ─── Helper: create a listener that returns an unsubscribe function ───────────
@@ -166,6 +202,23 @@ const api: FileDropApi = {
   // Transfer resume
   resumeTransfer: (payload) => ipcRenderer.invoke(IpcChannels.TRANSFER_RESUME, payload),
   onTransferPaused: (cb) => createListener(IpcChannels.TRANSFER_PAUSED, cb),
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  chatOpenSession: (payload) => ipcRenderer.invoke(ChatIpcChannels.CHAT_SESSION_OPEN, payload),
+  chatCloseSession: (payload) => ipcRenderer.invoke(ChatIpcChannels.CHAT_SESSION_CLOSE, payload),
+  chatSendText: (payload) => ipcRenderer.invoke(ChatIpcChannels.CHAT_SEND_TEXT, payload),
+  chatSendFile: (payload) => ipcRenderer.invoke(ChatIpcChannels.CHAT_SEND_FILE, payload),
+  chatAcceptInvite: (payload) => ipcRenderer.invoke(ChatIpcChannels.CHAT_INVITE_ACCEPT, payload),
+  chatDeclineInvite: (payload) => ipcRenderer.invoke(ChatIpcChannels.CHAT_INVITE_DECLINE, payload),
+  chatGetSessions: () => ipcRenderer.invoke(ChatIpcChannels.CHAT_SESSIONS_GET),
+  chatMarkRead: (payload) => ipcRenderer.invoke(ChatIpcChannels.CHAT_MARK_READ, payload),
+  onChatMessage: (cb) => createListener(ChatIpcChannels.CHAT_MESSAGE, cb),
+  onChatMessageStatus: (cb) => createListener(ChatIpcChannels.CHAT_MESSAGE_STATUS, cb),
+  onChatSessionUpdated: (cb) => createListener(ChatIpcChannels.CHAT_SESSION_UPDATED, cb),
+  onChatInvite: (cb) => createListener(ChatIpcChannels.CHAT_INVITE, cb),
+  onChatRequestPending: (cb) => createListener(ChatIpcChannels.CHAT_REQUEST_PENDING, cb),
+  onChatRequestResolved: (cb) => createListener(ChatIpcChannels.CHAT_REQUEST_RESOLVED, cb),
+  chatCancelRequest: (payload) => ipcRenderer.invoke(ChatIpcChannels.CHAT_REQUEST_CANCEL, payload),
 };
 
 contextBridge.exposeInMainWorld('api', api);

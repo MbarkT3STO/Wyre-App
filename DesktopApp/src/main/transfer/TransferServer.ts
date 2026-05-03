@@ -11,6 +11,7 @@ import { createHash } from 'crypto';
 import { basename } from 'path';
 import { FileChunker } from './FileChunker';
 import { TransferCrypto, type KeyPair } from '../crypto/TransferCrypto';
+import type { ChatHandshakeWireMessage } from '../../shared/models/ChatMessage';
 
 const PROGRESS_EMIT_INTERVAL_MS = 100;
 const HEADER_MAX_SIZE = 4096;
@@ -77,6 +78,8 @@ export interface TransferServerEvents {
   error: (transferId: string | null, err: Error) => void;
   cancelled: (transferId: string) => void;
   clipboardReceived: (senderName: string, text: string, truncated: boolean) => void;
+  /** Emitted when a chat_handshake connection arrives — route to ChatServer */
+  chatConnection: (handshake: ChatHandshakeWireMessage, socket: Socket, remainingBuffer: Buffer) => void;
 }
 
 export declare interface TransferServer {
@@ -299,6 +302,13 @@ export class TransferServer extends EventEmitter {
             header.text ?? '',
             header.truncated === true,
           );
+          return;
+        }
+
+        // ── Chat handshake — route to ChatServer ───────────────────────────
+        if (header.type === 'chat_handshake') {
+          const chatHandshake = header as unknown as ChatHandshakeWireMessage;
+          this.emit('chatConnection', chatHandshake, socket, remainingBuffer);
           return;
         }
 

@@ -7,6 +7,7 @@
 import './styles/base.css';
 import './styles/components.css';
 import './styles/animations.css';
+import './styles/chat.css';
 
 import { IpcClient } from './core/IpcClient';
 import { StateManager } from './core/StateManager';
@@ -17,6 +18,7 @@ import { ToastContainer } from './components/ToastContainer';
 import { HomeView } from './views/HomeView';
 import { TransfersView } from './views/TransfersView';
 import { SettingsView } from './views/SettingsView';
+import { ChatView } from './views/ChatView';
 import { mountShell } from './bootstrap/ShellBuilder';
 import { wireIpcListeners } from './bootstrap/IpcListeners';
 import { wireCustomEvents } from './bootstrap/CustomEventListeners';
@@ -67,6 +69,13 @@ async function bootstrap(): Promise<void> {
     }})
     .register({ path: '/settings', title: 'Settings', factory: () => {
       const v = new SettingsView(toasts);
+      const wrapper = document.createElement('div');
+      wrapper.className = 'view-wrapper';
+      v.mount(wrapper);
+      return wrapper;
+    }})
+    .register({ path: '/chat', title: 'Chat', factory: () => {
+      const v = new ChatView(toasts);
       const wrapper = document.createElement('div');
       wrapper.className = 'view-wrapper';
       v.mount(wrapper);

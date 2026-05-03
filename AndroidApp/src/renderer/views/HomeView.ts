@@ -14,6 +14,7 @@ import { AppBridge } from '../../bridge/AppBridge';
 import type { ToastContainer } from '../components/ToastContainer';
 import { TransferStatus } from '../../shared/models/Transfer';
 import { formatFileSize } from '../../shared/utils/formatters';
+import type { Device } from '../../shared/models/Device';
 
 interface SelectedFile {
   path: string;
@@ -120,6 +121,7 @@ export class HomeView extends Component {
         this.updateSelectedDeviceInfo(ids);
         this.updateSendButton();
       },
+      onChat: (device) => { void this.handleChatWithDevice(device); },
     });
     this.deviceList.mount(deviceListMount);
 
@@ -382,8 +384,18 @@ export class HomeView extends Component {
     }
   }
 
-  private wirePullToRefresh(scrollEl: HTMLElement): void {
-    let startY = 0;
+  private async handleChatWithDevice(device: Device): Promise<void> {
+    try {
+      const session = await AppBridge.chatOpenSession({ deviceId: device.id });
+      StateManager.updateChatSession(session);
+      StateManager.setState('activeChatSessionId', session.id);
+      window.location.hash = '/chat';
+    } catch (err) {
+      this.toasts.error(err instanceof Error ? err.message : 'Could not start chat');
+    }
+  }
+
+  private wirePullToRefresh(scrollEl: HTMLElement): void {    let startY = 0;
     let pulling = false;
     let indicator: HTMLElement | null = null;
 

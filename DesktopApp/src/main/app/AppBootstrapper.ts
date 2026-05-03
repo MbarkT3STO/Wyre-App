@@ -15,6 +15,10 @@ import { TransferClient } from '../transfer/TransferClient';
 import { TransferQueue } from '../transfer/TransferQueue';
 import { NotificationManager } from '../notifications/NotificationManager';
 import { IpcBridge } from '../ipc/IpcBridge';
+import { ChatServer } from '../chat/ChatServer';
+import { ChatClient } from '../chat/ChatClient';
+import { ChatManager } from '../chat/ChatManager';
+import { ChatIpcBridge } from '../chat/ChatIpcBridge';
 import type { Platform } from '../../shared/models/Device';
 
 function getElectronPlatform(): Platform {
@@ -35,6 +39,10 @@ export class AppBootstrapper {
   private transferQueue: TransferQueue | null = null;
   private notificationManager: NotificationManager | null = null;
   private ipcBridge: IpcBridge | null = null;
+  private chatServer: ChatServer | null = null;
+  private chatClient: ChatClient | null = null;
+  private chatManager: ChatManager | null = null;
+  private chatIpcBridge: ChatIpcBridge | null = null;
   private tray: Tray | null = null;
 
   constructor() {
@@ -83,6 +91,28 @@ export class AppBootstrapper {
       getMainWindow: () => this.windowManager.getMainWindow(),
     });
     this.ipcBridge.register();
+
+    // Initialize chat services
+    this.chatServer = new ChatServer();
+    this.chatClient = new ChatClient();
+    this.chatManager = new ChatManager({
+      chatServer: this.chatServer,
+      chatClient: this.chatClient,
+      discoveryService: this.discoveryService,
+      settingsStore: this.settingsStore,
+    });
+
+    // Route chat connections from TransferServer to ChatServer
+    this.transferServer.on('chatConnection', (handshake, socket, remainingBuffer) => {
+      this.chatServer!.handleIncomingConnection(socket, handshake, remainingBuffer);
+    });
+
+    // Wire Chat IPC
+    this.chatIpcBridge = new ChatIpcBridge({
+      chatManager: this.chatManager,
+      getMainWindow: () => this.windowManager.getMainWindow(),
+    });
+    this.chatIpcBridge.register();
 
     // Create window
     this.windowManager.createMainWindow();
@@ -168,6 +198,7 @@ export class AppBootstrapper {
   private shutdown(): void {
     this.discoveryService?.stop();
     this.transferServer?.stop();
+    this.chatServer?.stop();
     this.tray?.destroy();
   }
 }

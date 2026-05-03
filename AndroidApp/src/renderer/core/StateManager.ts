@@ -7,6 +7,7 @@ import type { Device } from '../../shared/models/Device';
 import type { AppSettings } from '../../shared/models/AppSettings';
 import type { Transfer, TransferRecord } from '../../shared/models/Transfer';
 import type { IncomingRequestEvent, TransferQueueUpdatedEvent } from '../../bridge/WyrePlugin';
+import type { ChatSession } from '../../shared/models/ChatMessage';
 
 export interface AppState {
   devices: Device[];
@@ -19,6 +20,12 @@ export interface AppState {
   pendingIncomingQueue: IncomingRequestEvent[];
   sendQueue: TransferQueueUpdatedEvent['queue'];
   isLoading: boolean;
+  /** Chat sessions keyed by sessionId */
+  chatSessions: Map<string, ChatSession>;
+  /** Active chat session being viewed */
+  activeChatSessionId: string | null;
+  /** Pending chat invites */
+  pendingChatInvites: Array<{ sessionId: string; peerId: string; peerName: string }>;
 }
 
 type StateListener<K extends keyof AppState> = (value: AppState[K], prev: AppState[K]) => void;
@@ -34,6 +41,9 @@ const initialState: AppState = {
   pendingIncomingQueue: [],
   sendQueue: [],
   isLoading: false,
+  chatSessions: new Map(),
+  activeChatSessionId: null,
+  pendingChatInvites: [],
 };
 
 class StateManagerClass {
@@ -82,6 +92,18 @@ class StateManagerClass {
     const transfers = new Map(this.state.activeTransfers);
     transfers.delete(transferId);
     this.setState('activeTransfers', transfers);
+  }
+
+  updateChatSession(session: import('../../shared/models/ChatMessage').ChatSession): void {
+    const sessions = new Map(this.state.chatSessions);
+    sessions.set(session.id, session);
+    this.setState('chatSessions', sessions);
+  }
+
+  removeChatSession(sessionId: string): void {
+    const sessions = new Map(this.state.chatSessions);
+    sessions.delete(sessionId);
+    this.setState('chatSessions', sessions);
   }
 }
 

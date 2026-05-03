@@ -66,6 +66,31 @@ export interface ClipboardReceivedEvent {
   truncated: boolean;
 }
 
+/** Chat message received */
+export interface ChatMessageEvent {
+  sessionId: string;
+  message: import('../shared/models/ChatMessage').ChatMessage;
+}
+
+/** Chat message status updated */
+export interface ChatMessageStatusEvent {
+  sessionId: string;
+  messageId: string;
+  status: string;
+}
+
+/** Chat session state changed */
+export interface ChatSessionUpdatedEvent {
+  session: import('../shared/models/ChatMessage').ChatSession;
+}
+
+/** A peer wants to start a chat */
+export interface ChatInviteEvent {
+  sessionId: string;
+  peerId: string;
+  peerName: string;
+}
+
 // ─── Plugin interface ─────────────────────────────────────────────────────────
 
 export interface WyrePluginInterface {
@@ -90,6 +115,16 @@ export interface WyrePluginInterface {
   // ── Clipboard (Feature 2) ─────────────────────────────────────────────────
   sendClipboard(options: { deviceId: string; text: string }): Promise<void>;
 
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  chatOpenSession(options: { deviceId: string }): Promise<{ sessionId: string; peerId: string; peerName: string; connected: boolean }>;
+  chatCloseSession(options: { sessionId: string }): Promise<void>;
+  chatSendText(options: { sessionId: string; text: string }): Promise<{ messageId: string } | null>;
+  chatSendFile(options: { sessionId: string; filePath: string; fileName: string; fileSize: number }): Promise<{ messageId: string } | null>;
+  chatAcceptInvite(options: { sessionId: string }): Promise<void>;
+  chatDeclineInvite(options: { sessionId: string }): Promise<void>;
+  chatGetSessions(): Promise<{ sessions: import('../shared/models/ChatMessage').ChatSession[] }>;
+  chatMarkRead(options: { sessionId: string }): Promise<void>;
+
   // ── History ───────────────────────────────────────────────────────────────
   getHistory(): Promise<{ history: import('../shared/models/Transfer').TransferRecord[] }>;
   clearHistory(): Promise<void>;
@@ -113,6 +148,10 @@ export interface WyrePluginInterface {
   addListener(event: 'incomingRequest',      handler: (data: IncomingRequestEvent)      => void): Promise<{ remove: () => void }>;
   addListener(event: 'transferQueueUpdated', handler: (data: TransferQueueUpdatedEvent) => void): Promise<{ remove: () => void }>;
   addListener(event: 'clipboardReceived',    handler: (data: ClipboardReceivedEvent)    => void): Promise<{ remove: () => void }>;
+  addListener(event: 'chatMessage',          handler: (data: ChatMessageEvent)          => void): Promise<{ remove: () => void }>;
+  addListener(event: 'chatMessageStatus',    handler: (data: ChatMessageStatusEvent)    => void): Promise<{ remove: () => void }>;
+  addListener(event: 'chatSessionUpdated',   handler: (data: ChatSessionUpdatedEvent)   => void): Promise<{ remove: () => void }>;
+  addListener(event: 'chatInvite',           handler: (data: ChatInviteEvent)           => void): Promise<{ remove: () => void }>;
 }
 
 export const WyrePlugin = registerPlugin<WyrePluginInterface>('WyrePlugin');

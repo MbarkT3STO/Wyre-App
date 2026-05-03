@@ -11,6 +11,7 @@ import type { Device } from '../../shared/models/Device';
 
 export interface DeviceListOptions {
   onSelectionChanged: (selectedIds: string[]) => void;
+  onChat?: (device: Device) => void;
 }
 
 export class DeviceList extends Component {
@@ -94,6 +95,7 @@ export class DeviceList extends Component {
           device,
           selected: isSelected,
           onClick: (d) => this.handleCardClick(d),
+          ...(this.options.onChat ? { onChat: (d: Device) => this.options.onChat!(d) } : {}),
         });
         card.mount(this.gridEl);
         this.cards.set(device.id, card);

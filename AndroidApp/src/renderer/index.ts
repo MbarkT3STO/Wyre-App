@@ -9,6 +9,7 @@ import './styles/base.css';
 import './styles/components.css';
 import './styles/animations.css';
 import './styles/android.css';
+import './styles/chat.css';
 
 import { AppBridge } from '../bridge/AppBridge';
 import { StateManager } from './core/StateManager';
@@ -16,9 +17,11 @@ import { Router } from './core/Router';
 import { ThemeEngine } from './theme/ThemeEngine';
 import { ToastContainer } from './components/ToastContainer';
 import { IncomingDialog } from './components/IncomingDialog';
+import { ChatInviteDialog } from './components/ChatInviteDialog';
 import { HomeView } from './views/HomeView';
 import { TransfersView } from './views/TransfersView';
 import { SettingsView } from './views/SettingsView';
+import { ChatView } from './views/ChatView';
 import type { Transfer } from '../shared/models/Transfer';
 import { TransferStatus } from '../shared/models/Transfer';
 import type { IncomingRequestEvent } from '../bridge/WyrePlugin';
@@ -74,6 +77,13 @@ async function bootstrap(): Promise<void> {
       wrapper.className = 'view-wrapper';
       v.mount(wrapper);
       return wrapper;
+    }})
+    .register({ path: '/chat', title: 'Chat', factory: () => {
+      const v = new ChatView(toasts);
+      const wrapper = document.createElement('div');
+      wrapper.className = 'view-wrapper';
+      v.mount(wrapper);
+      return wrapper;
     }});
 
   router.mount(outlet as HTMLElement);
@@ -117,6 +127,11 @@ function buildShell(deviceName: string): string {
          data-route="/transfers" role="menuitem" aria-label="Transfers">
         <i class="fa-solid fa-arrow-right-arrow-left android-bottom-nav__icon"></i>
         <span class="android-bottom-nav__label">Transfers</span>
+      </a>
+      <a href="#/chat" class="android-bottom-nav__item"
+         data-route="/chat" role="menuitem" aria-label="Chat" id="nav-chat-android">
+        <i class="fa-solid fa-comments android-bottom-nav__icon"></i>
+        <span class="android-bottom-nav__label">Chat</span>
       </a>
       <a href="#/settings" class="android-bottom-nav__item"
          data-route="/settings" role="menuitem" aria-label="Settings">
@@ -283,6 +298,51 @@ async function wireEventListeners(): Promise<void> {
     });
   });
 
+  // ── Chat event listeners ──────────────────────────────────────────────────
+
+  const unsubChatMessage = await AppBridge.onChatMessage(({ sessionId, message }) => {
+    const sessions = StateManager.get('chatSessions');
+    const session = sessions.get(sessionId);
+    if (session) {
+      const exists = session.messages.some(m => m.id === message.id);
+      if (!exists) {
+        StateManager.updateChatSession({
+          ...session,
+          messages: [...session.messages, message],
+          lastActivity: message.timestamp,
+          unreadCount: message.isOwn ? session.unreadCount : session.unreadCount + 1,
+        });
+      }
+    }
+  });
+
+  const unsubChatStatus = await AppBridge.onChatMessageStatus(({ sessionId, messageId, status }) => {
+    const sessions = StateManager.get('chatSessions');
+    const session = sessions.get(sessionId);
+    if (session) {
+      StateManager.updateChatSession({
+        ...session,
+        messages: session.messages.map(m =>
+          m.id === messageId ? { ...m, status: status as import('../shared/models/ChatMessage').ChatMessageStatus } : m,
+        ),
+      });
+    }
+  });
+
+  const unsubChatSession = await AppBridge.onChatSessionUpdated(({ session }) => {
+    StateManager.updateChatSession(session);
+  });
+
+  const unsubChatInvite = await AppBridge.onChatInvite((payload) => {
+    const invites = StateManager.get('pendingChatInvites');
+    if (!invites.some(i => i.sessionId === payload.sessionId)) {
+      StateManager.setState('pendingChatInvites', [...invites, payload]);
+    }
+    showChatInviteDialog(payload);
+    // Update unread badge
+    updateChatBadge();
+  });
+
   window.addEventListener('unload', () => {
     unsubDevices();
     unsubStarted();
@@ -293,7 +353,14 @@ async function wireEventListeners(): Promise<void> {
     unsubIncoming();
     unsubQueue();
     unsubClipboard();
+    unsubChatMessage();
+    unsubChatStatus();
+    unsubChatSession();
+    unsubChatInvite();
   });
+
+  // Update chat badge when sessions change
+  StateManager.subscribe('chatSessions', () => updateChatBadge());
 }
 
 function showIncomingDialog(payload: IncomingRequestEvent): void {
@@ -320,6 +387,31 @@ function showNextIncomingDialog(): void {
   const [, ...remaining] = queue;
   StateManager.setState('pendingIncomingQueue', remaining);
   if (remaining.length > 0) showIncomingDialog(remaining[0]!);
+}
+
+function showChatInviteDialog(payload: { sessionId: string; peerId: string; peerName: string }): void {
+  const dialogMount = document.getElementById('dialog-mount');
+  if (!dialogMount) return;
+  const dialog = new ChatInviteDialog(payload, router);
+  dialog.mount(dialogMount);
+}
+
+function updateChatBadge(): void {
+  const navChat = document.getElementById('nav-chat-android');
+  if (!navChat) return;
+  const total = Array.from(StateManager.get('chatSessions').values())
+    .reduce((sum, s) => sum + s.unreadCount, 0);
+  let badge = navChat.querySelector('.nav-badge') as HTMLElement | null;
+  if (total > 0) {
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'nav-badge';
+      navChat.appendChild(badge);
+    }
+    badge.textContent = total > 99 ? '99+' : String(total);
+  } else {
+    badge?.remove();
+  }
 }
 
 function wireCustomEvents(): void {

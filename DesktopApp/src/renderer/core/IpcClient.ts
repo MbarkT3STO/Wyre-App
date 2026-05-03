@@ -27,6 +27,24 @@ import type {
   TransferResumePayload,
   TransferPausedPayload,
 } from '../../shared/ipc/IpcContracts';
+import type {
+  ChatSessionOpenPayload,
+  ChatSessionClosePayload,
+  ChatSendTextPayload,
+  ChatSendFilePayload,
+  ChatInviteAcceptPayload,
+  ChatInviteDeclinePayload,
+  ChatMarkReadPayload,
+  ChatMessagePayload,
+  ChatMessageStatusPayload,
+  ChatSessionUpdatedPayload,
+  ChatInvitePayload,
+  ChatSessionsGetResponse,
+  ChatRequestPendingPayload,
+  ChatRequestResolvedPayload,
+  ChatRequestCancelPayload,
+} from '../../shared/ipc/ChatIpcContracts';
+import type { ChatMessage, ChatSession } from '../../shared/models/ChatMessage';
 
 function getApi(): FileDropApi {
   if (!window.api) throw new Error('window.api is not available — preload script may not be loaded');
@@ -103,4 +121,36 @@ export const IpcClient = {
   resumeTransfer: (payload: TransferResumePayload): Promise<void> => getApi().resumeTransfer(payload),
   onTransferPaused: (cb: (payload: TransferPausedPayload) => void): (() => void) =>
     getApi().onTransferPaused(cb),
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  chatOpenSession: (payload: ChatSessionOpenPayload): Promise<ChatSession> =>
+    getApi().chatOpenSession(payload),
+  chatCloseSession: (payload: ChatSessionClosePayload): Promise<void> =>
+    getApi().chatCloseSession(payload),
+  chatSendText: (payload: ChatSendTextPayload): Promise<ChatMessage | null> =>
+    getApi().chatSendText(payload),
+  chatSendFile: (payload: ChatSendFilePayload): Promise<ChatMessage | null> =>
+    getApi().chatSendFile(payload),
+  chatAcceptInvite: (payload: ChatInviteAcceptPayload): Promise<void> =>
+    getApi().chatAcceptInvite(payload),
+  chatDeclineInvite: (payload: ChatInviteDeclinePayload): Promise<void> =>
+    getApi().chatDeclineInvite(payload),
+  chatGetSessions: (): Promise<ChatSessionsGetResponse> =>
+    getApi().chatGetSessions(),
+  chatMarkRead: (payload: ChatMarkReadPayload): Promise<void> =>
+    getApi().chatMarkRead(payload),
+  onChatMessage: (cb: (payload: ChatMessagePayload) => void): (() => void) =>
+    getApi().onChatMessage(cb),
+  onChatMessageStatus: (cb: (payload: ChatMessageStatusPayload) => void): (() => void) =>
+    getApi().onChatMessageStatus(cb),
+  onChatSessionUpdated: (cb: (payload: ChatSessionUpdatedPayload) => void): (() => void) =>
+    getApi().onChatSessionUpdated(cb),
+  onChatInvite: (cb: (payload: ChatInvitePayload) => void): (() => void) =>
+    getApi().onChatInvite(cb),
+  onChatRequestPending: (cb: (payload: ChatRequestPendingPayload) => void): (() => void) =>
+    getApi().onChatRequestPending(cb),
+  onChatRequestResolved: (cb: (payload: ChatRequestResolvedPayload) => void): (() => void) =>
+    getApi().onChatRequestResolved(cb),
+  chatCancelRequest: (payload: ChatRequestCancelPayload): Promise<void> =>
+    getApi().chatCancelRequest(payload),
 } as const;

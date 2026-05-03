@@ -15,10 +15,15 @@ import type {
   IncomingRequestEvent,
   TransferQueueUpdatedEvent,
   ClipboardReceivedEvent,
+  ChatMessageEvent,
+  ChatMessageStatusEvent,
+  ChatSessionUpdatedEvent,
+  ChatInviteEvent,
 } from './WyrePlugin';
 import type { Device } from '../shared/models/Device';
 import type { AppSettings } from '../shared/models/AppSettings';
 import type { TransferRecord } from '../shared/models/Transfer';
+import type { ChatSession, ChatMessage } from '../shared/models/ChatMessage';
 
 export const AppBridge = {
   // ── Settings ──────────────────────────────────────────────────────────────
@@ -138,4 +143,65 @@ export const AppBridge = {
 
   // ── Platform ──────────────────────────────────────────────────────────────
   getPlatform: (): string => 'android',
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+  chatOpenSession: async (options: { deviceId: string }): Promise<ChatSession> => {
+    const result = await WyrePlugin.chatOpenSession(options);
+    return {
+      id: result.sessionId,
+      peerId: result.peerId,
+      peerName: result.peerName,
+      connected: result.connected,
+      messages: [],
+      lastActivity: Date.now(),
+      unreadCount: 0,
+    };
+  },
+
+  chatCloseSession: (options: { sessionId: string }): Promise<void> =>
+    WyrePlugin.chatCloseSession(options),
+
+  chatSendText: async (options: { sessionId: string; text: string }): Promise<ChatMessage | null> => {
+    const result = await WyrePlugin.chatSendText(options);
+    return result ? null : null; // Message comes back via chatMessage event
+  },
+
+  chatSendFile: async (options: { sessionId: string; filePath: string; fileName: string; fileSize: number }): Promise<ChatMessage | null> => {
+    const result = await WyrePlugin.chatSendFile(options);
+    return result ? null : null; // Message comes back via chatMessage event
+  },
+
+  chatAcceptInvite: (options: { sessionId: string }): Promise<void> =>
+    WyrePlugin.chatAcceptInvite(options),
+
+  chatDeclineInvite: (options: { sessionId: string }): Promise<void> =>
+    WyrePlugin.chatDeclineInvite(options),
+
+  chatGetSessions: async (): Promise<ChatSession[]> => {
+    const { sessions } = await WyrePlugin.chatGetSessions();
+    return sessions;
+  },
+
+  chatMarkRead: (options: { sessionId: string }): Promise<void> =>
+    WyrePlugin.chatMarkRead(options),
+
+  onChatMessage: async (cb: (data: ChatMessageEvent) => void): Promise<() => void> => {
+    const handle = await WyrePlugin.addListener('chatMessage', cb);
+    return () => handle.remove();
+  },
+
+  onChatMessageStatus: async (cb: (data: ChatMessageStatusEvent) => void): Promise<() => void> => {
+    const handle = await WyrePlugin.addListener('chatMessageStatus', cb);
+    return () => handle.remove();
+  },
+
+  onChatSessionUpdated: async (cb: (data: ChatSessionUpdatedEvent) => void): Promise<() => void> => {
+    const handle = await WyrePlugin.addListener('chatSessionUpdated', cb);
+    return () => handle.remove();
+  },
+
+  onChatInvite: async (cb: (data: ChatInviteEvent) => void): Promise<() => void> => {
+    const handle = await WyrePlugin.addListener('chatInvite', cb);
+    return () => handle.remove();
+  },
 } as const;

@@ -11,6 +11,8 @@ import { TransferStatus } from '../../shared/models/Transfer';
 import type { Transfer } from '../../shared/models/Transfer';
 import { IncomingDialog } from '../components/IncomingDialog';
 import type { IncomingRequestPayload } from '../../shared/ipc/IpcContracts';
+import { ChatInviteDialog } from '../components/ChatInviteDialog';
+import { ChatPendingDialog } from '../components/ChatPendingDialog';
 
 function showIncomingDialog(payload: IncomingRequestPayload, toasts: ToastContainer): void {
   const dialogMount = document.getElementById('dialog-mount');
@@ -199,6 +201,61 @@ export function wireIpcListeners(toasts: ToastContainer, _router: Router): void 
     }
   });
 
+  // ── Chat listeners ────────────────────────────────────────────────────────
+
+  // Chat message received
+  const unsubChatMessage = IpcClient.onChatMessage(({ sessionId, message }) => {
+    const sessions = StateManager.get('chatSessions');
+    const session = sessions.get(sessionId);
+    if (session) {
+      // Avoid duplicates (message may already be in state from optimistic send)
+      const exists = session.messages.some(m => m.id === message.id);
+      if (!exists) {
+        const updated = {
+          ...session,
+          messages: [...session.messages, message],
+          lastActivity: message.timestamp,
+          unreadCount: message.isOwn ? session.unreadCount : session.unreadCount + 1,
+        };
+        StateManager.updateChatSession(updated);
+      }
+    }
+  });
+
+  // Chat message status updated
+  const unsubChatStatus = IpcClient.onChatMessageStatus(({ sessionId, messageId, status }) => {
+    const sessions = StateManager.get('chatSessions');
+    const session = sessions.get(sessionId);
+    if (session) {
+      const updated = {
+        ...session,
+        messages: session.messages.map(m =>
+          m.id === messageId ? { ...m, status } : m,
+        ),
+      };
+      StateManager.updateChatSession(updated);
+    }
+  });
+
+  // Chat session updated
+  const unsubChatSession = IpcClient.onChatSessionUpdated(({ session }) => {
+    StateManager.updateChatSession(session);
+  });
+
+  // Chat invite received (receiver side)
+  const unsubChatInvite = IpcClient.onChatInvite((payload) => {
+    const invites = StateManager.get('pendingChatInvites');
+    if (!invites.some(i => i.sessionId === payload.sessionId)) {
+      StateManager.setState('pendingChatInvites', [...invites, payload]);
+    }
+    showChatInviteDialog(payload, _router);
+  });
+
+  // Chat request pending (sender side) — show the waiting modal
+  const unsubChatPending = IpcClient.onChatRequestPending((payload) => {
+    showChatPendingDialog(payload.sessionId, payload.peerName, _router);
+  });
+
   // Cleanup on unload
   window.addEventListener('unload', () => {
     unsubDevices();
@@ -210,5 +267,31 @@ export function wireIpcListeners(toasts: ToastContainer, _router: Router): void 
     unsubSendQueue();
     unsubClipboard();
     unsubPaused();
+    unsubChatMessage();
+    unsubChatStatus();
+    unsubChatSession();
+    unsubChatInvite();
+    unsubChatPending();
   });
+}
+
+function showChatInviteDialog(
+  payload: import('../../shared/ipc/ChatIpcContracts').ChatInvitePayload,
+  router: Router,
+): void {
+  const dialogMount = document.getElementById('dialog-mount');
+  if (!dialogMount) return;
+  const dialog = new ChatInviteDialog(payload, router);
+  dialog.mount(dialogMount);
+}
+
+function showChatPendingDialog(
+  sessionId: string,
+  peerName: string,
+  router: Router,
+): void {
+  const dialogMount = document.getElementById('dialog-mount');
+  if (!dialogMount) return;
+  const dialog = new ChatPendingDialog(sessionId, peerName, router);
+  dialog.mount(dialogMount);
 }

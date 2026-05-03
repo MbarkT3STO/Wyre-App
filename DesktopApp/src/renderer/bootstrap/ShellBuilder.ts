@@ -70,6 +70,10 @@ function buildShell(deviceName: string, platform: NodeJS.Platform): string {
             <i class="fa-solid fa-arrow-right-arrow-left sidebar__nav-item-icon" aria-hidden="true"></i>
             <span class="sidebar__nav-item-label">Transfers</span>
           </a>
+          <a href="#/chat" class="sidebar__nav-item" data-route="/chat" data-tooltip="Chat" role="menuitem" id="nav-chat">
+            <i class="fa-solid fa-comments sidebar__nav-item-icon" aria-hidden="true"></i>
+            <span class="sidebar__nav-item-label">Chat</span>
+          </a>
           <a href="#/settings" class="sidebar__nav-item" data-route="/settings" data-tooltip="Settings" role="menuitem">
             <i class="fa-solid fa-gear sidebar__nav-item-icon" aria-hidden="true"></i>
             <span class="sidebar__nav-item-label">Settings</span>
@@ -218,4 +222,22 @@ export function mountShell(
     const ipEl = document.getElementById('sidebar-device-ip');
     if (ipEl) ipEl.textContent = ip;
   }).catch(() => { /* non-fatal */ });
+
+  // Update chat unread badge in nav
+  StateManager.subscribe('chatSessions', (sessions) => {
+    const total = Array.from(sessions.values()).reduce((sum, s) => sum + s.unreadCount, 0);
+    const navChat = document.getElementById('nav-chat');
+    if (!navChat) return;
+    let badge = navChat.querySelector('.nav-badge') as HTMLElement | null;
+    if (total > 0) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'nav-badge';
+        navChat.appendChild(badge);
+      }
+      badge.textContent = total > 99 ? '99+' : String(total);
+    } else {
+      badge?.remove();
+    }
+  });
 }

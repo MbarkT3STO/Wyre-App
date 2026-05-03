@@ -9,6 +9,8 @@ import type { Device } from '../../shared/models/Device';
 import type { AppSettings } from '../../shared/models/AppSettings';
 import type { Transfer, TransferRecord } from '../../shared/models/Transfer';
 import type { IncomingRequestPayload, TransferQueueUpdatedPayload } from '../../shared/ipc/IpcContracts';
+import type { ChatSession } from '../../shared/models/ChatMessage';
+import type { ChatInvitePayload } from '../../shared/ipc/ChatIpcContracts';
 
 export interface AppState {
   devices: Device[];
@@ -23,6 +25,12 @@ export interface AppState {
   /** Pending outgoing sends waiting for the active transfer to finish */
   sendQueue: TransferQueueUpdatedPayload['queue'];
   isLoading: boolean;
+  /** Chat sessions keyed by sessionId */
+  chatSessions: Map<string, ChatSession>;
+  /** Active chat session being viewed */
+  activeChatSessionId: string | null;
+  /** Pending chat invites */
+  pendingChatInvites: ChatInvitePayload[];
 }
 
 type StateListener<K extends keyof AppState> = (value: AppState[K], prev: AppState[K]) => void;
@@ -38,6 +46,9 @@ const initialState: AppState = {
   pendingIncomingQueue: [],
   sendQueue: [],
   isLoading: false,
+  chatSessions: new Map(),
+  activeChatSessionId: null,
+  pendingChatInvites: [],
 };
 
 class StateManagerClass {
@@ -101,6 +112,20 @@ class StateManagerClass {
     const transfers = new Map(this.state.activeTransfers);
     transfers.delete(transferId);
     this.setState('activeTransfers', transfers);
+  }
+
+  /** Update a chat session in the chatSessions map */
+  updateChatSession(session: import('../../shared/models/ChatMessage').ChatSession): void {
+    const sessions = new Map(this.state.chatSessions);
+    sessions.set(session.id, session);
+    this.setState('chatSessions', sessions);
+  }
+
+  /** Remove a chat session */
+  removeChatSession(sessionId: string): void {
+    const sessions = new Map(this.state.chatSessions);
+    sessions.delete(sessionId);
+    this.setState('chatSessions', sessions);
   }
 }
 

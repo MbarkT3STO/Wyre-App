@@ -17,6 +17,7 @@ import { IpcClient } from '../core/IpcClient';
 import { appRouter } from '../core/Router';
 import type { ToastContainer } from '../components/ToastContainer';
 import { TransferStatus } from '../../shared/models/Transfer';
+import type { Device } from '../../shared/models/Device';
 
 export class HomeView extends Component {
   private deviceList: DeviceList | null = null;
@@ -96,6 +97,7 @@ export class HomeView extends Component {
         this.updateSelectedDeviceInfo(ids);
         this.updateSendButton();
       },
+      onChat: (device) => { void this.handleChatWithDevice(device); },
     });
     this.deviceList.mount(deviceListMount);
 
@@ -292,6 +294,18 @@ export class HomeView extends Component {
   private resetSendButton(): void {
     if (!this.sendBtn) return;
     this.sendBtn.innerHTML = `<i class="fa-solid fa-paper-plane btn__icon"></i> Send`;
+  }
+
+  private async handleChatWithDevice(device: Device): Promise<void> {
+    try {
+      const session = await IpcClient.chatOpenSession({ deviceId: device.id });
+      StateManager.updateChatSession(session);
+      StateManager.setState('activeChatSessionId', session.id);
+      appRouter.navigate('/chat');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Could not start chat';
+      this.toasts.error(msg);
+    }
   }
 
   protected onUnmount(): void {
