@@ -462,13 +462,14 @@ export class ChatView extends Component {
       });
     }
 
-    // ── Long-press context menu (touch) ──────────────────────────────────────
-    const canCopy   = msg.type === 'text' && !!msg.text;
-    const canEdit   = msg.isOwn && msg.type === 'text';
-    const canDelete = msg.isOwn;
+    const canCopy      = msg.type === 'text' && !!msg.text;
+    const canEdit      = msg.isOwn && msg.type === 'text';
+    const canDelete    = msg.isOwn;
+    const canOpenFile  = (msg.type === 'file' || msg.type === 'image') && !!(msg.filePath || msg.thumbnail);
+    const canOpenFolder = msg.type === 'file' && !!msg.filePath;
 
-    if (canCopy || canEdit || canDelete) {
-      this.wireLongPress(wrapper, msg, canCopy, canEdit, canDelete);
+    if (canCopy || canEdit || canDelete || canOpenFile || canOpenFolder) {
+      this.wireLongPress(wrapper, msg, canCopy, canEdit, canDelete, canOpenFile, canOpenFolder);
     }
 
     return wrapper;
@@ -482,6 +483,8 @@ export class ChatView extends Component {
     canCopy: boolean,
     canEdit: boolean,
     canDelete: boolean,
+    canOpenFile: boolean = false,
+    canOpenFolder: boolean = false,
   ): void {
     let pressTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -493,9 +496,11 @@ export class ChatView extends Component {
       menu.setAttribute('role', 'menu');
 
       const items: Array<{ icon: string; label: string; action: string; danger?: boolean }> = [];
-      if (canCopy)   items.push({ icon: 'fa-regular fa-copy',  label: 'Copy',   action: 'copy' });
-      if (canEdit)   items.push({ icon: 'fa-solid fa-pen',     label: 'Edit',   action: 'edit' });
-      if (canDelete) items.push({ icon: 'fa-solid fa-trash',   label: 'Delete', action: 'delete', danger: true });
+      if (canCopy)       items.push({ icon: 'fa-regular fa-copy',         label: 'Copy',        action: 'copy' });
+      if (canOpenFile)   items.push({ icon: 'fa-solid fa-arrow-up-right-from-square', label: 'Open', action: 'open' });
+      if (canOpenFolder) items.push({ icon: 'fa-solid fa-folder-open',    label: 'Open Folder', action: 'folder' });
+      if (canEdit)       items.push({ icon: 'fa-solid fa-pen',            label: 'Edit',        action: 'edit' });
+      if (canDelete)     items.push({ icon: 'fa-solid fa-trash',          label: 'Delete',      action: 'delete', danger: true });
 
       menu.innerHTML = items.map(item => `
         <button class="chat-context-menu__item${item.danger ? ' chat-context-menu__item--danger' : ''}"
@@ -505,9 +510,8 @@ export class ChatView extends Component {
         </button>
       `).join('');
 
-      // Position near the touch point, keep inside viewport
       document.body.appendChild(menu);
-      const menuW = 160;
+      const menuW = 170;
       const menuH = items.length * 44;
       const left = Math.min(x, window.innerWidth - menuW - 8);
       const top  = Math.min(y, window.innerHeight - menuH - 8);
@@ -520,12 +524,13 @@ export class ChatView extends Component {
           const action = (btn as HTMLElement).dataset['action'];
           this.closeContextMenu();
           if (action === 'copy')   this.handleCopyMessage(msg);
+          else if (action === 'open')   void this.handleOpenFile(msg);
+          else if (action === 'folder') void this.handleOpenFolder(msg);
           else if (action === 'edit')   this.handleEditMessage(msg, wrapper);
           else if (action === 'delete') void this.handleDeleteMessage(msg, wrapper);
         });
       });
 
-      // Close on outside tap
       const dismiss = (e: Event): void => {
         if (!menu.contains(e.target as Node)) {
           this.closeContextMenu();
@@ -543,14 +548,12 @@ export class ChatView extends Component {
 
     wrapper.addEventListener('touchstart', (e) => {
       const touch = e.touches[0]!;
-      pressTimer = setTimeout(() => {
-        openMenu(touch.clientX, touch.clientY);
-      }, 500);
+      pressTimer = setTimeout(() => openMenu(touch.clientX, touch.clientY), 500);
     }, { passive: true });
 
-    wrapper.addEventListener('touchend',   () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
-    wrapper.addEventListener('touchmove',  () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
-    wrapper.addEventListener('touchcancel',() => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+    wrapper.addEventListener('touchend',    () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+    wrapper.addEventListener('touchmove',   () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+    wrapper.addEventListener('touchcancel', () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
   }
 
   private _contextMenu: HTMLElement | null = null;
@@ -562,10 +565,21 @@ export class ChatView extends Component {
 
   // ── Message action handlers ────────────────────────────────────────────────
 
+  private async handleOpenFile(msg: ChatMessage): Promise<void> {
+    if (msg.filePath) {
+      void AppBridge.openFile(msg.filePath);
+    } else if (msg.thumbnail && msg.fileName) {
+      void this.openBase64File(msg.fileName, msg.thumbnail);
+    }
+  }
+
+  private handleOpenFolder(msg: ChatMessage): void {
+    if (msg.filePath) void AppBridge.showInFolder(msg.filePath);
+  }
+
   private handleCopyMessage(msg: ChatMessage): void {
     if (!msg.text) return;
-    navigator.clipboard.writeText(msg.text)
-      .then(() => this.toasts.success('Copied to clipboard'))
+    navigator.clipboard.writeText(msg.text)      .then(() => this.toasts.success('Copied to clipboard'))
       .catch(() => this.toasts.error('Failed to copy'));
   }
 
@@ -699,33 +713,30 @@ export class ChatView extends Component {
 
     try {
       const result = await AppBridge.chatSendText({ sessionId, text });
-      // Immediately add the sent message to state so it appears right away.
-      // The native side also fires a chatMessage event but we deduplicate by id.
-      if (result) {
-        const sessions = StateManager.get('chatSessions');
-        const session  = sessions.get(sessionId);
-        if (session) {
-          const alreadyExists = session.messages.some(m => m.id === (result as { messageId?: string }).messageId);
-          if (!alreadyExists) {
-            const settings = StateManager.get('settings');
-            const newMsg: ChatMessage = {
-              id:         (result as { messageId?: string }).messageId ?? crypto.randomUUID(),
-              sessionId,
-              senderId:   settings?.deviceId ?? '',
-              senderName: settings?.deviceName ?? '',
-              isOwn:      true,
-              type:       'text',
-              text,
-              timestamp:  Date.now(),
-              status:     'sent',
-            };
-            StateManager.updateChatSession({
-              ...session,
-              messages:     [...session.messages, newMsg],
-              lastActivity: newMsg.timestamp,
-            });
-          }
-        }
+      // Add the sent message to state immediately using the real messageId.
+      // When the native chatMessage event fires with the same id, the dedup
+      // check in index.ts will skip it — no duplicate.
+      const messageId = result?.messageId ?? crypto.randomUUID();
+      const settings  = StateManager.get('settings');
+      const sessions  = StateManager.get('chatSessions');
+      const session   = sessions.get(sessionId);
+      if (session && !session.messages.some(m => m.id === messageId)) {
+        const newMsg: ChatMessage = {
+          id:         messageId,
+          sessionId,
+          senderId:   settings?.deviceId ?? '',
+          senderName: settings?.deviceName ?? '',
+          isOwn:      true,
+          type:       'text',
+          text,
+          timestamp:  Date.now(),
+          status:     'sent',
+        };
+        StateManager.updateChatSession({
+          ...session,
+          messages:     [...session.messages, newMsg],
+          lastActivity: newMsg.timestamp,
+        });
       }
     } catch (err) {
       this.toasts.error(err instanceof Error ? err.message : 'Failed to send');
@@ -772,13 +783,14 @@ export class ChatView extends Component {
         base64,
       } as Parameters<typeof AppBridge.chatSendFile>[0]);
 
-      // Immediately show the sent file/image in the thread
-      const sessions = StateManager.get('chatSessions');
-      const session  = sessions.get(sessionId);
-      if (session) {
+      // Immediately show the sent file/image using the real messageId
+      const messageId = (result as { messageId?: string } | null)?.messageId ?? crypto.randomUUID();
+      const sessions  = StateManager.get('chatSessions');
+      const session   = sessions.get(sessionId);
+      if (session && !session.messages.some(m => m.id === messageId)) {
         const settings = StateManager.get('settings');
         const newMsg: ChatMessage = {
-          id:         (result as unknown as { messageId?: string } | null)?.messageId ?? crypto.randomUUID(),
+          id:         messageId,
           sessionId,
           senderId:   settings?.deviceId ?? '',
           senderName: settings?.deviceName ?? '',
@@ -790,14 +802,11 @@ export class ChatView extends Component {
           timestamp:  Date.now(),
           status:     'sent',
         };
-        const alreadyExists = session.messages.some(m => m.id === newMsg.id);
-        if (!alreadyExists) {
-          StateManager.updateChatSession({
-            ...session,
-            messages:     [...session.messages, newMsg],
-            lastActivity: newMsg.timestamp,
-          });
-        }
+        StateManager.updateChatSession({
+          ...session,
+          messages:     [...session.messages, newMsg],
+          lastActivity: newMsg.timestamp,
+        });
       }
     } catch (err) {
       this.toasts.error(err instanceof Error ? err.message : 'Failed to send file');
@@ -865,22 +874,12 @@ export class ChatView extends Component {
     });
   }
 
-  /** Save a base64 payload to the device's Downloads via native, then open it */
+  /** Save a base64 payload to Downloads via native, then open it */
   private async openBase64File(fileName: string, base64: string): Promise<void> {
     try {
-      // Use AppBridge.chatSaveAndOpen if available, otherwise fall back to a
-      // data-URL anchor download (works in the WebView for images).
-      const ext  = fileName.split('.').pop()?.toLowerCase() ?? '';
-      const mime = ({
-        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
-        gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
-      } as Record<string, string>)[ext] ?? 'application/octet-stream';
-
-      const a = document.createElement('a');
-      a.href     = `data:${mime};base64,${base64}`;
-      a.download = fileName;
-      a.click();
-    } catch (err) {
+      const { path } = await AppBridge.chatSaveFile({ fileName, base64 });
+      await AppBridge.openFile(path);
+    } catch {
       this.toasts.error('Could not open file');
     }
   }

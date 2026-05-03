@@ -126,6 +126,7 @@ export interface WyrePluginInterface {
   chatDeclineInvite(options: { sessionId: string }): Promise<void>;
   chatGetSessions(): Promise<{ sessions: import('../shared/models/ChatMessage').ChatSession[] }>;
   chatMarkRead(options: { sessionId: string }): Promise<void>;
+  chatSaveFile(options: { fileName: string; base64: string }): Promise<{ path: string }>;
   // ── History ───────────────────────────────────────────────────────────────
   getHistory(): Promise<{ history: import('../shared/models/Transfer').TransferRecord[] }>;
   clearHistory(): Promise<void>;

@@ -162,14 +162,14 @@ export const AppBridge = {
   chatCloseSession: (options: { sessionId: string }): Promise<void> =>
     WyrePlugin.chatCloseSession(options),
 
-  chatSendText: async (options: { sessionId: string; text: string }): Promise<ChatMessage | null> => {
+  chatSendText: async (options: { sessionId: string; text: string }): Promise<{ messageId: string } | null> => {
     const result = await WyrePlugin.chatSendText(options);
-    return result ? null : null; // Message comes back via chatMessage event
+    return result ?? null;
   },
 
-  chatSendFile: async (options: { sessionId: string; filePath: string; fileName: string; fileSize: number; base64?: string }): Promise<ChatMessage | null> => {
+  chatSendFile: async (options: { sessionId: string; filePath: string; fileName: string; fileSize: number; base64?: string }): Promise<{ messageId: string } | null> => {
     const result = await WyrePlugin.chatSendFile(options);
-    return result ? null : null; // Message comes back via chatMessage event
+    return result ?? null;
   },
 
   chatEditMessage: (options: { sessionId: string; messageId: string; newText: string }): Promise<void> =>
@@ -191,6 +191,9 @@ export const AppBridge = {
 
   chatMarkRead: (options: { sessionId: string }): Promise<void> =>
     WyrePlugin.chatMarkRead(options),
+
+  chatSaveFile: (options: { fileName: string; base64: string }): Promise<{ path: string }> =>
+    WyrePlugin.chatSaveFile(options),
 
   onChatMessage: async (cb: (data: ChatMessageEvent) => void): Promise<() => void> => {
     const handle = await WyrePlugin.addListener('chatMessage', cb);

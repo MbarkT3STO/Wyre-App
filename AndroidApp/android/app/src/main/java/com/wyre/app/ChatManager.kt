@@ -415,6 +415,7 @@ class ChatManager(
                 val text       = json.optString("text").ifEmpty { null }
                 val fileName   = json.optString("fileName").ifEmpty { null }
                 val fileSize   = json.optLong("fileSize", 0L).takeIf { it > 0 }
+                val thumbnail  = json.optString("thumbnail").ifEmpty { null }
                 val timestamp  = json.optLong("timestamp", System.currentTimeMillis())
 
                 val msg = ChatMessageData(
@@ -427,6 +428,7 @@ class ChatManager(
                     text       = text,
                     fileName   = fileName,
                     fileSize   = fileSize,
+                    thumbnail  = thumbnail,
                     timestamp  = timestamp,
                     status     = "delivered"
                 )
@@ -530,6 +532,7 @@ data class ChatMessageData(
     val fileName: String? = null,
     val fileSize: Long? = null,
     val filePath: String? = null,
+    val thumbnail: String? = null,
     val timestamp: Long,
     var status: String,
     var editedAt: Long? = null,
@@ -545,11 +548,12 @@ data class ChatMessageData(
         obj.put("type",       type)
         obj.put("timestamp",  timestamp)
         obj.put("status",     status)
-        text?.let     { obj.put("text",     it) }
-        fileName?.let { obj.put("fileName", it) }
-        fileSize?.let { obj.put("fileSize", it) }
-        filePath?.let { obj.put("filePath", it) }
-        editedAt?.let { obj.put("editedAt", it) }
+        text?.let      { obj.put("text",      it) }
+        fileName?.let  { obj.put("fileName",  it) }
+        fileSize?.let  { obj.put("fileSize",  it) }
+        filePath?.let  { obj.put("filePath",  it) }
+        thumbnail?.let { obj.put("thumbnail", it) }
+        editedAt?.let  { obj.put("editedAt",  it) }
         if (deleted) obj.put("deleted", true)
         return obj
     }

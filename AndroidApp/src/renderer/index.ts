@@ -310,9 +310,22 @@ async function wireEventListeners(): Promise<void> {
           ...session,
           messages: [...session.messages, message],
           lastActivity: message.timestamp,
+          // Only increment unread for messages from the peer, not own messages
           unreadCount: message.isOwn ? session.unreadCount : session.unreadCount + 1,
         });
       }
+    } else {
+      // Session not in state yet (e.g. message arrived before session was opened)
+      // Create a minimal session shell so the message isn't lost
+      StateManager.updateChatSession({
+        id: sessionId,
+        peerId: message.senderId,
+        peerName: message.senderName,
+        connected: true,
+        messages: [message],
+        lastActivity: message.timestamp,
+        unreadCount: message.isOwn ? 0 : 1,
+      });
     }
   });
 

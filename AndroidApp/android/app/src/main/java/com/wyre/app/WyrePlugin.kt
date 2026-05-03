@@ -422,6 +422,29 @@ class WyrePlugin : Plugin() {
         call.resolve()
     }
 
+    @PluginMethod
+    fun chatSaveFile(call: PluginCall) {
+        val fileName = call.getString("fileName") ?: run { call.reject("fileName required"); return }
+        val base64   = call.getString("base64")   ?: run { call.reject("base64 required");   return }
+        executor.submit {
+            try {
+                val bytes = android.util.Base64.decode(base64, android.util.Base64.NO_WRAP)
+                val downloadsDir = android.os.Environment
+                    .getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+                downloadsDir.mkdirs()
+                val file = java.io.File(downloadsDir, fileName)
+                file.writeBytes(bytes)
+                mainHandler.post {
+                    val result = com.getcapacitor.JSObject()
+                    result.put("path", file.absolutePath)
+                    call.resolve(result)
+                }
+            } catch (e: Exception) {
+                mainHandler.post { call.reject(e.message ?: "Failed to save file") }
+            }
+        }
+    }
+
     // ── Shell actions ─────────────────────────────────────────────────────────
 
     @PluginMethod
