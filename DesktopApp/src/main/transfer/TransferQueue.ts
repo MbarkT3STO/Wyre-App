@@ -280,6 +280,8 @@ export class TransferQueue extends EventEmitter {
 
     this.startSend(next).catch((err: Error) => {
       this.logger()?.error('Failed to start queued send', { fileName: next.fileName, error: err.message });
+      // Continue draining so remaining items aren't stuck
+      this.drainQueue();
     });
   }
 

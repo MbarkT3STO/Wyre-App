@@ -353,6 +353,10 @@ class WyreManager(
             ?: throw Exception("Chat service not ready")
     }
 
+    fun chatCancelRequest(sessionId: String) {
+        chatManager?.cancelRequest(sessionId)
+    }
+
     fun chatCloseSession(sessionId: String) {
         chatManager?.closeSession(sessionId)
     }

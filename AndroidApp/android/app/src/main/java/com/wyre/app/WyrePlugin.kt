@@ -324,6 +324,14 @@ class WyrePlugin : Plugin() {
     }
 
     @PluginMethod
+    fun chatCancelRequest(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val sessionId = call.getString("sessionId") ?: run { call.reject("sessionId required"); return }
+        m.chatCancelRequest(sessionId)
+        call.resolve()
+    }
+
+    @PluginMethod
     fun chatCloseSession(call: PluginCall) {
         val m = manager ?: run { call.reject("Service not ready"); return }
         val sessionId = call.getString("sessionId") ?: run { call.reject("sessionId required"); return }

@@ -91,6 +91,19 @@ export interface ChatInviteEvent {
   peerName: string;
 }
 
+/** Outgoing chat request is pending (waiting for peer to accept/decline) */
+export interface ChatRequestPendingEvent {
+  sessionId: string;
+  peerId: string;
+  peerName: string;
+}
+
+/** Outgoing chat request was resolved */
+export interface ChatRequestResolvedEvent {
+  sessionId: string;
+  outcome: 'accepted' | 'declined' | 'cancelled' | 'timeout';
+}
+
 // ─── Plugin interface ─────────────────────────────────────────────────────────
 
 export interface WyrePluginInterface {
@@ -122,6 +135,7 @@ export interface WyrePluginInterface {
   chatSendFile(options: { sessionId: string; filePath: string; fileName: string; fileSize: number; base64?: string }): Promise<{ messageId: string } | null>;
   chatEditMessage(options: { sessionId: string; messageId: string; newText: string }): Promise<void>;
   chatDeleteMessage(options: { sessionId: string; messageId: string }): Promise<void>;
+  chatCancelRequest(options: { sessionId: string }): Promise<void>;
   chatAcceptInvite(options: { sessionId: string }): Promise<void>;
   chatDeclineInvite(options: { sessionId: string }): Promise<void>;
   chatGetSessions(): Promise<{ sessions: import('../shared/models/ChatMessage').ChatSession[] }>;
@@ -154,6 +168,8 @@ export interface WyrePluginInterface {
   addListener(event: 'chatMessageStatus',    handler: (data: ChatMessageStatusEvent)    => void): Promise<{ remove: () => void }>;
   addListener(event: 'chatSessionUpdated',   handler: (data: ChatSessionUpdatedEvent)   => void): Promise<{ remove: () => void }>;
   addListener(event: 'chatInvite',           handler: (data: ChatInviteEvent)           => void): Promise<{ remove: () => void }>;
+  addListener(event: 'chatRequestPending',   handler: (data: ChatRequestPendingEvent)   => void): Promise<{ remove: () => void }>;
+  addListener(event: 'chatRequestResolved',  handler: (data: ChatRequestResolvedEvent)  => void): Promise<{ remove: () => void }>;
 }
 
 export const WyrePlugin = registerPlugin<WyrePluginInterface>('WyrePlugin');

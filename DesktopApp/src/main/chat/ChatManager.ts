@@ -379,6 +379,8 @@ export class ChatManager extends EventEmitter {
       if (session) {
         session.connected = false;
         this.emit('sessionUpdated', { ...session });
+        // Remove from map so a future openSession call starts fresh
+        this.sessions.delete(sessionId);
       }
     });
 
@@ -388,6 +390,8 @@ export class ChatManager extends EventEmitter {
       if (session) {
         session.connected = false;
         this.emit('sessionUpdated', { ...session });
+        // Remove from map so a future openSession call starts fresh
+        this.sessions.delete(sessionId);
       }
     });
 

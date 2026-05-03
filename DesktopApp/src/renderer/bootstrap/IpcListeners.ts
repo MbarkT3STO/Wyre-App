@@ -208,9 +208,9 @@ export function wireIpcListeners(toasts: ToastContainer, _router: Router): void 
     const sessions = StateManager.get('chatSessions');
     const session = sessions.get(sessionId);
     if (session) {
-      // Avoid duplicates (message may already be in state from optimistic send)
-      const exists = session.messages.some(m => m.id === message.id);
-      if (!exists) {
+      const existingIndex = session.messages.findIndex(m => m.id === message.id);
+      if (existingIndex === -1) {
+        // New message — append it
         const updated = {
           ...session,
           messages: [...session.messages, message],
@@ -218,6 +218,10 @@ export function wireIpcListeners(toasts: ToastContainer, _router: Router): void 
           unreadCount: message.isOwn ? session.unreadCount : session.unreadCount + 1,
         };
         StateManager.updateChatSession(updated);
+      } else {
+        // Existing message updated (edit or delete) — replace it in-place
+        const updatedMessages = session.messages.map(m => m.id === message.id ? message : m);
+        StateManager.updateChatSession({ ...session, messages: updatedMessages });
       }
     }
   });

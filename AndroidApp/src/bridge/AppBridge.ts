@@ -19,6 +19,8 @@ import type {
   ChatMessageStatusEvent,
   ChatSessionUpdatedEvent,
   ChatInviteEvent,
+  ChatRequestPendingEvent,
+  ChatRequestResolvedEvent,
 } from './WyrePlugin';
 import type { Device } from '../shared/models/Device';
 import type { AppSettings } from '../shared/models/AppSettings';
@@ -178,6 +180,9 @@ export const AppBridge = {
   chatDeleteMessage: (options: { sessionId: string; messageId: string }): Promise<void> =>
     WyrePlugin.chatDeleteMessage(options),
 
+  chatCancelRequest: (options: { sessionId: string }): Promise<void> =>
+    WyrePlugin.chatCancelRequest(options),
+
   chatAcceptInvite: (options: { sessionId: string }): Promise<void> =>
     WyrePlugin.chatAcceptInvite(options),
 
@@ -212,6 +217,16 @@ export const AppBridge = {
 
   onChatInvite: async (cb: (data: ChatInviteEvent) => void): Promise<() => void> => {
     const handle = await WyrePlugin.addListener('chatInvite', cb);
+    return () => handle.remove();
+  },
+
+  onChatRequestPending: async (cb: (data: ChatRequestPendingEvent) => void): Promise<() => void> => {
+    const handle = await WyrePlugin.addListener('chatRequestPending', cb);
+    return () => handle.remove();
+  },
+
+  onChatRequestResolved: async (cb: (data: ChatRequestResolvedEvent) => void): Promise<() => void> => {
+    const handle = await WyrePlugin.addListener('chatRequestResolved', cb);
     return () => handle.remove();
   },
 } as const;

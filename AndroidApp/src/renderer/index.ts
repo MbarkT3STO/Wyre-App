@@ -18,6 +18,7 @@ import { ThemeEngine } from './theme/ThemeEngine';
 import { ToastContainer } from './components/ToastContainer';
 import { IncomingDialog } from './components/IncomingDialog';
 import { ChatInviteDialog } from './components/ChatInviteDialog';
+import { ChatPendingDialog } from './components/ChatPendingDialog';
 import { HomeView } from './views/HomeView';
 import { TransfersView } from './views/TransfersView';
 import { SettingsView } from './views/SettingsView';
@@ -364,6 +365,17 @@ async function wireEventListeners(): Promise<void> {
     updateChatBadge();
   });
 
+  // Chat request pending (sender side) — show the waiting modal
+  const unsubChatPending = await AppBridge.onChatRequestPending((payload) => {
+    showChatPendingDialog(payload);
+  });
+
+  // Chat request resolved — the ChatPendingDialog handles this itself via its own
+  // onChatRequestResolved subscription, but we keep a top-level unsub for cleanup
+  const unsubChatResolved = await AppBridge.onChatRequestResolved((_payload) => {
+    // Handled inside ChatPendingDialog; nothing extra needed at the bootstrap level
+  });
+
   window.addEventListener('unload', () => {
     unsubDevices();
     unsubStarted();
@@ -378,6 +390,8 @@ async function wireEventListeners(): Promise<void> {
     unsubChatStatus();
     unsubChatSession();
     unsubChatInvite();
+    unsubChatPending();
+    unsubChatResolved();
   });
 
   // Update chat badge when sessions change
@@ -414,6 +428,13 @@ function showChatInviteDialog(payload: { sessionId: string; peerId: string; peer
   const dialogMount = document.getElementById('dialog-mount');
   if (!dialogMount) return;
   const dialog = new ChatInviteDialog(payload, router);
+  dialog.mount(dialogMount);
+}
+
+function showChatPendingDialog(payload: { sessionId: string; peerName: string }): void {
+  const dialogMount = document.getElementById('dialog-mount');
+  if (!dialogMount) return;
+  const dialog = new ChatPendingDialog(payload, router);
   dialog.mount(dialogMount);
 }
 

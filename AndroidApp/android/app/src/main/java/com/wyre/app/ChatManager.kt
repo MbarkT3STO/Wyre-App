@@ -81,14 +81,32 @@ class ChatManager(
         out.write((handshake.toString() + "\n").toByteArray(Charsets.UTF_8))
         out.flush()
 
+        // Notify JS that the request is now pending (waiting for peer to accept/decline)
+        val pendingPayload = JSObject()
+        pendingPayload.put("sessionId", sessionId)
+        pendingPayload.put("peerId",    peerId)
+        pendingPayload.put("peerName",  peerName)
+        notifyFn("chatRequestPending", pendingPayload)
+
         // Wait for accept/decline response
         val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
         val responseLine = reader.readLine()
-            ?: throw Exception("Peer closed connection during handshake")
+            ?: run {
+                socket.close()
+                val timeoutPayload = JSObject()
+                timeoutPayload.put("sessionId", sessionId)
+                timeoutPayload.put("outcome",   "timeout")
+                notifyFn("chatRequestResolved", timeoutPayload)
+                throw Exception("Peer closed connection during handshake")
+            }
 
         val response = JSONObject(responseLine)
         if (!response.optBoolean("accepted", false)) {
             socket.close()
+            val declinedPayload = JSObject()
+            declinedPayload.put("sessionId", sessionId)
+            declinedPayload.put("outcome",   "declined")
+            notifyFn("chatRequestResolved", declinedPayload)
             throw Exception("Chat invite declined by peer")
         }
 
@@ -105,6 +123,12 @@ class ChatManager(
         )
         sessions[sessionId] = session
         sockets[sessionId]  = socket
+
+        // Notify JS that the request was accepted
+        val acceptedPayload = JSObject()
+        acceptedPayload.put("sessionId", sessionId)
+        acceptedPayload.put("outcome",   "accepted")
+        notifyFn("chatRequestResolved", acceptedPayload)
 
         // Start read loop
         executor.submit { readLoop(sessionId, socket, reader) }
@@ -188,6 +212,23 @@ class ChatManager(
             socket.getOutputStream().flush()
         } catch (_: Exception) {}
         runCatching { socket.close() }
+    }
+
+    // ── Cancel outgoing request ───────────────────────────────────────────────
+
+    /**
+     * Cancels a pending outgoing chat request (before the peer has responded).
+     * Closes the socket and notifies JS with outcome 'cancelled'.
+     */
+    fun cancelRequest(sessionId: String) {
+        val socket = sockets.remove(sessionId)
+        runCatching { socket?.close() }
+        sessions.remove(sessionId)
+
+        val payload = JSObject()
+        payload.put("sessionId", sessionId)
+        payload.put("outcome",   "cancelled")
+        notifyFn("chatRequestResolved", payload)
     }
 
     // ── Close session ─────────────────────────────────────────────────────────

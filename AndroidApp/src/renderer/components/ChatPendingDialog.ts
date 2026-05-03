@@ -1,12 +1,12 @@
 /**
- * ChatPendingDialog.ts
+ * ChatPendingDialog.ts — Android version.
  * Shown on the SENDER side while waiting for the receiver to accept/decline.
  * Displays the target device name, a pulsing "waiting" indicator, and a
  * Cancel button. Dismisses automatically when the request is resolved.
  */
 
 import { Component } from './base/Component';
-import { IpcClient } from '../core/IpcClient';
+import { AppBridge } from '../../bridge/AppBridge';
 import { StateManager } from '../core/StateManager';
 import type { Router } from '../core/Router';
 
@@ -16,10 +16,10 @@ export class ChatPendingDialog extends Component {
   private router: Router;
   private unsubResolved: (() => void) | null = null;
 
-  constructor(sessionId: string, peerName: string, router: Router) {
+  constructor(payload: { sessionId: string; peerName: string }, router: Router) {
     super();
-    this.sessionId = sessionId;
-    this.peerName = peerName;
+    this.sessionId = payload.sessionId;
+    this.peerName = payload.peerName;
     this.router = router;
   }
 
@@ -44,9 +44,9 @@ export class ChatPendingDialog extends Component {
 
         <!-- Text content -->
         <div class="chat-invite-modal__content">
-          <h2 class="chat-invite-modal__heading">Chat Request Sent</h2>
+          <h2 class="chat-invite-modal__heading" id="chat-pending-heading">Chat Request Sent</h2>
           <p class="chat-invite-modal__peer"><strong>${escapeHtml(this.peerName)}</strong></p>
-          <p class="chat-invite-modal__subtext">Waiting for them to accept your request…</p>
+          <p class="chat-invite-modal__subtext" id="chat-pending-subtext">Waiting for them to accept your request…</p>
           <p class="chat-invite-modal__note">
             <i class="fa-solid fa-circle-info" aria-hidden="true"></i>
             Messages are not stored after the session ends
@@ -55,7 +55,8 @@ export class ChatPendingDialog extends Component {
 
         <!-- Single action: cancel -->
         <div class="chat-invite-modal__actions">
-          <button class="chat-invite-modal__btn chat-invite-modal__btn--decline chat-pending-modal__cancel-btn" id="chat-pending-cancel" aria-label="Cancel chat request">
+          <button class="chat-invite-modal__btn chat-invite-modal__btn--decline chat-pending-modal__cancel-btn"
+                  id="chat-pending-cancel" aria-label="Cancel chat request">
             <i class="fa-solid fa-xmark" aria-hidden="true"></i>
             <span>Cancel Request</span>
           </button>
@@ -72,53 +73,45 @@ export class ChatPendingDialog extends Component {
       void this.handleCancel();
     });
 
-    // Keyboard: Escape = cancel
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') void this.handleCancel();
-    };
-    document.addEventListener('keydown', onKey);
-    this.addCleanup(() => document.removeEventListener('keydown', onKey));
-
-    // Listen for resolution from main process
-    this.unsubResolved = IpcClient.onChatRequestResolved((payload) => {
+    // Subscribe to resolution events from the native layer
+    void AppBridge.onChatRequestResolved((payload) => {
       if (payload.sessionId !== this.sessionId) return;
       this.handleResolution(payload.outcome);
+    }).then((unsub) => {
+      this.unsubResolved = unsub;
+      this.addCleanup(() => this.unsubResolved?.());
     });
-    this.addCleanup(() => this.unsubResolved?.());
   }
 
   private handleResolution(outcome: 'accepted' | 'declined' | 'cancelled' | 'timeout'): void {
     if (outcome === 'accepted') {
-      // Navigate to chat — session is now connected
       StateManager.setState('activeChatSessionId', this.sessionId);
       this.router.navigate('/chat');
       this.dismiss();
     } else {
-      // Show brief status then dismiss
       this.showOutcome(outcome);
       setTimeout(() => this.dismiss(), 2200);
     }
   }
 
   private showOutcome(outcome: 'declined' | 'cancelled' | 'timeout'): void {
-    const subtext = this.element?.querySelector('.chat-invite-modal__subtext');
+    const heading = this.element?.querySelector('#chat-pending-heading');
+    const subtext = this.element?.querySelector('#chat-pending-subtext');
     const cancelBtn = this.element?.querySelector('#chat-pending-cancel') as HTMLButtonElement | null;
     const avatarWrap = this.element?.querySelector('.chat-pending-modal__avatar-wrap') as HTMLElement | null;
-    const heading = this.element?.querySelector('.chat-invite-modal__heading');
 
     if (cancelBtn) cancelBtn.disabled = true;
     if (avatarWrap) {
       avatarWrap.style.opacity = '0.5';
-      // Stop the pulse animation
       avatarWrap.querySelectorAll('.chat-pending-modal__pulse-ring').forEach(el => {
         (el as HTMLElement).style.animationPlayState = 'paused';
       });
     }
 
     const outcomes: Record<string, { heading: string; message: string }> = {
-      declined:  { heading: 'Request Declined',   message: `${escapeHtml(this.peerName)} declined your chat request.` },
-      cancelled: { heading: 'Request Cancelled',  message: 'You cancelled the chat request.' },
-      timeout:   { heading: 'No Response',        message: `${escapeHtml(this.peerName)} didn't respond in time.` },
+      declined:  { heading: 'Request Declined',  message: `${escapeHtml(this.peerName)} declined your chat request.` },
+      cancelled: { heading: 'Request Cancelled', message: 'You cancelled the chat request.' },
+      timeout:   { heading: 'No Response',       message: `${escapeHtml(this.peerName)} didn't respond in time.` },
     };
 
     const result = outcomes[outcome] ?? { heading: 'Request Ended', message: 'The chat request ended.' };
@@ -128,7 +121,7 @@ export class ChatPendingDialog extends Component {
 
   private async handleCancel(): Promise<void> {
     try {
-      await IpcClient.chatCancelRequest({ sessionId: this.sessionId });
+      await AppBridge.chatCancelRequest({ sessionId: this.sessionId });
     } catch { /* non-fatal */ }
     this.dismiss();
   }

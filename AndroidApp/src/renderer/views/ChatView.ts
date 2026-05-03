@@ -338,26 +338,32 @@ export class ChatView extends Component {
     for (const msg of session.messages) {
       const el = this.messageListEl.querySelector(`[data-message-id="${msg.id}"]`) as HTMLElement | null;
       if (!el) continue;
+
+      // Deleted — replace with tombstone (applies to own and peer messages)
       if (msg.deleted && !el.querySelector('.chat-message__bubble--deleted')) {
         el.replaceWith(this.createMessageBubble(msg));
         continue;
       }
+
+      // Edited — patch text and badge (applies to own and peer messages)
+      if (msg.editedAt) {
+        const textEl = el.querySelector('.chat-message__text');
+        if (textEl && msg.text) textEl.innerHTML = escapeHtml(msg.text).replace(/\n/g, '<br>');
+        const meta = el.querySelector('.chat-message__meta');
+        if (meta && !meta.querySelector('.chat-message__edited')) {
+          const badge = document.createElement('span');
+          badge.className = 'chat-message__edited';
+          badge.textContent = 'edited';
+          meta.prepend(badge);
+        }
+      }
+
+      // Status icon — own messages only
       if (msg.isOwn) {
         const statusEl = el.querySelector('.chat-message__status-icon');
         if (statusEl) {
           const newIcon = this.getStatusIcon(msg.status);
           if (newIcon) statusEl.outerHTML = newIcon;
-        }
-        if (msg.editedAt) {
-          const textEl = el.querySelector('.chat-message__text');
-          if (textEl && msg.text) textEl.innerHTML = escapeHtml(msg.text).replace(/\n/g, '<br>');
-          const meta = el.querySelector('.chat-message__meta');
-          if (meta && !meta.querySelector('.chat-message__edited')) {
-            const badge = document.createElement('span');
-            badge.className = 'chat-message__edited';
-            badge.textContent = 'edited';
-            meta.prepend(badge);
-          }
         }
       }
     }
