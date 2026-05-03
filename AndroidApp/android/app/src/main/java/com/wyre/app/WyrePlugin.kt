@@ -346,8 +346,46 @@ class WyrePlugin : Plugin() {
 
     @PluginMethod
     fun chatSendFile(call: PluginCall) {
-        // File sending via chat not yet implemented on Android
-        call.reject("chatSendFile not yet implemented on Android")
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val sessionId = call.getString("sessionId") ?: run { call.reject("sessionId required"); return }
+        val fileName  = call.getString("fileName")  ?: run { call.reject("fileName required");  return }
+        val fileSize  = call.getLong("fileSize")    ?: 0L
+        val base64    = call.getString("base64")
+
+        if (base64.isNullOrEmpty()) {
+            call.reject("base64 data required on Android")
+            return
+        }
+
+        executor.submit {
+            val result = m.chatSendFileBase64(sessionId, fileName, fileSize, base64)
+            mainHandler.post {
+                if (result != null) call.resolve(result) else call.reject("Failed to send file")
+            }
+        }
+    }
+
+    @PluginMethod
+    fun chatEditMessage(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val sessionId = call.getString("sessionId") ?: run { call.reject("sessionId required"); return }
+        val messageId = call.getString("messageId") ?: run { call.reject("messageId required"); return }
+        val newText   = call.getString("newText")   ?: run { call.reject("newText required");   return }
+        executor.submit {
+            m.chatEditMessage(sessionId, messageId, newText)
+            mainHandler.post { call.resolve() }
+        }
+    }
+
+    @PluginMethod
+    fun chatDeleteMessage(call: PluginCall) {
+        val m = manager ?: run { call.reject("Service not ready"); return }
+        val sessionId = call.getString("sessionId") ?: run { call.reject("sessionId required"); return }
+        val messageId = call.getString("messageId") ?: run { call.reject("messageId required"); return }
+        executor.submit {
+            m.chatDeleteMessage(sessionId, messageId)
+            mainHandler.post { call.resolve() }
+        }
     }
 
     @PluginMethod

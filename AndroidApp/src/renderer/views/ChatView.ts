@@ -128,13 +128,37 @@ export class ChatView extends Component {
     this.fileInput?.addEventListener('change', () => { void this.handleFileAttach(); });
     this.element.querySelector('#chat-back-btn')?.addEventListener('click', () => this.showSessionList());
     this.element.querySelector('#chat-close-btn')?.addEventListener('click', () => { void this.handleCloseSession(); });
-  }
+
+    // ── Keyboard avoidance (Android soft keyboard) ──────────────────────────
+    // When the virtual keyboard appears, visualViewport shrinks. We push the
+    // thread panel up so the input area stays above the keyboard.
+    if (window.visualViewport) {
+      const onViewportResize = (): void => {
+        const threadPanel = this.element?.querySelector('#chat-thread-panel') as HTMLElement | null;
+        if (!threadPanel || threadPanel.style.display === 'none') return;
+        const offsetFromBottom = window.innerHeight - (window.visualViewport?.height ?? window.innerHeight)
+          - (window.visualViewport?.offsetTop ?? 0);
+        threadPanel.style.paddingBottom = offsetFromBottom > 0 ? `${offsetFromBottom}px` : '';
+        // Scroll to bottom so latest message stays visible
+        if (this.messageListEl) {
+          this.messageListEl.scrollTop = this.messageListEl.scrollHeight;
+        }
+      };
+      window.visualViewport.addEventListener('resize', onViewportResize);
+      window.visualViewport.addEventListener('scroll', onViewportResize);
+      this.addCleanup(() => {
+        window.visualViewport?.removeEventListener('resize', onViewportResize);
+        window.visualViewport?.removeEventListener('scroll', onViewportResize);
+      });
+    }  }
 
   private async loadSessions(): Promise<void> {
     try {
       const sessions = await AppBridge.chatGetSessions();
+      // Batch-update state; the chatSessions subscriber will call renderSessionList()
       for (const session of sessions) StateManager.updateChatSession(session);
-      this.renderSessionList();
+      // Only render directly if there are no sessions (subscriber won't fire on empty map)
+      if (sessions.length === 0) this.renderSessionList();
     } catch { /* non-fatal */ }
   }
 
@@ -265,8 +289,24 @@ export class ChatView extends Component {
     wrapper.className = `chat-message ${msg.isOwn ? 'chat-message--own' : 'chat-message--peer'}`;
     wrapper.dataset['messageId'] = msg.id;
 
+    // Deleted tombstone
+    if (msg.deleted) {
+      wrapper.innerHTML = `
+        <div class="chat-message__bubble chat-message__bubble--deleted">
+          <p class="chat-message__deleted-text">
+            <i class="fa-solid fa-ban" aria-hidden="true"></i>
+            Message deleted
+          </p>
+        </div>
+      `;
+      return wrapper;
+    }
+
     const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const statusIcon = msg.isOwn ? this.getStatusIcon(msg.status) : '';
+    const editedBadge = msg.editedAt
+      ? `<span class="chat-message__edited" title="Edited">edited</span>`
+      : '';
 
     let contentHtml = '';
 
@@ -307,6 +347,7 @@ export class ChatView extends Component {
       <div class="chat-message__bubble">
         ${contentHtml}
         <div class="chat-message__meta">
+          ${editedBadge}
           <span class="chat-message__time">${time}</span>
           ${statusIcon}
         </div>
@@ -321,7 +362,190 @@ export class ChatView extends Component {
       });
     }
 
+    // ── Long-press context menu (touch) ──────────────────────────────────────
+    const canCopy   = msg.type === 'text' && !!msg.text;
+    const canEdit   = msg.isOwn && msg.type === 'text';
+    const canDelete = msg.isOwn;
+
+    if (canCopy || canEdit || canDelete) {
+      this.wireLongPress(wrapper, msg, canCopy, canEdit, canDelete);
+    }
+
     return wrapper;
+  }
+
+  // ── Long-press context menu ────────────────────────────────────────────────
+
+  private wireLongPress(
+    wrapper: HTMLElement,
+    msg: ChatMessage,
+    canCopy: boolean,
+    canEdit: boolean,
+    canDelete: boolean,
+  ): void {
+    let pressTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const openMenu = (x: number, y: number): void => {
+      this.closeContextMenu();
+
+      const menu = document.createElement('div');
+      menu.className = 'chat-context-menu';
+      menu.setAttribute('role', 'menu');
+
+      const items: Array<{ icon: string; label: string; action: string; danger?: boolean }> = [];
+      if (canCopy)   items.push({ icon: 'fa-regular fa-copy',  label: 'Copy',   action: 'copy' });
+      if (canEdit)   items.push({ icon: 'fa-solid fa-pen',     label: 'Edit',   action: 'edit' });
+      if (canDelete) items.push({ icon: 'fa-solid fa-trash',   label: 'Delete', action: 'delete', danger: true });
+
+      menu.innerHTML = items.map(item => `
+        <button class="chat-context-menu__item${item.danger ? ' chat-context-menu__item--danger' : ''}"
+                data-action="${item.action}" role="menuitem">
+          <i class="${item.icon}" aria-hidden="true"></i>
+          <span>${item.label}</span>
+        </button>
+      `).join('');
+
+      // Position near the touch point, keep inside viewport
+      document.body.appendChild(menu);
+      const menuW = 160;
+      const menuH = items.length * 44;
+      const left = Math.min(x, window.innerWidth - menuW - 8);
+      const top  = Math.min(y, window.innerHeight - menuH - 8);
+      menu.style.left = `${Math.max(8, left)}px`;
+      menu.style.top  = `${Math.max(8, top)}px`;
+
+      menu.querySelectorAll('.chat-context-menu__item').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const action = (btn as HTMLElement).dataset['action'];
+          this.closeContextMenu();
+          if (action === 'copy')   this.handleCopyMessage(msg);
+          else if (action === 'edit')   this.handleEditMessage(msg, wrapper);
+          else if (action === 'delete') void this.handleDeleteMessage(msg, wrapper);
+        });
+      });
+
+      // Close on outside tap
+      const dismiss = (e: Event): void => {
+        if (!menu.contains(e.target as Node)) {
+          this.closeContextMenu();
+          document.removeEventListener('touchstart', dismiss, true);
+          document.removeEventListener('mousedown', dismiss, true);
+        }
+      };
+      setTimeout(() => {
+        document.addEventListener('touchstart', dismiss, true);
+        document.addEventListener('mousedown', dismiss, true);
+      }, 0);
+
+      this._contextMenu = menu;
+    };
+
+    wrapper.addEventListener('touchstart', (e) => {
+      const touch = e.touches[0]!;
+      pressTimer = setTimeout(() => {
+        openMenu(touch.clientX, touch.clientY);
+      }, 500);
+    }, { passive: true });
+
+    wrapper.addEventListener('touchend',   () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+    wrapper.addEventListener('touchmove',  () => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+    wrapper.addEventListener('touchcancel',() => { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } });
+  }
+
+  private _contextMenu: HTMLElement | null = null;
+
+  private closeContextMenu(): void {
+    this._contextMenu?.remove();
+    this._contextMenu = null;
+  }
+
+  // ── Message action handlers ────────────────────────────────────────────────
+
+  private handleCopyMessage(msg: ChatMessage): void {
+    if (!msg.text) return;
+    navigator.clipboard.writeText(msg.text)
+      .then(() => this.toasts.success('Copied to clipboard'))
+      .catch(() => this.toasts.error('Failed to copy'));
+  }
+
+  private handleEditMessage(msg: ChatMessage, wrapper: HTMLElement): void {
+    if (!this.activeSessionId || !msg.isOwn || msg.type !== 'text') return;
+    const bubble = wrapper.querySelector('.chat-message__bubble') as HTMLElement | null;
+    if (!bubble) return;
+
+    const originalText = msg.text ?? '';
+    bubble.innerHTML = `
+      <div class="chat-message__edit-wrap">
+        <textarea class="chat-message__edit-input" aria-label="Edit message" maxlength="10000">${escapeHtml(originalText)}</textarea>
+        <div class="chat-message__edit-actions">
+          <button class="btn btn--ghost btn--sm" id="edit-cancel-${msg.id}">Cancel</button>
+          <button class="btn btn--primary btn--sm" id="edit-save-${msg.id}">Save</button>
+        </div>
+      </div>
+    `;
+
+    const textarea = bubble.querySelector('textarea') as HTMLTextAreaElement;
+    textarea.focus();
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    textarea.addEventListener('input', () => {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
+    });
+
+    const cancelEdit = (): void => {
+      wrapper.replaceWith(this.createMessageBubble(msg));
+    };
+
+    const saveEdit = (): void => {
+      const newText = textarea.value.trim();
+      if (!newText || newText === originalText) { cancelEdit(); return; }
+      if (!this.activeSessionId) return;
+
+      void AppBridge.chatEditMessage({ sessionId: this.activeSessionId, messageId: msg.id, newText });
+
+      // Optimistic update
+      msg.text    = newText;
+      msg.editedAt = Date.now();
+      const sessions = StateManager.get('chatSessions');
+      const session  = sessions.get(this.activeSessionId!);
+      if (session) {
+        const updated = session.messages.map(m => m.id === msg.id ? { ...m, text: newText, editedAt: msg.editedAt } : m);
+        StateManager.updateChatSession({ ...session, messages: updated });
+      }
+      wrapper.replaceWith(this.createMessageBubble(msg));
+    };
+
+    bubble.querySelector(`#edit-cancel-${msg.id}`)?.addEventListener('click', cancelEdit);
+    bubble.querySelector(`#edit-save-${msg.id}`)?.addEventListener('click', saveEdit);
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saveEdit(); }
+      if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); }
+    });
+  }
+
+  private async handleDeleteMessage(msg: ChatMessage, wrapper: HTMLElement): Promise<void> {
+    if (!this.activeSessionId || !msg.isOwn) return;
+
+    // Optimistic tombstone
+    msg.deleted = true;
+    wrapper.replaceWith(this.createMessageBubble(msg));
+
+    const sessions = StateManager.get('chatSessions');
+    const session  = sessions.get(this.activeSessionId);
+    if (session) {
+      const updated = session.messages.map(m => m.id === msg.id ? { ...m, deleted: true } : m);
+      StateManager.updateChatSession({ ...session, messages: updated });
+    }
+
+    try {
+      await AppBridge.chatDeleteMessage({ sessionId: this.activeSessionId, messageId: msg.id });
+    } catch {
+      // Revert
+      msg.deleted = false;
+      this.toasts.error('Could not delete message');
+    }
   }
 
   private getStatusIcon(status: ChatMessage['status']): string {
@@ -392,11 +616,6 @@ export class ChatView extends Component {
     this.fileInput.value = '';
 
     const sessionId = this.activeSessionId;
-    const filePath = (file as File & { path?: string }).path;
-    if (!filePath) {
-      this.toasts.error('Cannot read file path.');
-      return;
-    }
 
     if (file.size > 4 * 1024 * 1024) {
       this.toasts.warning('File too large for chat (max 4 MB).');
@@ -404,7 +623,26 @@ export class ChatView extends Component {
     }
 
     try {
-      await AppBridge.chatSendFile({ sessionId, filePath, fileName: file.name, fileSize: file.size });
+      // On Android, File.path is not available — read the file as base64 inline
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          // Strip the data URL prefix (e.g. "data:image/png;base64,")
+          const comma = result.indexOf(',');
+          resolve(comma >= 0 ? result.slice(comma + 1) : result);
+        };
+        reader.onerror = () => reject(new Error('Failed to read file'));
+        reader.readAsDataURL(file);
+      });
+
+      await AppBridge.chatSendFile({
+        sessionId,
+        filePath: '',          // not used on Android — native side reads base64
+        fileName: file.name,
+        fileSize: file.size,
+        base64,                // extra field passed through to native
+      } as Parameters<typeof AppBridge.chatSendFile>[0]);
     } catch (err) {
       this.toasts.error(err instanceof Error ? err.message : 'Failed to send file');
     }

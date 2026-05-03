@@ -360,6 +360,17 @@ class WyreManager(
     fun chatSendText(sessionId: String, text: String): JSObject? =
         chatManager?.sendText(sessionId, text)
 
+    fun chatSendFileBase64(sessionId: String, fileName: String, fileSize: Long, base64: String): JSObject? =
+        chatManager?.sendFileBase64(sessionId, fileName, fileSize, base64)
+
+    fun chatEditMessage(sessionId: String, messageId: String, newText: String) {
+        chatManager?.editMessage(sessionId, messageId, newText)
+    }
+
+    fun chatDeleteMessage(sessionId: String, messageId: String) {
+        chatManager?.deleteMessage(sessionId, messageId)
+    }
+
     fun chatAcceptInvite(sessionId: String) {
         chatManager?.acceptInvite(sessionId)
     }

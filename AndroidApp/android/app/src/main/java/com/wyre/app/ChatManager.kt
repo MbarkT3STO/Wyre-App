@@ -254,7 +254,115 @@ class ChatManager(
         }
     }
 
-    // ── Get sessions ──────────────────────────────────────────────────────────
+    // ── Send file (base64 inline) ─────────────────────────────────────────────
+
+    fun sendFileBase64(sessionId: String, fileName: String, fileSize: Long, base64: String): JSObject? {
+        val socket  = sockets[sessionId]  ?: return null
+        val session = sessions[sessionId] ?: return null
+
+        val messageId = UUID.randomUUID().toString()
+        val timestamp = System.currentTimeMillis()
+        val ext       = fileName.substringAfterLast('.', "").lowercase()
+        val isImage   = ext in listOf("jpg", "jpeg", "png", "gif", "webp", "bmp", "svg")
+        val msgType   = if (isImage) "image" else "file"
+
+        val frame = JSONObject().apply {
+            put("type",           "chat")
+            put("id",             messageId)
+            put("senderDeviceId", localDeviceId)
+            put("senderName",     localDeviceName)
+            put("msgType",        msgType)
+            put("fileName",       fileName)
+            put("fileSize",       fileSize)
+            put("thumbnail",      base64)
+            put("timestamp",      timestamp)
+        }
+
+        return try {
+            socket.getOutputStream().write((frame.toString() + "\n").toByteArray(Charsets.UTF_8))
+            socket.getOutputStream().flush()
+
+            val msg = ChatMessageData(
+                id         = messageId,
+                sessionId  = sessionId,
+                senderId   = localDeviceId,
+                senderName = localDeviceName,
+                isOwn      = true,
+                type       = msgType,
+                fileName   = fileName,
+                fileSize   = fileSize,
+                timestamp  = timestamp,
+                status     = "sent"
+            )
+            session.messages.add(msg)
+            session.lastActivity = timestamp
+
+            val result = JSObject()
+            result.put("messageId", messageId)
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "sendFileBase64 failed: ${e.message}")
+            null
+        }
+    }
+
+    // ── Edit message ──────────────────────────────────────────────────────────
+
+    fun editMessage(sessionId: String, messageId: String, newText: String) {
+        val socket  = sockets[sessionId]  ?: return
+        val session = sessions[sessionId] ?: return
+        val editedAt = System.currentTimeMillis()
+
+        val frame = JSONObject().apply {
+            put("type",           "chat_edit")
+            put("id",             messageId)
+            put("senderDeviceId", localDeviceId)
+            put("newText",        newText.take(MAX_TEXT_LENGTH))
+            put("editedAt",       editedAt)
+        }
+
+        try {
+            socket.getOutputStream().write((frame.toString() + "\n").toByteArray(Charsets.UTF_8))
+            socket.getOutputStream().flush()
+        } catch (e: Exception) {
+            Log.e(TAG, "editMessage failed: ${e.message}")
+        }
+
+        // Update local copy
+        val msg = session.messages.find { it.id == messageId }
+        if (msg != null) {
+            msg.text     = newText
+            msg.editedAt = editedAt
+            notifySessionUpdated(sessionId)
+        }
+    }
+
+    // ── Delete message ────────────────────────────────────────────────────────
+
+    fun deleteMessage(sessionId: String, messageId: String) {
+        val socket  = sockets[sessionId]  ?: return
+        val session = sessions[sessionId] ?: return
+
+        val frame = JSONObject().apply {
+            put("type",           "chat_delete")
+            put("id",             messageId)
+            put("senderDeviceId", localDeviceId)
+        }
+
+        try {
+            socket.getOutputStream().write((frame.toString() + "\n").toByteArray(Charsets.UTF_8))
+            socket.getOutputStream().flush()
+        } catch (e: Exception) {
+            Log.e(TAG, "deleteMessage failed: ${e.message}")
+        }
+
+        // Update local copy
+        val msg = session.messages.find { it.id == messageId }
+        if (msg != null) {
+            msg.deleted = true
+            notifySessionUpdated(sessionId)
+        }
+    }
 
     fun getSessionsJson(): JSArray {
         val arr = JSArray()

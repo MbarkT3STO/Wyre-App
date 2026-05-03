@@ -730,8 +730,117 @@
 }
 
 /* ══════════════════════════════════════════════════════════
-   DEVICE CARD CHAT BUTTON
+   MESSAGE CONTEXT MENU (long-press)
    ══════════════════════════════════════════════════════════ */
+
+.chat-context-menu {
+  position: fixed;
+  z-index: 9999;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+  min-width: 160px;
+  overflow: hidden;
+  animation: contextMenuIn 160ms var(--ease-spring) both;
+}
+
+@keyframes contextMenuIn {
+  from { opacity: 0; transform: scale(0.88); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.chat-context-menu__item {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  padding: 13px var(--sp-4);
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition-fast);
+}
+
+.chat-context-menu__item:active {
+  background: var(--bg-hover);
+}
+
+.chat-context-menu__item i {
+  width: 16px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.chat-context-menu__item--danger { color: var(--danger-text); }
+.chat-context-menu__item--danger i { color: var(--danger-text); }
+
+/* Deleted tombstone */
+.chat-message__bubble--deleted {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 1px dashed var(--border-default) !important;
+  padding: var(--sp-2) var(--sp-3) !important;
+}
+
+.chat-message__deleted-text {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  user-select: none;
+}
+
+/* Edited badge */
+.chat-message__edited {
+  font-size: 10px;
+  color: rgba(255,255,255,0.55);
+  font-style: italic;
+  margin-right: 3px;
+}
+.chat-message--peer .chat-message__edited { color: var(--text-muted); }
+
+/* Inline edit */
+.chat-message__edit-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  width: 100%;
+}
+
+.chat-message__edit-input {
+  width: 100%;
+  min-height: 60px;
+  max-height: 200px;
+  padding: var(--sp-2) var(--sp-3);
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: var(--radius-md);
+  color: #fff;
+  font-family: var(--font-family);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  resize: none;
+  outline: none;
+}
+
+.chat-message__edit-actions {
+  display: flex;
+  gap: var(--sp-2);
+  justify-content: flex-end;
+}
+
+/* ══════════════════════════════════════════════════════════
+   DEVICE CARD CHAT BUTTON   ══════════════════════════════════════════════════════════ */
 
 .device-card__chat-btn {
   /* Sits in the bottom-centre of the card, always visible on mobile

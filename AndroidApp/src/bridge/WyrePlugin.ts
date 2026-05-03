@@ -119,12 +119,13 @@ export interface WyrePluginInterface {
   chatOpenSession(options: { deviceId: string }): Promise<{ sessionId: string; peerId: string; peerName: string; connected: boolean }>;
   chatCloseSession(options: { sessionId: string }): Promise<void>;
   chatSendText(options: { sessionId: string; text: string }): Promise<{ messageId: string } | null>;
-  chatSendFile(options: { sessionId: string; filePath: string; fileName: string; fileSize: number }): Promise<{ messageId: string } | null>;
+  chatSendFile(options: { sessionId: string; filePath: string; fileName: string; fileSize: number; base64?: string }): Promise<{ messageId: string } | null>;
+  chatEditMessage(options: { sessionId: string; messageId: string; newText: string }): Promise<void>;
+  chatDeleteMessage(options: { sessionId: string; messageId: string }): Promise<void>;
   chatAcceptInvite(options: { sessionId: string }): Promise<void>;
   chatDeclineInvite(options: { sessionId: string }): Promise<void>;
   chatGetSessions(): Promise<{ sessions: import('../shared/models/ChatMessage').ChatSession[] }>;
   chatMarkRead(options: { sessionId: string }): Promise<void>;
-
   // ── History ───────────────────────────────────────────────────────────────
   getHistory(): Promise<{ history: import('../shared/models/Transfer').TransferRecord[] }>;
   clearHistory(): Promise<void>;

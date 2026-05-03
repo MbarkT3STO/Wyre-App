@@ -147,14 +147,15 @@ export const AppBridge = {
   // ── Chat ──────────────────────────────────────────────────────────────────
   chatOpenSession: async (options: { deviceId: string }): Promise<ChatSession> => {
     const result = await WyrePlugin.chatOpenSession(options);
+    // Native returns the full session object (id, peerId, peerName, connected, messages, etc.)
     return {
-      id: result.sessionId,
-      peerId: result.peerId,
-      peerName: result.peerName,
-      connected: result.connected,
-      messages: [],
-      lastActivity: Date.now(),
-      unreadCount: 0,
+      id:           (result as unknown as ChatSession).id           ?? (result as unknown as { sessionId: string }).sessionId,
+      peerId:       (result as unknown as ChatSession).peerId       ?? (result as unknown as { peerId: string }).peerId,
+      peerName:     (result as unknown as ChatSession).peerName     ?? (result as unknown as { peerName: string }).peerName,
+      connected:    (result as unknown as ChatSession).connected    ?? false,
+      messages:     (result as unknown as ChatSession).messages     ?? [],
+      lastActivity: (result as unknown as ChatSession).lastActivity ?? Date.now(),
+      unreadCount:  (result as unknown as ChatSession).unreadCount  ?? 0,
     };
   },
 
@@ -166,10 +167,16 @@ export const AppBridge = {
     return result ? null : null; // Message comes back via chatMessage event
   },
 
-  chatSendFile: async (options: { sessionId: string; filePath: string; fileName: string; fileSize: number }): Promise<ChatMessage | null> => {
+  chatSendFile: async (options: { sessionId: string; filePath: string; fileName: string; fileSize: number; base64?: string }): Promise<ChatMessage | null> => {
     const result = await WyrePlugin.chatSendFile(options);
     return result ? null : null; // Message comes back via chatMessage event
   },
+
+  chatEditMessage: (options: { sessionId: string; messageId: string; newText: string }): Promise<void> =>
+    WyrePlugin.chatEditMessage(options),
+
+  chatDeleteMessage: (options: { sessionId: string; messageId: string }): Promise<void> =>
+    WyrePlugin.chatDeleteMessage(options),
 
   chatAcceptInvite: (options: { sessionId: string }): Promise<void> =>
     WyrePlugin.chatAcceptInvite(options),

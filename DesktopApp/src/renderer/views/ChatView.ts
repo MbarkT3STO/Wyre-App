@@ -590,25 +590,22 @@ export class ChatView extends Component {
     const canEdit = msg.isOwn && msg.type === 'text';
     const canDelete = msg.isOwn;
 
-    const actionBar = `
+    // ⋮ menu button — always visible on hover, opens a dropdown
+    const menuItems: string[] = [];
+    if (canCopy)   menuItems.push(`<button class="chat-message__menu-item" data-action="copy"><i class="fa-regular fa-copy"></i> Copy</button>`);
+    if (canEdit)   menuItems.push(`<button class="chat-message__menu-item" data-action="edit"><i class="fa-solid fa-pen"></i> Edit</button>`);
+    if (canDelete) menuItems.push(`<button class="chat-message__menu-item chat-message__menu-item--danger" data-action="delete"><i class="fa-solid fa-trash"></i> Delete</button>`);
+
+    const actionBar = menuItems.length > 0 ? `
       <div class="chat-message__actions" role="toolbar" aria-label="Message actions">
-        ${canCopy ? `
-          <button class="chat-message__action-btn" data-action="copy" title="Copy text" aria-label="Copy message text">
-            <i class="fa-regular fa-copy" aria-hidden="true"></i>
-          </button>
-        ` : ''}
-        ${canEdit ? `
-          <button class="chat-message__action-btn" data-action="edit" title="Edit message" aria-label="Edit message">
-            <i class="fa-solid fa-pen" aria-hidden="true"></i>
-          </button>
-        ` : ''}
-        ${canDelete ? `
-          <button class="chat-message__action-btn chat-message__action-btn--danger" data-action="delete" title="Delete message" aria-label="Delete message">
-            <i class="fa-solid fa-trash" aria-hidden="true"></i>
-          </button>
-        ` : ''}
+        <button class="chat-message__action-btn chat-message__action-btn--menu" aria-label="Message options" aria-haspopup="true">
+          <i class="fa-solid fa-ellipsis-vertical" aria-hidden="true"></i>
+        </button>
+        <div class="chat-message__menu" role="menu">
+          ${menuItems.join('')}
+        </div>
       </div>
-    `;
+    ` : '';
 
     wrapper.innerHTML = `
       ${actionBar}
@@ -640,13 +637,36 @@ export class ChatView extends Component {
       });
     }
 
-    // Wire action buttons
-    wrapper.querySelectorAll('.chat-message__action-btn').forEach((btn) => {
+    // Wire ⋮ menu button toggle
+    const menuBtn = wrapper.querySelector('.chat-message__action-btn--menu') as HTMLButtonElement | null;
+    const menuEl  = wrapper.querySelector('.chat-message__menu') as HTMLElement | null;
+    if (menuBtn && menuEl) {
+      menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = menuEl.classList.toggle('chat-message__menu--open');
+        menuBtn.setAttribute('aria-expanded', String(isOpen));
+        if (isOpen) {
+          // Close when clicking outside
+          const close = (ev: MouseEvent): void => {
+            if (!menuEl.contains(ev.target as Node) && ev.target !== menuBtn) {
+              menuEl.classList.remove('chat-message__menu--open');
+              menuBtn.setAttribute('aria-expanded', 'false');
+            }
+            document.removeEventListener('click', close, true);
+          };
+          setTimeout(() => document.addEventListener('click', close, true), 0);
+        }
+      });
+    }
+
+    // Wire menu item clicks
+    wrapper.querySelectorAll('.chat-message__menu-item').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
+        menuEl?.classList.remove('chat-message__menu--open');
         const action = (btn as HTMLElement).dataset['action'];
-        if (action === 'copy') this.handleCopyMessage(msg);
-        else if (action === 'edit') this.handleEditMessage(msg, wrapper);
+        if (action === 'copy')   this.handleCopyMessage(msg);
+        else if (action === 'edit')   this.handleEditMessage(msg, wrapper);
         else if (action === 'delete') void this.handleDeleteMessage(msg, wrapper);
       });
     });
