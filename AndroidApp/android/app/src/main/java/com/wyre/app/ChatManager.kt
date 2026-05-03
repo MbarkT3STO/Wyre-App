@@ -6,141 +6,188 @@ import com.getcapacitor.JSObject
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.net.ServerSocket
 import java.net.Socket
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 
 private const val TAG = "ChatManager"
-private const val CHAT_PORT_OFFSET = 1   // chat listens on transferPort + 1
-private const val HEADER_MAX = 65536
+private const val MAX_TEXT_LENGTH = 10_000
 
 /**
  * ChatManager.kt
- * Implements peer-to-peer chat over a dedicated TCP connection per session.
+ * Implements peer-to-peer chat over the SAME TCP port as file transfers.
  *
- * Wire protocol: newline-delimited JSON frames (same as file transfer / clipboard).
- * Frame types: chat_handshake, chat, chat_ack, chat_edit, chat_delete, chat_close
+ * Wire protocol (identical to desktop ChatServer.ts):
+ *   Initiator → Receiver:
+ *     { "type": "chat_handshake", "senderDeviceId": "...", "senderName": "..." }\n
+ *   Receiver → Initiator:
+ *     { "accepted": true }\n  OR  { "accepted": false }\n
+ *   Both sides then exchange newline-delimited JSON frames:
+ *     { "type": "chat", "id": "...", "senderDeviceId": "...", "msgType": "text", "text": "...", "timestamp": 0 }\n
+ *     { "type": "chat_ack", "id": "..." }\n
+ *     { "type": "chat_edit", "id": "...", "senderDeviceId": "...", "newText": "...", "editedAt": 0 }\n
+ *     { "type": "chat_delete", "id": "...", "senderDeviceId": "..." }\n
+ *     { "type": "chat_close", "senderDeviceId": "..." }\n
  *
- * Each session is a persistent TCP connection:
- *   - Initiator connects to peer's chat port and sends chat_handshake
- *   - Acceptor receives handshake, fires chatInvite event to JS, then sends chat_handshake back
- *   - Both sides can then send chat frames freely
+ * Session IDs match the desktop format: "chat_{peerId}"
+ *
+ * Incoming connections are routed here by TransferServer when it detects
+ * type == "chat_handshake" in the first JSON header line.
  */
 class ChatManager(
     private val executor: ExecutorService,
     private val localDeviceId: String,
     private val localDeviceName: String,
-    private val chatPort: Int,
     private val notifyFn: (event: String, data: JSObject) -> Unit
 ) {
-    // sessionId → active session
-    private val sessions = ConcurrentHashMap<String, ChatSession>()
+    // sessionId → active session state
+    private val sessions = ConcurrentHashMap<String, ChatSessionState>()
 
     // sessionId → open socket (for sending)
     private val sockets = ConcurrentHashMap<String, Socket>()
 
-    // Pending invites waiting for JS accept/decline
+    // sessionId → pending incoming socket (waiting for JS accept/decline)
     private val pendingInvites = ConcurrentHashMap<String, Socket>()
-
-    private var serverSocket: ServerSocket? = null
-    @Volatile private var running = false
-
-    // ── Lifecycle ─────────────────────────────────────────────────────────────
-
-    fun start() {
-        running = true
-        val ss = try {
-            ServerSocket(chatPort)
-        } catch (e: Exception) {
-            Log.e(TAG, "Could not bind chat server on port $chatPort: ${e.message}")
-            return
-        }
-        serverSocket = ss
-        executor.submit {
-            while (running) {
-                try {
-                    val client = ss.accept()
-                    executor.submit { handleIncomingConnection(client) }
-                } catch (_: Exception) {
-                    if (!running) break
-                }
-            }
-        }
-        Log.d(TAG, "Chat server listening on port $chatPort")
-    }
-
-    fun stop() {
-        running = false
-        sockets.values.forEach { runCatching { it.close() } }
-        sockets.clear()
-        pendingInvites.values.forEach { runCatching { it.close() } }
-        pendingInvites.clear()
-        sessions.clear()
-        serverSocket?.close()
-    }
 
     // ── Open session (initiator side) ─────────────────────────────────────────
 
     /**
-     * Opens a chat session with a peer. Connects to peerIp:peerChatPort,
-     * sends a handshake, and waits for the peer's handshake reply.
-     * Returns a JSObject with sessionId, peerId, peerName, connected.
+     * Connects to peerIp:peerPort (the transfer port), sends chat_handshake,
+     * waits for { "accepted": true/false } response.
+     * Runs on a background thread — call from executor.
      */
-    fun openSession(peerId: String, peerName: String, peerIp: String, peerChatPort: Int): JSObject {
-        // Reuse existing connected session if one exists
-        val existing = sessions.values.find { it.peerId == peerId && it.connected }
-        if (existing != null) {
+    fun openSession(peerId: String, peerName: String, peerIp: String, peerPort: Int): JSObject {
+        val sessionId = makeSessionId(peerId)
+
+        // Reuse existing connected session
+        val existing = sessions[sessionId]
+        if (existing != null && sockets[sessionId]?.isClosed == false) {
             return existing.toJSObject()
         }
 
-        val sessionId = buildSessionId(localDeviceId, peerId)
-        val socket = Socket(peerIp, peerChatPort)
+        val socket = Socket(peerIp, peerPort)
         socket.soTimeout = 10_000
+        socket.tcpNoDelay = true
 
         val out = socket.getOutputStream()
 
-        // Send handshake
+        // Send handshake — same format as desktop ChatClient.ts
         val handshake = JSONObject().apply {
             put("type",           "chat_handshake")
             put("senderDeviceId", localDeviceId)
             put("senderName",     localDeviceName)
-            put("sessionId",      sessionId)
         }
         out.write((handshake.toString() + "\n").toByteArray(Charsets.UTF_8))
         out.flush()
 
-        // Wait for peer's handshake reply (with timeout)
+        // Wait for accept/decline response
         val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
-        val replyLine = reader.readLine() ?: throw Exception("Peer closed connection during handshake")
-        val reply = JSONObject(replyLine)
+        val responseLine = reader.readLine()
+            ?: throw Exception("Peer closed connection during handshake")
 
-        if (reply.optString("type") != "chat_handshake") {
+        val response = JSONObject(responseLine)
+        if (!response.optBoolean("accepted", false)) {
             socket.close()
-            throw Exception("Unexpected handshake reply: ${reply.optString("type")}")
+            throw Exception("Chat invite declined by peer")
         }
 
-        val resolvedPeerName = reply.optString("senderName", peerName)
+        socket.soTimeout = 0  // no timeout for live session
 
-        socket.soTimeout = 0  // no timeout for the live session
-
-        val session = ChatSession(
-            id          = sessionId,
-            peerId      = peerId,
-            peerName    = resolvedPeerName,
-            connected   = true,
-            messages    = mutableListOf(),
+        val session = ChatSessionState(
+            id           = sessionId,
+            peerId       = peerId,
+            peerName     = peerName,
+            connected    = true,
+            messages     = mutableListOf(),
             lastActivity = System.currentTimeMillis(),
-            unreadCount = 0
+            unreadCount  = 0
         )
         sessions[sessionId] = session
         sockets[sessionId]  = socket
 
-        // Start reader loop
+        // Start read loop
         executor.submit { readLoop(sessionId, socket, reader) }
 
         return session.toJSObject()
+    }
+
+    // ── Incoming connection (acceptor side) ───────────────────────────────────
+
+    /**
+     * Called by TransferServer when it detects a chat_handshake frame.
+     * The socket is already paused; remainingBuffer contains bytes after the header line.
+     */
+    fun handleIncomingConnection(
+        socket: Socket,
+        handshake: JSONObject,
+        remainingBuffer: ByteArray
+    ) {
+        val peerId    = handshake.getString("senderDeviceId")
+        val peerName  = handshake.optString("senderName", "Unknown")
+        val sessionId = makeSessionId(peerId)
+
+        // Close any existing session for this peer
+        sockets.remove(sessionId)?.let { runCatching { it.close() } }
+
+        val session = ChatSessionState(
+            id           = sessionId,
+            peerId       = peerId,
+            peerName     = peerName,
+            connected    = false,
+            messages     = sessions[sessionId]?.messages ?: mutableListOf(),
+            lastActivity = System.currentTimeMillis(),
+            unreadCount  = 0
+        )
+        sessions[sessionId]       = session
+        pendingInvites[sessionId] = socket
+
+        // Notify JS of the invite
+        val invite = JSObject()
+        invite.put("sessionId", sessionId)
+        invite.put("peerId",    peerId)
+        invite.put("peerName",  peerName)
+        notifyFn("chatInvite", invite)
+    }
+
+    // ── Accept / decline invite ───────────────────────────────────────────────
+
+    fun acceptInvite(sessionId: String) {
+        val socket = pendingInvites.remove(sessionId) ?: return
+        val session = sessions[sessionId] ?: return
+
+        // Send accept response — same format as desktop ChatServer.acceptSession()
+        try {
+            socket.getOutputStream().write(
+                (JSONObject().apply { put("accepted", true) }.toString() + "\n")
+                    .toByteArray(Charsets.UTF_8)
+            )
+            socket.getOutputStream().flush()
+        } catch (e: Exception) {
+            Log.e(TAG, "acceptInvite: failed to send accept: ${e.message}")
+            runCatching { socket.close() }
+            return
+        }
+
+        session.connected = true
+        sockets[sessionId] = socket
+        notifySessionUpdated(sessionId)
+
+        val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
+        executor.submit { readLoop(sessionId, socket, reader) }
+    }
+
+    fun declineInvite(sessionId: String) {
+        val socket = pendingInvites.remove(sessionId) ?: return
+        sessions.remove(sessionId)
+        try {
+            socket.getOutputStream().write(
+                (JSONObject().apply { put("accepted", false) }.toString() + "\n")
+                    .toByteArray(Charsets.UTF_8)
+            )
+            socket.getOutputStream().flush()
+        } catch (_: Exception) {}
+        runCatching { socket.close() }
     }
 
     // ── Close session ─────────────────────────────────────────────────────────
@@ -155,7 +202,7 @@ class ChatManager(
             socket.getOutputStream().write((close.toString() + "\n").toByteArray(Charsets.UTF_8))
             socket.getOutputStream().flush()
         } catch (_: Exception) {}
-        socket.close()
+        runCatching { socket.close() }
         sessions[sessionId]?.connected = false
         notifySessionUpdated(sessionId)
     }
@@ -163,11 +210,12 @@ class ChatManager(
     // ── Send text ─────────────────────────────────────────────────────────────
 
     fun sendText(sessionId: String, text: String): JSObject? {
-        val socket = sockets[sessionId] ?: return null
+        val socket  = sockets[sessionId]  ?: return null
         val session = sessions[sessionId] ?: return null
 
         val messageId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
+        val safeText  = text.take(MAX_TEXT_LENGTH)
 
         val frame = JSONObject().apply {
             put("type",           "chat")
@@ -175,7 +223,7 @@ class ChatManager(
             put("senderDeviceId", localDeviceId)
             put("senderName",     localDeviceName)
             put("msgType",        "text")
-            put("text",           text)
+            put("text",           safeText)
             put("timestamp",      timestamp)
         }
 
@@ -183,16 +231,16 @@ class ChatManager(
             socket.getOutputStream().write((frame.toString() + "\n").toByteArray(Charsets.UTF_8))
             socket.getOutputStream().flush()
 
-            val msg = buildMessage(
-                id        = messageId,
-                sessionId = sessionId,
-                senderId  = localDeviceId,
+            val msg = ChatMessageData(
+                id         = messageId,
+                sessionId  = sessionId,
+                senderId   = localDeviceId,
                 senderName = localDeviceName,
-                isOwn     = true,
-                type      = "text",
-                text      = text,
-                timestamp = timestamp,
-                status    = "sent"
+                isOwn      = true,
+                type       = "text",
+                text       = safeText,
+                timestamp  = timestamp,
+                status     = "sent"
             )
             session.messages.add(msg)
             session.lastActivity = timestamp
@@ -204,43 +252,6 @@ class ChatManager(
             Log.e(TAG, "sendText failed: ${e.message}")
             null
         }
-    }
-
-    // ── Accept / decline invite ───────────────────────────────────────────────
-
-    fun acceptInvite(sessionId: String) {
-        val socket = pendingInvites.remove(sessionId) ?: return
-
-        val session = sessions[sessionId] ?: return
-        sockets[sessionId] = socket
-
-        // Send our handshake back
-        try {
-            val handshake = JSONObject().apply {
-                put("type",           "chat_handshake")
-                put("senderDeviceId", localDeviceId)
-                put("senderName",     localDeviceName)
-                put("sessionId",      sessionId)
-            }
-            socket.getOutputStream().write((handshake.toString() + "\n").toByteArray(Charsets.UTF_8))
-            socket.getOutputStream().flush()
-        } catch (e: Exception) {
-            Log.e(TAG, "acceptInvite handshake failed: ${e.message}")
-            socket.close()
-            return
-        }
-
-        session.connected = true
-        notifySessionUpdated(sessionId)
-
-        val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
-        executor.submit { readLoop(sessionId, socket, reader) }
-    }
-
-    fun declineInvite(sessionId: String) {
-        val socket = pendingInvites.remove(sessionId) ?: return
-        sessions.remove(sessionId)
-        runCatching { socket.close() }
     }
 
     // ── Get sessions ──────────────────────────────────────────────────────────
@@ -256,48 +267,12 @@ class ChatManager(
         notifySessionUpdated(sessionId)
     }
 
-    // ── Incoming connection handler (acceptor side) ───────────────────────────
-
-    private fun handleIncomingConnection(socket: Socket) {
-        try {
-            val reader = BufferedReader(InputStreamReader(socket.getInputStream(), Charsets.UTF_8))
-            val line = reader.readLine() ?: run { socket.close(); return }
-            val json = JSONObject(line)
-
-            when (json.optString("type")) {
-                "chat_handshake" -> {
-                    val peerId    = json.getString("senderDeviceId")
-                    val peerName  = json.getString("senderName")
-                    val sessionId = json.optString("sessionId").ifEmpty { buildSessionId(peerId, localDeviceId) }
-
-                    val session = ChatSession(
-                        id           = sessionId,
-                        peerId       = peerId,
-                        peerName     = peerName,
-                        connected    = false,  // not yet — waiting for JS accept
-                        messages     = mutableListOf(),
-                        lastActivity = System.currentTimeMillis(),
-                        unreadCount  = 0
-                    )
-                    sessions[sessionId]       = session
-                    pendingInvites[sessionId] = socket
-
-                    // Notify JS of the invite
-                    val invite = JSObject()
-                    invite.put("sessionId", sessionId)
-                    invite.put("peerId",    peerId)
-                    invite.put("peerName",  peerName)
-                    notifyFn("chatInvite", invite)
-                }
-                else -> {
-                    Log.w(TAG, "Unexpected first frame type: ${json.optString("type")}")
-                    socket.close()
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "handleIncomingConnection error: ${e.message}")
-            socket.close()
-        }
+    fun stop() {
+        sockets.values.forEach { runCatching { it.close() } }
+        sockets.clear()
+        pendingInvites.values.forEach { runCatching { it.close() } }
+        pendingInvites.clear()
+        sessions.clear()
     }
 
     // ── Read loop ─────────────────────────────────────────────────────────────
@@ -324,25 +299,25 @@ class ChatManager(
 
         when (json.optString("type")) {
             "chat" -> {
-                val messageId  = json.getString("id")
-                val senderId   = json.getString("senderDeviceId")
+                val messageId  = json.optString("id").ifEmpty { return }
+                val senderId   = json.optString("senderDeviceId").ifEmpty { return }
                 val senderName = json.optString("senderName", session.peerName)
                 val msgType    = json.optString("msgType", "text")
-                val text       = json.optString("text")
-                val fileName   = json.optString("fileName")
-                val fileSize   = json.optLong("fileSize", 0L)
+                val text       = json.optString("text").ifEmpty { null }
+                val fileName   = json.optString("fileName").ifEmpty { null }
+                val fileSize   = json.optLong("fileSize", 0L).takeIf { it > 0 }
                 val timestamp  = json.optLong("timestamp", System.currentTimeMillis())
 
-                val msg = buildMessage(
+                val msg = ChatMessageData(
                     id         = messageId,
                     sessionId  = sessionId,
                     senderId   = senderId,
                     senderName = senderName,
                     isOwn      = senderId == localDeviceId,
                     type       = msgType,
-                    text       = text.ifEmpty { null },
-                    fileName   = fileName.ifEmpty { null },
-                    fileSize   = if (fileSize > 0) fileSize else null,
+                    text       = text,
+                    fileName   = fileName,
+                    fileSize   = fileSize,
                     timestamp  = timestamp,
                     status     = "delivered"
                 )
@@ -350,7 +325,7 @@ class ChatManager(
                 session.lastActivity = timestamp
                 session.unreadCount++
 
-                // Send ack
+                // Auto-ack
                 sendAck(sessionId, messageId)
 
                 val payload = JSObject()
@@ -361,9 +336,9 @@ class ChatManager(
             }
 
             "chat_ack" -> {
-                val messageId = json.getString("id")
+                val messageId = json.optString("id").ifEmpty { return }
                 val msg = session.messages.find { it.id == messageId }
-                if (msg != null) {
+                if (msg != null && msg.status != "delivered") {
                     msg.status = "delivered"
                     val payload = JSObject()
                     payload.put("sessionId", sessionId)
@@ -374,8 +349,8 @@ class ChatManager(
             }
 
             "chat_edit" -> {
-                val messageId = json.getString("id")
-                val newText   = json.getString("newText")
+                val messageId = json.optString("id").ifEmpty { return }
+                val newText   = json.optString("newText")
                 val editedAt  = json.optLong("editedAt", System.currentTimeMillis())
                 val msg = session.messages.find { it.id == messageId }
                 if (msg != null) {
@@ -389,7 +364,7 @@ class ChatManager(
             }
 
             "chat_delete" -> {
-                val messageId = json.getString("id")
+                val messageId = json.optString("id").ifEmpty { return }
                 val msg = session.messages.find { it.id == messageId }
                 if (msg != null) {
                     msg.deleted = true
@@ -429,23 +404,8 @@ class ChatManager(
         notifyFn("chatSessionUpdated", payload)
     }
 
-    /** Deterministic session ID from two device IDs (sorted so both sides agree) */
-    private fun buildSessionId(a: String, b: String): String {
-        val sorted = listOf(a, b).sorted()
-        return "${sorted[0]}_${sorted[1]}"
-    }
-
-    private fun buildMessage(
-        id: String, sessionId: String, senderId: String, senderName: String,
-        isOwn: Boolean, type: String, text: String? = null, fileName: String? = null,
-        fileSize: Long? = null, filePath: String? = null, timestamp: Long,
-        status: String
-    ) = ChatMessageData(
-        id = id, sessionId = sessionId, senderId = senderId, senderName = senderName,
-        isOwn = isOwn, type = type, text = text, fileName = fileName,
-        fileSize = fileSize, filePath = filePath, timestamp = timestamp,
-        status = status
-    )
+    /** Session ID format matches desktop: "chat_{peerId}" */
+    fun makeSessionId(peerId: String): String = "chat_$peerId"
 }
 
 // ── Data classes ──────────────────────────────────────────────────────────────
@@ -458,9 +418,9 @@ data class ChatMessageData(
     val isOwn: Boolean,
     val type: String,
     var text: String?,
-    val fileName: String?,
-    val fileSize: Long?,
-    val filePath: String?,
+    val fileName: String? = null,
+    val fileSize: Long? = null,
+    val filePath: String? = null,
     val timestamp: Long,
     var status: String,
     var editedAt: Long? = null,
@@ -486,7 +446,7 @@ data class ChatMessageData(
     }
 }
 
-data class ChatSession(
+data class ChatSessionState(
     val id: String,
     val peerId: String,
     val peerName: String,
@@ -503,7 +463,7 @@ data class ChatSession(
         obj.put("connected",    connected)
         obj.put("lastActivity", lastActivity)
         obj.put("unreadCount",  unreadCount)
-        val msgs = JSArray()
+        val msgs = com.getcapacitor.JSArray()
         messages.forEach { msgs.put(it.toJSObject()) }
         obj.put("messages", msgs)
         return obj

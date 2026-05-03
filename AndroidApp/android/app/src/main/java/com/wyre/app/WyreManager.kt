@@ -55,21 +55,22 @@ class WyreManager(
             settings            = settings,
             onIncomingRequest   = ::onIncomingRequest,
             onEvent             = ::onTransferEvent,
-            onClipboardReceived = ::onClipboardReceived
+            onClipboardReceived = ::onClipboardReceived,
+            onChatHandshake     = { handshake, socket, remaining ->
+                chatManager?.handleIncomingConnection(socket, handshake, remaining)
+                    ?: socket.close()
+            }
         )
         val actualPort = transferServer!!.start()
         if (actualPort != port) settings.setInt("transferPort", actualPort)
 
-        // Chat server listens on transferPort + 1
-        val chatPort = actualPort + 1
+        // ChatManager shares the transfer port — TransferServer routes chat_handshake frames here
         chatManager = ChatManager(
             executor        = executor,
             localDeviceId   = settings.getString("deviceId", java.util.UUID.randomUUID().toString()),
             localDeviceName = settings.getString("deviceName", android.os.Build.MODEL),
-            chatPort        = chatPort,
             notifyFn        = notifyFn
         )
-        chatManager!!.start()
 
         discoveryService = DiscoveryService(
             deviceId   = settings.getString("deviceId", UUID.randomUUID().toString()),
@@ -347,8 +348,8 @@ class WyreManager(
     fun chatOpenSession(deviceId: String): JSObject {
         val device = discoveryService?.getDevices()?.find { it.id == deviceId }
             ?: throw Exception("Device not found or offline")
-        val chatPort = device.port + 1
-        return chatManager?.openSession(device.id, device.name, device.ip, chatPort)
+        // Chat uses the same port as file transfers (multiplexed by header type)
+        return chatManager?.openSession(device.id, device.name, device.ip, device.port)
             ?: throw Exception("Chat service not ready")
     }
 

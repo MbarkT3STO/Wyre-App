@@ -30,7 +30,8 @@ class TransferServer(
     private val settings: SettingsStore,
     private val onIncomingRequest: (IncomingRequest) -> Unit,
     private val onEvent: (TransferEvent) -> Unit,
-    private val onClipboardReceived: ((senderName: String, text: String, truncated: Boolean) -> Unit)? = null
+    private val onClipboardReceived: ((senderName: String, text: String, truncated: Boolean) -> Unit)? = null,
+    private val onChatHandshake: ((handshake: org.json.JSONObject, socket: java.net.Socket, remaining: ByteArray) -> Unit)? = null
 ) {
     private var serverSocket: ServerSocket? = null
     @Volatile private var running = false
@@ -137,6 +138,22 @@ class TransferServer(
                 val truncated  = json.optBoolean("truncated", false)
                 socket.close()
                 onClipboardReceived?.invoke(senderName, text, truncated)
+                return
+            }
+
+            // ── Chat handshake — route to ChatManager ──────────────────────────
+            if (json.optString("type") == "chat_handshake") {
+                // Pass the socket and any bytes already read after the header line
+                val available = inp.available()
+                val chatRemaining = if (available > 0) {
+                    val buf = ByteArray(available)
+                    inp.read(buf)
+                    buf
+                } else {
+                    ByteArray(0)
+                }
+                onChatHandshake?.invoke(json, socket, chatRemaining)
+                    ?: socket.close()  // no handler registered — close gracefully
                 return
             }
 
