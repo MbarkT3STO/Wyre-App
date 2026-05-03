@@ -104,7 +104,7 @@ DesktopApp/
 │   │   │   ├── TransfersView.ts     # Active + history
 │   │   │   ├── ChatView.ts          # Chat sessions
 │   │   │   └── SettingsView.ts
-│   │   ├── styles/                  # CSS design system ("Keyra")
+│   │   ├── styles/                  # CSS design system ("Keyra Tactil Neumorphic")
 │   │   │   ├── tokens.css           # Design tokens (colors, spacing, typography)
 │   │   │   ├── base.css
 │   │   │   ├── components.css
@@ -354,9 +354,9 @@ Tests live in `tests/` and use [Vitest](https://vitest.dev/). They cover:
 
 ---
 
-## 🎨 Design System — Keyra
+## 🎨 Design System — Keyra Tactil Neumorphic
 
-The UI uses a custom design system called **Keyra**, defined in `src/renderer/styles/tokens.css`.
+The UI uses a custom design system called **Keyra Tactil Neumorphic**, defined in `src/renderer/styles/tokens.css`.
 
 - **Primary accent** — `hsl(258, 85%, 55%)` (deep violet/purple)
 - **Font** — Inter Variable (self-hosted, weights 300–900)

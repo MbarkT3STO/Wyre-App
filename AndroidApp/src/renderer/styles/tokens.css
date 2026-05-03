@@ -1,6 +1,6 @@
 /* ============================================================
    tokens.css — Design System Tokens
-   Wyre — Keyra Design Language
+   Wyre — Keyra Tactil Neumorphic Design
    ============================================================ */
 
 /* ── Self-hosted Inter Variable font ───────────────────────── */
@@ -82,7 +82,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════
-   DARK THEME — Keyra "Deep Charcoal"
+   DARK THEME — Keyra Tactil "Deep Charcoal"
    ══════════════════════════════════════════════════════════ */
 [data-theme="dark"], :root {
   /* ── Backgrounds ── */
@@ -185,7 +185,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════
-   LIGHT THEME — Keyra "Soft White"
+   LIGHT THEME — Keyra Tactil "Soft White"
    ══════════════════════════════════════════════════════════ */
 [data-theme="light"] {
   /* ── Backgrounds ── */
