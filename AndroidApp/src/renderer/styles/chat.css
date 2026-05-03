@@ -840,6 +840,82 @@
 }
 
 /* ══════════════════════════════════════════════════════════
+   CLOSE CHAT CONFIRMATION MODAL
+   ══════════════════════════════════════════════════════════ */
+
+.chat-close-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1300;
+  padding: var(--sp-5);
+  animation: backdropIn 180ms var(--ease-out) both;
+}
+
+.chat-close-confirm-backdrop--exit {
+  animation: backdropIn 180ms var(--ease-out) reverse both;
+}
+
+.chat-close-confirm {
+  width: 100%;
+  max-width: 340px;
+  background: var(--bg-app);
+  border-radius: var(--radius-xl);
+  padding: var(--sp-7) var(--sp-6) var(--sp-6);
+  box-shadow: var(--shadow-modal);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-4);
+  animation: inviteModalIn 320ms var(--ease-spring) both;
+  border: 1px solid var(--border-default);
+}
+
+.chat-close-confirm__icon {
+  font-size: 40px;
+  color: var(--danger-text);
+  opacity: 0.85;
+}
+
+.chat-close-confirm__title {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.chat-close-confirm__body {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: center;
+  margin: 0;
+  line-height: var(--leading-relaxed);
+}
+
+.chat-close-confirm__actions {
+  display: flex;
+  gap: var(--sp-3);
+  width: 100%;
+}
+
+.chat-close-confirm__btn--danger {
+  background: var(--danger) !important;
+  box-shadow: 0 4px 16px rgba(239,68,68,0.35) !important;
+}
+
+/* Disabled input area */
+.chat-view__input-area--disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════
    DEVICE CARD CHAT BUTTON   ══════════════════════════════════════════════════════════ */
 
 .device-card__chat-btn {

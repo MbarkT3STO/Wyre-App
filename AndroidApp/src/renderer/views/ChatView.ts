@@ -17,7 +17,12 @@ export class ChatView extends Component {
   private messageListEl: HTMLElement | null = null;
   private inputEl: HTMLTextAreaElement | null = null;
   private sendBtn: HTMLButtonElement | null = null;
+  private attachBtn: HTMLButtonElement | null = null;
   private fileInput: HTMLInputElement | null = null;
+  private inputAreaEl: HTMLElement | null = null;
+  /** Track how many messages have been rendered to do incremental appends */
+  private renderedMsgCount = 0;
+  private renderedSessionId: string | null = null;
 
   constructor(toasts: ToastContainer) {
     super();
@@ -97,13 +102,15 @@ export class ChatView extends Component {
     this.messageListEl = this.element.querySelector('#chat-messages');
     this.inputEl = this.element.querySelector('#chat-input') as HTMLTextAreaElement;
     this.sendBtn = this.element.querySelector('#chat-send-btn') as HTMLButtonElement;
+    this.attachBtn = this.element.querySelector('#chat-attach-btn') as HTMLButtonElement;
     this.fileInput = this.element.querySelector('#chat-file-input') as HTMLInputElement;
+    this.inputAreaEl = this.element.querySelector('.chat-view__input-area') as HTMLElement;
 
     void this.loadSessions();
 
     const unsubSessions = StateManager.subscribe('chatSessions', () => {
       this.renderSessionList();
-      if (this.activeSessionId) this.renderThread(this.activeSessionId);
+      if (this.activeSessionId) this.appendNewMessages(this.activeSessionId);
     });
     this.addCleanup(unsubSessions);
 
@@ -227,6 +234,8 @@ export class ChatView extends Component {
 
   private selectSession(sessionId: string): void {
     this.activeSessionId = sessionId;
+    this.renderedMsgCount = 0;
+    this.renderedSessionId = sessionId;
     StateManager.setState('activeChatSessionId', sessionId);
     this.renderThread(sessionId);
     this.showThread();
@@ -257,10 +266,12 @@ export class ChatView extends Component {
 
     if (!this.messageListEl) return;
     this.messageListEl.innerHTML = '';
+    this.renderedMsgCount = 0;
+    this.renderedSessionId = sessionId;
 
     if (session.messages.length === 0) {
       this.messageListEl.innerHTML = `
-        <div class="chat-view__messages-empty">
+        <div class="chat-view__messages-empty" id="chat-messages-empty">
           <i class="fa-regular fa-comment chat-view__messages-empty-icon"></i>
           <p>Say hello to ${escapeHtml(session.peerName)}!</p>
         </div>
@@ -277,11 +288,85 @@ export class ChatView extends Component {
           lastDate = msgDate;
         }
         this.messageListEl.appendChild(this.createMessageBubble(msg));
+        this.renderedMsgCount++;
       }
     }
 
     this.messageListEl.scrollTop = this.messageListEl.scrollHeight;
-    this.updateSendButton(session.connected);
+    this.setInputDisabled(!session.connected);
+  }
+
+  /** Incremental append — only adds messages not yet in the DOM */
+  private appendNewMessages(sessionId: string): void {
+    if (!this.messageListEl || sessionId !== this.renderedSessionId) return;
+    const session = StateManager.get('chatSessions').get(sessionId);
+    if (!session) return;
+
+    // Update header status
+    const statusEl = this.element?.querySelector('#chat-thread-status');
+    if (statusEl) {
+      statusEl.innerHTML = session.connected
+        ? `<span class="chat-view__status-dot chat-view__status-dot--online"></span> Connected`
+        : `<span class="chat-view__status-dot chat-view__status-dot--offline"></span> Disconnected`;
+    }
+    this.setInputDisabled(!session.connected);
+
+    if (session.messages.length <= this.renderedMsgCount) {
+      // No new messages — patch statuses on existing bubbles
+      this.patchMessageStatuses(session);
+      return;
+    }
+
+    // Remove empty state if present
+    this.messageListEl.querySelector('#chat-messages-empty')?.remove();
+
+    const wasAtBottom = this.isScrolledToBottom();
+    const newMsgs = session.messages.slice(this.renderedMsgCount);
+
+    for (const msg of newMsgs) {
+      this.messageListEl.appendChild(this.createMessageBubble(msg));
+      this.renderedMsgCount++;
+    }
+
+    if (wasAtBottom) {
+      this.messageListEl.scrollTop = this.messageListEl.scrollHeight;
+    }
+  }
+
+  private patchMessageStatuses(session: ChatSession): void {
+    if (!this.messageListEl) return;
+    for (const msg of session.messages) {
+      const el = this.messageListEl.querySelector(`[data-message-id="${msg.id}"]`) as HTMLElement | null;
+      if (!el) continue;
+      if (msg.deleted && !el.querySelector('.chat-message__bubble--deleted')) {
+        el.replaceWith(this.createMessageBubble(msg));
+        continue;
+      }
+      if (msg.isOwn) {
+        const statusEl = el.querySelector('.chat-message__status-icon');
+        if (statusEl) {
+          const newIcon = this.getStatusIcon(msg.status);
+          if (newIcon) statusEl.outerHTML = newIcon;
+        }
+        if (msg.editedAt) {
+          const textEl = el.querySelector('.chat-message__text');
+          if (textEl && msg.text) textEl.innerHTML = escapeHtml(msg.text).replace(/\n/g, '<br>');
+          const meta = el.querySelector('.chat-message__meta');
+          if (meta && !meta.querySelector('.chat-message__edited')) {
+            const badge = document.createElement('span');
+            badge.className = 'chat-message__edited';
+            badge.textContent = 'edited';
+            meta.prepend(badge);
+          }
+        }
+      }
+    }
+  }
+
+  private isScrolledToBottom(): boolean {
+    if (!this.messageListEl) return true;
+    const { scrollTop, scrollHeight, clientHeight } = this.messageListEl;
+    return scrollHeight - scrollTop - clientHeight < 80;
   }
 
   private createMessageBubble(msg: ChatMessage): HTMLElement {
@@ -321,11 +406,12 @@ export class ChatView extends Component {
       const mime = mimeMap[ext] ?? 'image/png';
       contentHtml = `
         <div class="chat-message__image-wrap">
-          <img class="chat-message__image" src="data:${mime};base64,${msg.thumbnail}" alt="${escapeHtml(msg.fileName ?? 'Image')}" loading="lazy" />
+          <img class="chat-message__image" src="data:${mime};base64,${msg.thumbnail}"
+               alt="${escapeHtml(msg.fileName ?? 'Image')}" loading="lazy" />
           ${msg.fileName ? `<span class="chat-message__image-name">${escapeHtml(msg.fileName)}</span>` : ''}
         </div>
       `;
-    } else if (msg.type === 'file') {
+    } else if (msg.type === 'file' || (msg.type === 'image' && !msg.thumbnail)) {
       const sizeStr = msg.fileSize ? formatFileSize(msg.fileSize) : '';
       contentHtml = `
         <div class="chat-message__file">
@@ -334,11 +420,9 @@ export class ChatView extends Component {
             <span class="chat-message__file-name">${escapeHtml(msg.fileName ?? 'File')}</span>
             ${sizeStr ? `<span class="chat-message__file-size">${sizeStr}</span>` : ''}
           </div>
-          ${msg.filePath ? `
-            <button class="btn btn--ghost btn--icon btn--sm chat-message__file-open" data-path="${escapeHtml(msg.filePath)}" aria-label="Open file">
-              <i class="fa-solid fa-arrow-up-right-from-square"></i>
-            </button>
-          ` : ''}
+          <button class="btn btn--ghost btn--icon btn--sm chat-message__file-open" aria-label="Open file">
+            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+          </button>
         </div>
       `;
     }
@@ -357,8 +441,24 @@ export class ChatView extends Component {
     const openBtn = wrapper.querySelector('.chat-message__file-open') as HTMLButtonElement | null;
     if (openBtn) {
       openBtn.addEventListener('click', () => {
-        const path = openBtn.dataset['path'];
-        if (path) void AppBridge.openFile(path);
+        if (msg.filePath) {
+          void AppBridge.openFile(msg.filePath);
+        } else if (msg.thumbnail && msg.fileName) {
+          void this.openBase64File(msg.fileName, msg.thumbnail);
+        }
+      });
+    }
+
+    // Tap image to open full-size
+    const img = wrapper.querySelector('.chat-message__image') as HTMLImageElement | null;
+    if (img) {
+      img.style.cursor = 'pointer';
+      img.addEventListener('click', () => {
+        if (msg.filePath) {
+          void AppBridge.openFile(msg.filePath);
+        } else if (msg.thumbnail && msg.fileName) {
+          void this.openBase64File(msg.fileName, msg.thumbnail);
+        }
       });
     }
 
@@ -587,9 +687,7 @@ export class ChatView extends Component {
   private updateSendButton(connected: boolean): void {
     if (!this.sendBtn || !this.inputEl) return;
     this.sendBtn.disabled = !connected || !this.inputEl.value.trim();
-  }
-
-  private async handleSend(): Promise<void> {
+  }  private async handleSend(): Promise<void> {
     if (!this.inputEl || !this.activeSessionId) return;
     const text = this.inputEl.value.trim();
     if (!text) return;
@@ -600,7 +698,35 @@ export class ChatView extends Component {
     this.updateSendButton(false);
 
     try {
-      await AppBridge.chatSendText({ sessionId, text });
+      const result = await AppBridge.chatSendText({ sessionId, text });
+      // Immediately add the sent message to state so it appears right away.
+      // The native side also fires a chatMessage event but we deduplicate by id.
+      if (result) {
+        const sessions = StateManager.get('chatSessions');
+        const session  = sessions.get(sessionId);
+        if (session) {
+          const alreadyExists = session.messages.some(m => m.id === (result as { messageId?: string }).messageId);
+          if (!alreadyExists) {
+            const settings = StateManager.get('settings');
+            const newMsg: ChatMessage = {
+              id:         (result as { messageId?: string }).messageId ?? crypto.randomUUID(),
+              sessionId,
+              senderId:   settings?.deviceId ?? '',
+              senderName: settings?.deviceName ?? '',
+              isOwn:      true,
+              type:       'text',
+              text,
+              timestamp:  Date.now(),
+              status:     'sent',
+            };
+            StateManager.updateChatSession({
+              ...session,
+              messages:     [...session.messages, newMsg],
+              lastActivity: newMsg.timestamp,
+            });
+          }
+        }
+      }
     } catch (err) {
       this.toasts.error(err instanceof Error ? err.message : 'Failed to send');
     }
@@ -623,12 +749,10 @@ export class ChatView extends Component {
     }
 
     try {
-      // On Android, File.path is not available — read the file as base64 inline
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
           const result = reader.result as string;
-          // Strip the data URL prefix (e.g. "data:image/png;base64,")
           const comma = result.indexOf(',');
           resolve(comma >= 0 ? result.slice(comma + 1) : result);
         };
@@ -636,30 +760,134 @@ export class ChatView extends Component {
         reader.readAsDataURL(file);
       });
 
-      await AppBridge.chatSendFile({
+      const ext     = file.name.split('.').pop()?.toLowerCase() ?? '';
+      const isImage = ['jpg','jpeg','png','gif','webp','bmp','svg'].includes(ext);
+      const msgType = isImage ? 'image' : 'file';
+
+      const result = await AppBridge.chatSendFile({
         sessionId,
-        filePath: '',          // not used on Android — native side reads base64
+        filePath: '',
         fileName: file.name,
         fileSize: file.size,
-        base64,                // extra field passed through to native
+        base64,
       } as Parameters<typeof AppBridge.chatSendFile>[0]);
+
+      // Immediately show the sent file/image in the thread
+      const sessions = StateManager.get('chatSessions');
+      const session  = sessions.get(sessionId);
+      if (session) {
+        const settings = StateManager.get('settings');
+        const newMsg: ChatMessage = {
+          id:         (result as unknown as { messageId?: string } | null)?.messageId ?? crypto.randomUUID(),
+          sessionId,
+          senderId:   settings?.deviceId ?? '',
+          senderName: settings?.deviceName ?? '',
+          isOwn:      true,
+          type:       msgType as 'image' | 'file',
+          fileName:   file.name,
+          fileSize:   file.size,
+          thumbnail:  isImage ? base64 : undefined,
+          timestamp:  Date.now(),
+          status:     'sent',
+        };
+        const alreadyExists = session.messages.some(m => m.id === newMsg.id);
+        if (!alreadyExists) {
+          StateManager.updateChatSession({
+            ...session,
+            messages:     [...session.messages, newMsg],
+            lastActivity: newMsg.timestamp,
+          });
+        }
+      }
     } catch (err) {
       this.toasts.error(err instanceof Error ? err.message : 'Failed to send file');
+    }
+  }
+
+  private setInputDisabled(disabled: boolean): void {
+    if (this.inputEl) {
+      this.inputEl.disabled = disabled;
+      this.inputEl.placeholder = disabled ? 'Chat session ended' : 'Type a message…';
+    }
+    if (this.sendBtn)   this.sendBtn.disabled   = disabled || !this.inputEl?.value.trim();
+    if (this.attachBtn) this.attachBtn.disabled  = disabled;
+    if (this.inputAreaEl) {
+      this.inputAreaEl.classList.toggle('chat-view__input-area--disabled', disabled);
     }
   }
 
   private async handleCloseSession(): Promise<void> {
     if (!this.activeSessionId) return;
     const sessionId = this.activeSessionId;
+
+    // Confirmation modal
+    const confirmed = await this.showCloseConfirm();
+    if (!confirmed) return;
+
     try { await AppBridge.chatCloseSession({ sessionId }); } catch { /* non-fatal */ }
     StateManager.removeChatSession(sessionId);
     this.activeSessionId = null;
+    this.renderedSessionId = null;
+    this.renderedMsgCount = 0;
     StateManager.setState('activeChatSessionId', null);
     this.showSessionList();
     this.renderSessionList();
   }
 
-  protected onUnmount(): void { /* cleanup handled by addCleanup */ }
+  private showCloseConfirm(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'chat-close-confirm-backdrop';
+      backdrop.innerHTML = `
+        <div class="chat-close-confirm" role="dialog" aria-modal="true" aria-label="Close chat">
+          <div class="chat-close-confirm__icon">
+            <i class="fa-solid fa-circle-xmark"></i>
+          </div>
+          <h3 class="chat-close-confirm__title">Close chat?</h3>
+          <p class="chat-close-confirm__body">This will end the session. Messages won't be saved.</p>
+          <div class="chat-close-confirm__actions">
+            <button class="chat-invite-modal__btn chat-invite-modal__btn--decline" id="close-cancel-btn">Cancel</button>
+            <button class="chat-invite-modal__btn chat-invite-modal__btn--accept chat-close-confirm__btn--danger" id="close-confirm-btn">Close</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(backdrop);
+
+      const cleanup = (result: boolean): void => {
+        backdrop.classList.add('chat-close-confirm-backdrop--exit');
+        setTimeout(() => backdrop.remove(), 220);
+        resolve(result);
+      };
+
+      backdrop.querySelector('#close-confirm-btn')?.addEventListener('click', () => cleanup(true));
+      backdrop.querySelector('#close-cancel-btn')?.addEventListener('click',  () => cleanup(false));
+      backdrop.addEventListener('click', (e) => { if (e.target === backdrop) cleanup(false); });
+    });
+  }
+
+  /** Save a base64 payload to the device's Downloads via native, then open it */
+  private async openBase64File(fileName: string, base64: string): Promise<void> {
+    try {
+      // Use AppBridge.chatSaveAndOpen if available, otherwise fall back to a
+      // data-URL anchor download (works in the WebView for images).
+      const ext  = fileName.split('.').pop()?.toLowerCase() ?? '';
+      const mime = ({
+        jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png',
+        gif: 'image/gif', webp: 'image/webp', pdf: 'application/pdf',
+      } as Record<string, string>)[ext] ?? 'application/octet-stream';
+
+      const a = document.createElement('a');
+      a.href     = `data:${mime};base64,${base64}`;
+      a.download = fileName;
+      a.click();
+    } catch (err) {
+      this.toasts.error('Could not open file');
+    }
+  }
+
+  protected onUnmount(): void {
+    this.closeContextMenu();
+  }
 }
 
 function escapeHtml(str: string): string {
