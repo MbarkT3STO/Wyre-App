@@ -289,6 +289,7 @@ class ChatManager(
                 senderName = localDeviceName,
                 isOwn      = true,
                 type       = msgType,
+                text       = null,
                 fileName   = fileName,
                 fileSize   = fileSize,
                 timestamp  = timestamp,
