@@ -1,7 +1,7 @@
 {
   "productName": "Wyre",
   "appId": "com.wyre.app",
-  "copyright": "Copyright © 2024 Wyre",
+  "copyright": "Copyright © 2026 Wyre",
   "directories": {
     "output": "release",
     "buildResources": "assets"

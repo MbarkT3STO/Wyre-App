@@ -195,6 +195,6 @@ Built by **[MBVRK](https://github.com/MbarkT3STO)** — a passion project focuse
 
 <div align="center">
 
-MIT License · © 2025 Wyre
+MIT License · © 2026 Wyre
 
 </div>
