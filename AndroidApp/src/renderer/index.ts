@@ -304,14 +304,22 @@ async function wireEventListeners(): Promise<void> {
     const sessions = StateManager.get('chatSessions');
     const session = sessions.get(sessionId);
     if (session) {
-      const exists = session.messages.some(m => m.id === message.id);
-      if (!exists) {
+      const existingIndex = session.messages.findIndex(m => m.id === message.id);
+      if (existingIndex === -1) {
+        // New message — append it
         StateManager.updateChatSession({
           ...session,
           messages: [...session.messages, message],
           lastActivity: message.timestamp,
           // Only increment unread for messages from the peer, not own messages
           unreadCount: message.isOwn ? session.unreadCount : session.unreadCount + 1,
+        });
+      } else {
+        // Existing message updated (edit or delete) — replace it in-place
+        const updatedMessages = session.messages.map(m => m.id === message.id ? message : m);
+        StateManager.updateChatSession({
+          ...session,
+          messages: updatedMessages,
         });
       }
     } else {
