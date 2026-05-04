@@ -1478,8 +1478,8 @@
 }
 .chat-message__edit-input:focus { border-color: rgba(255,255,255,0.55); }
 [data-theme="light"] .chat-message__edit-input {
-  background: rgba(0,0,0,0.06);
-  border-color: rgba(0,0,0,0.18);
+  background: rgba(255,255,255,0.92);
+  border-color: rgba(255,255,255,0.60);
   color: var(--text-primary);
 }
 
@@ -1504,10 +1504,10 @@
 }
 
 [data-theme="light"] .chat-message__edit-actions .btn--ghost {
-  color: var(--text-secondary);
+  color: rgba(255,255,255,0.85);
 }
 
 [data-theme="light"] .chat-message__edit-actions .btn--ghost:hover {
-  color: var(--text-primary);
-  background: var(--bg-hover);
+  color: #fff;
+  background: rgba(255,255,255,0.18);
 }

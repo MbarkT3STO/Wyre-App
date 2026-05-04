@@ -758,7 +758,10 @@ export class ChatView extends Component {
   private async handleDeleteMessage(msg: ChatMessage, wrapper: HTMLElement): Promise<void> {
     if (!this.activeSessionId || !msg.isOwn) return;
 
-    // Instant optimistic delete — replace with tombstone immediately
+    const confirmed = await this.showDeleteConfirmation();
+    if (!confirmed) return;
+
+    // Optimistic tombstone
     msg.deleted = true;
     const tombstone = this.createMessageBubble(msg);
     wrapper.replaceWith(tombstone);
@@ -775,6 +778,50 @@ export class ChatView extends Component {
       tombstone.replaceWith(restored);
       this.toasts.error('Could not delete message');
     }
+  }
+
+  private showDeleteConfirmation(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const dialogMount = document.getElementById('dialog-mount');
+      if (!dialogMount) { resolve(true); return; }
+
+      const backdrop = document.createElement('div');
+      backdrop.className = 'chat-close-backdrop';
+      backdrop.setAttribute('role', 'dialog');
+      backdrop.setAttribute('aria-modal', 'true');
+      backdrop.setAttribute('aria-label', 'Delete message confirmation');
+
+      backdrop.innerHTML = `
+        <div class="chat-close-modal">
+          <div class="chat-close-modal__icon-wrap" aria-hidden="true">
+            <i class="fa-solid fa-trash chat-close-modal__icon"></i>
+          </div>
+          <h2 class="chat-close-modal__heading">Delete message?</h2>
+          <p class="chat-close-modal__body">This message will be permanently deleted for everyone.</p>
+          <div class="chat-close-modal__actions">
+            <button class="btn btn--secondary" id="delete-msg-cancel">Cancel</button>
+            <button class="btn btn--danger" id="delete-msg-confirm">
+              <i class="fa-solid fa-trash btn__icon" aria-hidden="true"></i>
+              Delete
+            </button>
+          </div>
+        </div>
+      `;
+
+      const cleanup = (): void => { backdrop.remove(); };
+
+      backdrop.querySelector('#delete-msg-confirm')?.addEventListener('click', () => { cleanup(); resolve(true); });
+      backdrop.querySelector('#delete-msg-cancel')?.addEventListener('click', () => { cleanup(); resolve(false); });
+      backdrop.addEventListener('click', (e) => { if (e.target === backdrop) { cleanup(); resolve(false); } });
+
+      const onKey = (e: KeyboardEvent): void => {
+        if (e.key === 'Escape') { document.removeEventListener('keydown', onKey); cleanup(); resolve(false); }
+        if (e.key === 'Enter')  { document.removeEventListener('keydown', onKey); cleanup(); resolve(true); }
+      };
+      document.addEventListener('keydown', onKey);
+      dialogMount.appendChild(backdrop);
+      setTimeout(() => (backdrop.querySelector('#delete-msg-confirm') as HTMLButtonElement | null)?.focus(), 50);
+    });
   }
 
   private getStatusIcon(status: ChatMessage['status']): string {

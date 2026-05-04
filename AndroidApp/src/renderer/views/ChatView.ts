@@ -648,6 +648,9 @@ export class ChatView extends Component {
   private async handleDeleteMessage(msg: ChatMessage, wrapper: HTMLElement): Promise<void> {
     if (!this.activeSessionId || !msg.isOwn) return;
 
+    const confirmed = await this.showDeleteConfirmation();
+    if (!confirmed) return;
+
     // Optimistic tombstone
     msg.deleted = true;
     wrapper.replaceWith(this.createMessageBubble(msg));
@@ -666,6 +669,37 @@ export class ChatView extends Component {
       msg.deleted = false;
       this.toasts.error('Could not delete message');
     }
+  }
+
+  private showDeleteConfirmation(): Promise<boolean> {
+    return new Promise((resolve) => {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'chat-close-confirm-backdrop';
+      backdrop.innerHTML = `
+        <div class="chat-close-confirm" role="dialog" aria-modal="true" aria-label="Delete message">
+          <div class="chat-close-confirm__icon">
+            <i class="fa-solid fa-trash"></i>
+          </div>
+          <h3 class="chat-close-confirm__title">Delete message?</h3>
+          <p class="chat-close-confirm__body">This message will be permanently deleted for everyone.</p>
+          <div class="chat-close-confirm__actions">
+            <button class="chat-invite-modal__btn chat-invite-modal__btn--decline" id="delete-msg-cancel-btn">Cancel</button>
+            <button class="chat-invite-modal__btn chat-invite-modal__btn--accept chat-close-confirm__btn--danger" id="delete-msg-confirm-btn">Delete</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(backdrop);
+
+      const cleanup = (result: boolean): void => {
+        backdrop.classList.add('chat-close-confirm-backdrop--exit');
+        setTimeout(() => backdrop.remove(), 220);
+        resolve(result);
+      };
+
+      backdrop.querySelector('#delete-msg-confirm-btn')?.addEventListener('click', () => cleanup(true));
+      backdrop.querySelector('#delete-msg-cancel-btn')?.addEventListener('click',  () => cleanup(false));
+      backdrop.addEventListener('click', (e) => { if (e.target === backdrop) cleanup(false); });
+    });
   }
 
   private getStatusIcon(status: ChatMessage['status']): string {
