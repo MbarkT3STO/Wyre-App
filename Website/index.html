@@ -493,16 +493,44 @@
         <p class="section-subtitle">Available on all major platforms. MIT licensed and open source.</p>
       </div>
       <div class="download__grid">
-        <a href="#" class="download-card">
-          <div class="download-card__icon download-card__icon--windows">
-            <i class="fa-brands fa-windows"></i>
+
+        <!-- Windows — trigger card + dropdown wrapper -->
+        <div class="macos-wrap" id="windowsWrap">
+          <div class="download-card download-card--macos-trigger" id="windowsTrigger" role="button" tabindex="0" aria-haspopup="true" aria-expanded="false">
+            <div class="download-card__icon download-card__icon--windows">
+              <i class="fa-brands fa-windows"></i>
+            </div>
+            <div class="download-card__info">
+              <span class="download-card__platform">Windows</span>
+              <span class="download-card__format">Installer &amp; Portable · x64</span>
+            </div>
+            <i class="fa-solid fa-chevron-down download-card__arrow download-card__chevron"></i>
           </div>
-          <div class="download-card__info">
-            <span class="download-card__platform">Windows</span>
-            <span class="download-card__format">NSIS Installer · x64</span>
+          <div class="macos-dropdown" id="windowsDropdown" role="menu">
+            <div class="macos-dropdown__arrow"></div>
+            <a href="https://github.com/MbarkT3STO/Wyre-App/releases/download/v1.0.0/Wyre.Setup.1.0.0.exe" class="macos-dropdown__item" role="menuitem">
+              <div class="macos-dropdown__item-icon">
+                <i class="fa-solid fa-box-open"></i>
+              </div>
+              <div class="macos-dropdown__item-info">
+                <span class="macos-dropdown__item-name">Installer</span>
+                <span class="macos-dropdown__item-sub">NSIS Setup · x64</span>
+              </div>
+              <i class="fa-solid fa-download macos-dropdown__item-dl"></i>
+            </a>
+            <div class="macos-dropdown__divider"></div>
+            <a href="https://github.com/MbarkT3STO/Wyre-App/releases/download/v1.0.0/Wyre-1.0.0-Portable.exe" class="macos-dropdown__item" role="menuitem">
+              <div class="macos-dropdown__item-icon">
+                <i class="fa-solid fa-box"></i>
+              </div>
+              <div class="macos-dropdown__item-info">
+                <span class="macos-dropdown__item-name">Portable</span>
+                <span class="macos-dropdown__item-sub">No install needed · x64</span>
+              </div>
+              <i class="fa-solid fa-download macos-dropdown__item-dl"></i>
+            </a>
           </div>
-          <i class="fa-solid fa-download download-card__arrow"></i>
-        </a>
+        </div>
 
         <!-- macOS — trigger card + dropdown wrapper -->
         <div class="macos-wrap" id="macosWrap">
@@ -519,7 +547,7 @@
           <!-- Dropdown sits inside the wrapper, absolutely positioned below the card -->
           <div class="macos-dropdown" id="macosDropdown" role="menu">
             <div class="macos-dropdown__arrow"></div>
-            <a href="#" class="macos-dropdown__item" role="menuitem">
+            <a href="https://github.com/MbarkT3STO/Wyre-App/releases/download/v1.0.0/Wyre-1.0.0-arm64.dmg" class="macos-dropdown__item" role="menuitem">
               <div class="macos-dropdown__item-icon">
                 <i class="fa-solid fa-microchip"></i>
               </div>
@@ -530,7 +558,7 @@
               <i class="fa-solid fa-download macos-dropdown__item-dl"></i>
             </a>
             <div class="macos-dropdown__divider"></div>
-            <a href="#" class="macos-dropdown__item" role="menuitem">
+            <a href="https://github.com/MbarkT3STO/Wyre-App/releases/download/v1.0.0/Wyre-1.0.0.dmg" class="macos-dropdown__item" role="menuitem">
               <div class="macos-dropdown__item-icon">
                 <i class="fa-solid fa-microchip"></i>
               </div>
@@ -543,7 +571,7 @@
           </div>
         </div>
 
-        <a href="#" class="download-card">
+        <a href="https://github.com/MbarkT3STO/Wyre-App/releases/download/v1.0.0/Wyre-1.0.0.AppImage" class="download-card">
           <div class="download-card__icon download-card__icon--linux">
             <i class="fa-brands fa-linux"></i>
           </div>
@@ -553,7 +581,7 @@
           </div>
           <i class="fa-solid fa-download download-card__arrow"></i>
         </a>
-        <a href="#" class="download-card">
+        <a href="https://github.com/MbarkT3STO/Wyre-App/releases/download/v1.0.0/Wyre-1.0.0.apk" class="download-card">
           <div class="download-card__icon download-card__icon--android">
             <i class="fa-brands fa-android"></i>
           </div>

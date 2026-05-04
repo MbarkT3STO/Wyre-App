@@ -159,6 +159,50 @@
     });
   }
 
+  /* ── Windows dropdown ─────────────────────────────────── */
+  const windowsTrigger  = document.getElementById('windowsTrigger');
+  const windowsDropdown = document.getElementById('windowsDropdown');
+
+  function openWindowsDropdown() {
+    windowsDropdown.classList.add('open');
+    windowsTrigger.classList.add('open');
+    windowsTrigger.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeWindowsDropdown() {
+    windowsDropdown.classList.remove('open');
+    windowsTrigger.classList.remove('open');
+    windowsTrigger.setAttribute('aria-expanded', 'false');
+  }
+
+  if (windowsTrigger && windowsDropdown) {
+
+    windowsTrigger.addEventListener('click', function (e) {
+      e.stopPropagation();
+      windowsDropdown.classList.contains('open') ? closeWindowsDropdown() : openWindowsDropdown();
+    });
+
+    windowsTrigger.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        windowsDropdown.classList.contains('open') ? closeWindowsDropdown() : openWindowsDropdown();
+      }
+    });
+
+    document.addEventListener('click', function (e) {
+      if (
+        !windowsTrigger.contains(e.target) &&
+        !windowsDropdown.contains(e.target)
+      ) {
+        closeWindowsDropdown();
+      }
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') closeWindowsDropdown();
+    });
+  }
+
   /* ── Mockup device selection animation ───────────────── */
   const mockupDevices = document.querySelectorAll('.mockup-device');
   let currentSelected = 0;
