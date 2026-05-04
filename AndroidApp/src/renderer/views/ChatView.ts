@@ -447,11 +447,7 @@ export class ChatView extends Component {
     const openBtn = wrapper.querySelector('.chat-message__file-open') as HTMLButtonElement | null;
     if (openBtn) {
       openBtn.addEventListener('click', () => {
-        if (msg.filePath) {
-          void AppBridge.openFile(msg.filePath);
-        } else if (msg.thumbnail && msg.fileName) {
-          void this.openBase64File(msg.fileName, msg.thumbnail);
-        }
+        void this.handleOpenFile(msg);
       });
     }
 
@@ -460,22 +456,21 @@ export class ChatView extends Component {
     if (img) {
       img.style.cursor = 'pointer';
       img.addEventListener('click', () => {
-        if (msg.filePath) {
-          void AppBridge.openFile(msg.filePath);
-        } else if (msg.thumbnail && msg.fileName) {
-          void this.openBase64File(msg.fileName, msg.thumbnail);
-        }
+        void this.handleOpenFile(msg);
       });
     }
 
-    const canCopy      = msg.type === 'text' && !!msg.text;
-    const canEdit      = msg.isOwn && msg.type === 'text';
-    const canDelete    = msg.isOwn;
-    const canOpenFile  = (msg.type === 'file' || msg.type === 'image') && !!(msg.filePath || msg.thumbnail);
+    const canCopy       = msg.type === 'text' && !!msg.text;
+    const canEdit       = msg.isOwn && msg.type === 'text';
+    const canDelete     = msg.isOwn;
+    // "Open" is available if we have a path OR a thumbnail (image) to save+open
+    const canOpenFile   = (msg.type === 'file' || msg.type === 'image') && !!(msg.filePath || msg.thumbnail);
+    // "Save to Downloads" for peer images that only have thumbnail data
+    const canSaveFile   = !msg.isOwn && msg.type === 'image' && !!msg.thumbnail && !msg.filePath;
     const canOpenFolder = msg.type === 'file' && !!msg.filePath;
 
-    if (canCopy || canEdit || canDelete || canOpenFile || canOpenFolder) {
-      this.wireLongPress(wrapper, msg, canCopy, canEdit, canDelete, canOpenFile, canOpenFolder);
+    if (canCopy || canEdit || canDelete || canOpenFile || canSaveFile || canOpenFolder) {
+      this.wireLongPress(wrapper, msg, canCopy, canEdit, canDelete, canOpenFile, canSaveFile, canOpenFolder);
     }
 
     return wrapper;
@@ -490,6 +485,7 @@ export class ChatView extends Component {
     canEdit: boolean,
     canDelete: boolean,
     canOpenFile: boolean = false,
+    canSaveFile: boolean = false,
     canOpenFolder: boolean = false,
   ): void {
     let pressTimer: ReturnType<typeof setTimeout> | null = null;
@@ -502,11 +498,12 @@ export class ChatView extends Component {
       menu.setAttribute('role', 'menu');
 
       const items: Array<{ icon: string; label: string; action: string; danger?: boolean }> = [];
-      if (canCopy)       items.push({ icon: 'fa-regular fa-copy',         label: 'Copy',        action: 'copy' });
-      if (canOpenFile)   items.push({ icon: 'fa-solid fa-arrow-up-right-from-square', label: 'Open', action: 'open' });
-      if (canOpenFolder) items.push({ icon: 'fa-solid fa-folder-open',    label: 'Open Folder', action: 'folder' });
-      if (canEdit)       items.push({ icon: 'fa-solid fa-pen',            label: 'Edit',        action: 'edit' });
-      if (canDelete)     items.push({ icon: 'fa-solid fa-trash',          label: 'Delete',      action: 'delete', danger: true });
+      if (canCopy)       items.push({ icon: 'fa-regular fa-copy',                        label: 'Copy',              action: 'copy' });
+      if (canOpenFile)   items.push({ icon: 'fa-solid fa-arrow-up-right-from-square',    label: 'Open',              action: 'open' });
+      if (canSaveFile)   items.push({ icon: 'fa-solid fa-download',                      label: 'Save to Downloads', action: 'save' });
+      if (canOpenFolder) items.push({ icon: 'fa-solid fa-folder-open',                   label: 'Open Folder',       action: 'folder' });
+      if (canEdit)       items.push({ icon: 'fa-solid fa-pen',                           label: 'Edit',              action: 'edit' });
+      if (canDelete)     items.push({ icon: 'fa-solid fa-trash',                         label: 'Delete',            action: 'delete', danger: true });
 
       menu.innerHTML = items.map(item => `
         <button class="chat-context-menu__item${item.danger ? ' chat-context-menu__item--danger' : ''}"
@@ -531,6 +528,7 @@ export class ChatView extends Component {
           this.closeContextMenu();
           if (action === 'copy')   this.handleCopyMessage(msg);
           else if (action === 'open')   void this.handleOpenFile(msg);
+          else if (action === 'save')   void this.handleSaveFile(msg);
           else if (action === 'folder') void this.handleOpenFolder(msg);
           else if (action === 'edit')   this.handleEditMessage(msg, wrapper);
           else if (action === 'delete') void this.handleDeleteMessage(msg, wrapper);
@@ -572,10 +570,41 @@ export class ChatView extends Component {
   // ── Message action handlers ────────────────────────────────────────────────
 
   private async handleOpenFile(msg: ChatMessage): Promise<void> {
+    // Case 1: we have a real file path — open it directly
     if (msg.filePath) {
-      void AppBridge.openFile(msg.filePath);
-    } else if (msg.thumbnail && msg.fileName) {
-      void this.openBase64File(msg.fileName, msg.thumbnail);
+      try {
+        await AppBridge.openFile(msg.filePath);
+      } catch {
+        this.toasts.error('Could not open file');
+      }
+      return;
+    }
+
+    // Case 2: image with base64 thumbnail — save to Downloads then open
+    if (msg.type === 'image' && msg.thumbnail && msg.fileName) {
+      try {
+        const { path } = await AppBridge.chatSaveFile({ fileName: msg.fileName, base64: msg.thumbnail });
+        await AppBridge.openFile(path);
+      } catch {
+        this.toasts.error('Could not open file');
+      }
+      return;
+    }
+
+    // Case 3: no accessible data
+    this.toasts.warning('File is not available on this device');
+  }
+
+  private async handleSaveFile(msg: ChatMessage): Promise<void> {
+    if (!msg.thumbnail || !msg.fileName) {
+      this.toasts.warning('File data is not available');
+      return;
+    }
+    try {
+      await AppBridge.chatSaveFile({ fileName: msg.fileName, base64: msg.thumbnail });
+      this.toasts.success(`Saved "${msg.fileName}" to Downloads`);
+    } catch {
+      this.toasts.error('Could not save file');
     }
   }
 
@@ -912,16 +941,6 @@ export class ChatView extends Component {
       backdrop.querySelector('#close-cancel-btn')?.addEventListener('click',  () => cleanup(false));
       backdrop.addEventListener('click', (e) => { if (e.target === backdrop) cleanup(false); });
     });
-  }
-
-  /** Save a base64 payload to Downloads via native, then open it */
-  private async openBase64File(fileName: string, base64: string): Promise<void> {
-    try {
-      const { path } = await AppBridge.chatSaveFile({ fileName, base64 });
-      await AppBridge.openFile(path);
-    } catch {
-      this.toasts.error('Could not open file');
-    }
   }
 
   protected onUnmount(): void {
