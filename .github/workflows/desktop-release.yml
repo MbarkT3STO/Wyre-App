@@ -37,6 +37,18 @@ jobs:
         run: npm run package -- --mac --x64 --arm64
 
       - name: Upload macOS artifacts
+        id: upload-mac
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: release-mac
+          path: |
+            DesktopApp/release/*.dmg
+            DesktopApp/release/*.dmg.blockmap
+          retention-days: 7
+
+      - name: Upload macOS artifacts (retry)
+        if: steps.upload-mac.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: release-mac
@@ -44,6 +56,7 @@ jobs:
             DesktopApp/release/*.dmg
             DesktopApp/release/*.dmg.blockmap
           retention-days: 7
+          overwrite: true
 
   # ── Windows ────────────────────────────────────────────────────────────────
   build-win:
