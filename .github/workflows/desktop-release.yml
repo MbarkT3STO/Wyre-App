@@ -36,6 +36,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run package -- --mac --x64
 
+      - name: Upload artifact
+        id: upload-mac-x64
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: Wyre-macOS-Intel-x64
+          path: DesktopApp/release/*.dmg
+          retention-days: 7
+
+      - name: Upload artifact (retry)
+        if: steps.upload-mac-x64.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wyre-macOS-Intel-x64
+          path: DesktopApp/release/*.dmg
+          retention-days: 7
+          overwrite: true
+
       - name: Publish to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -73,6 +91,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run package -- --mac --arm64
+
+      - name: Upload artifact
+        id: upload-mac-arm64
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: Wyre-macOS-AppleSilicon-arm64
+          path: DesktopApp/release/*.dmg
+          retention-days: 7
+
+      - name: Upload artifact (retry)
+        if: steps.upload-mac-arm64.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wyre-macOS-AppleSilicon-arm64
+          path: DesktopApp/release/*.dmg
+          retention-days: 7
+          overwrite: true
 
       - name: Publish to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -112,6 +148,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run package -- --win nsis --x64
 
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wyre-Windows-x64-Installer
+          path: DesktopApp/release/*-Setup.exe
+          retention-days: 7
+
       - name: Publish to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
@@ -120,7 +163,7 @@ jobs:
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: false
-          files: DesktopApp/release/*.exe
+          files: DesktopApp/release/*-Setup.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -149,6 +192,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run package -- --win portable --x64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wyre-Windows-x64-Portable
+          path: DesktopApp/release/*.exe
+          retention-days: 7
 
       - name: Publish to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -187,6 +237,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run package -- --linux AppImage --x64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Wyre-Linux-x64-AppImage
+          path: DesktopApp/release/*.AppImage
+          retention-days: 7
 
       - name: Publish to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
