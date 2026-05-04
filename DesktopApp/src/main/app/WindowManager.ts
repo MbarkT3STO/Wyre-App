@@ -106,6 +106,8 @@ export class WindowManager {
       trafficLightPosition: { x: 16, y: 16 },
       backgroundColor: '#0a0812',
       show: false,
+      // Ensure no per-window menu bar appears on Windows/Linux
+      autoHideMenuBar: true,
       webPreferences: {
         preload: join(__dirname, '../preload/index.js'),
         contextIsolation: true,
@@ -115,12 +117,32 @@ export class WindowManager {
       },
     });
 
+    // Belt-and-suspenders: explicitly remove the per-window menu on all platforms
+    this.mainWindow.setMenu(null);
+
     // Restore maximized state after creation so the window has correct bounds first
     if (maximized) {
       this.mainWindow.maximize();
     }
 
-    // ── DevTools lockdown removed for development ────────────────────────────
+    // ── DevTools: completely disabled in production ───────────────────────────
+    if (!isDev) {
+      // Block the devtools-opened event and close immediately if somehow triggered
+      this.mainWindow.webContents.on('devtools-opened', () => {
+        this.mainWindow?.webContents.closeDevTools();
+      });
+
+      // Block keyboard shortcuts that open DevTools (F12, Ctrl+Shift+I, Cmd+Option+I)
+      this.mainWindow.webContents.on('before-input-event', (_event, input) => {
+        const isDevToolsShortcut =
+          input.key === 'F12' ||
+          (input.key === 'I' && input.control && input.shift) ||
+          (input.key === 'I' && input.meta && input.alt);
+        if (isDevToolsShortcut) {
+          _event.preventDefault();
+        }
+      });
+    }
 
     // Load the renderer
     if (process.env['VITE_DEV_SERVER_URL']) {
@@ -128,9 +150,6 @@ export class WindowManager {
     } else {
       this.mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
     }
-
-    // Open DevTools automatically
-    this.mainWindow.webContents.openDevTools();
 
     // Show window when ready to avoid flash
     this.mainWindow.once('ready-to-show', () => {

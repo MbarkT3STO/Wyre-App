@@ -53,9 +53,14 @@ export class AppBootstrapper {
   async bootstrap(): Promise<void> {
     await app.whenReady();
 
-    // Remove the default Electron application menu on every platform.
-    // Must be called before any window is created so it takes effect immediately.
-    Menu.setApplicationMenu(null);
+    // ── Disable the application menu on all platforms ────────────────────────
+    // On Windows/Linux: null removes the menu bar entirely.
+    // On macOS: null causes Electron to fall back to a built-in default menu
+    // that includes "View > Toggle Developer Tools". We use an empty Menu
+    // instead so the macOS menu bar shows nothing beyond the app name stub.
+    Menu.setApplicationMenu(
+      process.platform === 'darwin' ? Menu.buildFromTemplate([]) : null,
+    );
 
     const settings = this.settingsStore.get();
 
