@@ -18,8 +18,7 @@
   "mac": {
     "target": [
       {
-        "target": "dmg",
-        "arch": ["x64", "arm64"]
+        "target": "dmg"
       }
     ],
     "icon": "assets/icons/icon.icns",
@@ -50,16 +49,7 @@
     "category": "Utility"
   },
   "dmg": {
-    "title": "Wyre",
-    "background": null,
-    "contents": [
-      { "x": 130, "y": 220 },
-      { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
-    ],
-    "window": {
-      "width": 540,
-      "height": 380
-    }
+    "title": "Wyre"
   },
   "nsis": {
     "oneClick": false,
