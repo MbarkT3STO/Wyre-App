@@ -68,8 +68,8 @@
   },
   "publish": {
     "provider": "github",
-    "owner": "your-org",
-    "repo": "wyre",
+    "owner": "MbarkT3STO",
+    "repo": "Wyre-App",
     "releaseType": "release"
   }
 }
